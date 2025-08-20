@@ -1,0 +1,32 @@
+const PatternLearning = {
+  beginner: {
+    pattern: "<imię> jest z <miasto>",
+    examples: [
+      "Jan jest z Warszawy",
+      "Anna jest z Krakowa", 
+      "Piotr jest z Gdańska",
+      "Maria jest z Poznania",
+      "Tomek jest z Wrocławia"
+    ],
+    exercise: "Uzupełnij: Kasia jest z ___"
+  },
+  
+  intermediate: {
+    pattern: "<imię> pracuje jako <zawód>",
+    examples: [
+      "Jan pracuje jako programista",
+      "Anna pracuje jako lekarka",
+      "Piotr pracuje jako nauczyciel"
+    ],
+    exercise: "Stwórz zdanie o Marku który jest mechanikiem"
+  },
+  
+  advanced: {
+    pattern: "<imię> jest z <miasto> i pracuje jako <zawód>",
+    examples: [
+      "Jan jest z Warszawy i pracuje jako programista",
+      "Anna jest z Krakowa i pracuje jako lekarka"
+    ],
+    exercise: "Połącz informacje o Tomku (Gdańsk, kucharz)"
+  }
+};
