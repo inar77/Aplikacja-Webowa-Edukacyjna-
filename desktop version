@@ -521,3 +521,430 @@ const CareerWebApp = () => {
 };
 
 export default CareerWebApp;
+
+
+
+
+import React, { useState } from 'react';
+import { 
+  Home, Target, Trophy, ShoppingBag, Users, User, Settings,
+  Zap, Clock, CheckCircle, Lock, Flame, Star, Bell,
+  MessageSquare, TrendingUp, Award, Book, Code, Briefcase,
+  ChevronRight, ChevronDown, Search, LogOut
+} from 'lucide-react';
+
+const CareerWebApp = () => {
+  const [activeSection, setActiveSection] = useState('home');
+  const [user] = useState({
+    name: 'Jan Kowalski',
+    level: 3,
+    xp: 240,
+    xpToNext: 500,
+    totalXp: 1240,
+    coins: 150,
+    currentPath: 'Programista',
+    streak: 7,
+    avatar: '👤'
+  });
+
+  // Top Navigation Bar (Facebook style)
+  const TopBar = () => (
+    <div className="bg-blue-600 border-b-2 border-blue-700 h-12 fixed top-0 left-0 right-0 z-50">
+      <div className="max-w-screen-xl mx-auto px-4 h-full flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <h1 className="text-white font-bold text-xl">PathFinder</h1>
+          <div className="relative">
+            <input 
+              type="text" 
+              placeholder="Szukaj zadań..."
+              className="bg-white/10 text-white placeholder-white/70 px-3 py-1 rounded text-sm w-64 focus:bg-white focus:text-gray-900 focus:placeholder-gray-500 transition-all"
+            />
+            <Search className="absolute right-2 top-1.5 w-4 h-4 text-white/70" />
+          </div>
+        </div>
+        
+        <div className="flex items-center space-x-6">
+          <button className="text-white hover:text-white/80 text-sm">Główna</button>
+          <button className="text-white hover:text-white/80 text-sm">Profil</button>
+          
+          <div className="flex items-center space-x-3 border-l border-blue-500 pl-6">
+            <button className="relative">
+              <MessageSquare className="w-5 h-5 text-white" />
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">3</span>
+            </button>
+            <button className="relative">
+              <Bell className="w-5 h-5 text-white" />
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">5</span>
+            </button>
+            <button>
+              <Settings className="w-5 h-5 text-white" />
+            </button>
+            <button>
+              <LogOut className="w-5 h-5 text-white" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Left Sidebar
+  const LeftSidebar = () => (
+    <div className="w-64 fixed left-0 top-12 bottom-0 bg-gray-50 border-r border-gray-300 overflow-y-auto">
+      {/* User Profile Card */}
+      <div className="p-4 bg-white border-b">
+        <div className="flex items-center space-x-3">
+          <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center text-2xl">
+            {user.avatar}
+          </div>
+          <div>
+            <p className="font-semibold text-gray-900">{user.name}</p>
+            <p className="text-sm text-gray-600">Poziom {user.level} • {user.currentPath}</p>
+          </div>
+        </div>
+        
+        <div className="mt-4 space-y-2">
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-600">XP</span>
+            <span className="font-medium">{user.xp}/{user.xpToNext}</span>
+          </div>
+          <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-blue-500 transition-all"
+              style={{ width: `${(user.xp / user.xpToNext) * 100}%` }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Navigation Menu */}
+      <div className="p-2">
+        <button 
+          onClick={() => setActiveSection('home')}
+          className={`w-full flex items-center space-x-3 px-3 py-2 rounded hover:bg-gray-200 transition-colors ${
+            activeSection === 'home' ? 'bg-gray-200 font-medium' : ''
+          }`}
+        >
+          <Home className="w-5 h-5 text-gray-600" />
+          <span>Strona główna</span>
+        </button>
+        
+        <button 
+          onClick={() => setActiveSection('tasks')}
+          className={`w-full flex items-center space-x-3 px-3 py-2 rounded hover:bg-gray-200 transition-colors ${
+            activeSection === 'tasks' ? 'bg-gray-200 font-medium' : ''
+          }`}
+        >
+          <Target className="w-5 h-5 text-gray-600" />
+          <span>Zadania</span>
+          <span className="ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">12</span>
+        </button>
+        
+        <button 
+          onClick={() => setActiveSection('courses')}
+          className={`w-full flex items-center space-x-3 px-3 py-2 rounded hover:bg-gray-200 transition-colors ${
+            activeSection === 'courses' ? 'bg-gray-200 font-medium' : ''
+          }`}
+        >
+          <Book className="w-5 h-5 text-gray-600" />
+          <span>Kursy</span>
+        </button>
+        
+        <button 
+          onClick={() => setActiveSection('shop')}
+          className={`w-full flex items-center space-x-3 px-3 py-2 rounded hover:bg-gray-200 transition-colors ${
+            activeSection === 'shop' ? 'bg-gray-200 font-medium' : ''
+          }`}
+        >
+          <ShoppingBag className="w-5 h-5 text-gray-600" />
+          <span>Sklep</span>
+        </button>
+        
+        <button 
+          onClick={() => setActiveSection('community')}
+          className={`w-full flex items-center space-x-3 px-3 py-2 rounded hover:bg-gray-200 transition-colors ${
+            activeSection === 'community' ? 'bg-gray-200 font-medium' : ''
+          }`}
+        >
+          <Users className="w-5 h-5 text-gray-600" />
+          <span>Społeczność</span>
+        </button>
+        
+        <button 
+          onClick={() => setActiveSection('achievements')}
+          className={`w-full flex items-center space-x-3 px-3 py-2 rounded hover:bg-gray-200 transition-colors ${
+            activeSection === 'achievements' ? 'bg-gray-200 font-medium' : ''
+          }`}
+        >
+          <Trophy className="w-5 h-5 text-gray-600" />
+          <span>Osiągnięcia</span>
+        </button>
+      </div>
+
+      {/* Quick Stats */}
+      <div className="p-4 border-t">
+        <p className="text-xs text-gray-500 uppercase tracking-wider mb-3">Statystyki</p>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Flame className="w-4 h-4 text-orange-500" />
+              <span className="text-sm">Seria</span>
+            </div>
+            <span className="font-bold">{user.streak} dni</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <div className="w-4 h-4 bg-yellow-400 rounded-full" />
+              <span className="text-sm">Monety</span>
+            </div>
+            <span className="font-bold">{user.coins}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Star className="w-4 h-4 text-blue-500" />
+              <span className="text-sm">Całkowite XP</span>
+            </div>
+            <span className="font-bold">{user.totalXp}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Right Sidebar
+  const RightSidebar = () => (
+    <div className="w-64 fixed right-0 top-12 bottom-0 bg-gray-50 border-l border-gray-300 overflow-y-auto">
+      {/* Friends Online */}
+      <div className="p-4 bg-white border-b">
+        <h3 className="font-semibold text-gray-900 mb-3">Znajomi online (8)</h3>
+        <div className="space-y-2">
+          {['Anna W.', 'Michał K.', 'Piotr N.', 'Kasia M.'].map((friend) => (
+            <button key={friend} className="w-full flex items-center space-x-2 hover:bg-gray-50 p-1 rounded">
+              <div className="w-2 h-2 bg-green-500 rounded-full" />
+              <span className="text-sm">{friend}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Recent Achievements */}
+      <div className="p-4 bg-white border-b">
+        <h3 className="font-semibold text-gray-900 mb-3">Ostatnie osiągnięcia</h3>
+        <div className="space-y-3">
+          <div className="flex items-start space-x-2">
+            <span className="text-xl">🏆</span>
+            <div>
+              <p className="text-sm font-medium">Pierwszy tydzień</p>
+              <p className="text-xs text-gray-500">2 dni temu</p>
+            </div>
+          </div>
+          <div className="flex items-start space-x-2">
+            <span className="text-xl">🐍</span>
+            <div>
+              <p className="text-sm font-medium">Python Master</p>
+              <p className="text-xs text-gray-500">Tydzień temu</p>
+            </div>
+          </div>
+          <div className="flex items-start space-x-2">
+            <span className="text-xl">⚡</span>
+            <div>
+              <p className="text-sm font-medium">Speed Learner</p>
+              <p className="text-xs text-gray-500">2 tygodnie temu</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Leaderboard */}
+      <div className="p-4 bg-white">
+        <h3 className="font-semibold text-gray-900 mb-3">Ranking tygodnia</h3>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <span className="text-sm font-bold text-yellow-500">1.</span>
+              <span className="text-sm">Tomek R.</span>
+            </div>
+            <span className="text-sm font-medium">1,250 XP</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <span className="text-sm font-bold text-gray-400">2.</span>
+              <span className="text-sm">Maria K.</span>
+            </div>
+            <span className="text-sm font-medium">980 XP</span>
+          </div>
+          <div className="flex items-center justify-between bg-blue-50 px-2 py-1 rounded">
+            <div className="flex items-center space-x-2">
+              <span className="text-sm font-bold text-blue-500">3.</span>
+              <span className="text-sm font-medium">Ty</span>
+            </div>
+            <span className="text-sm font-medium">750 XP</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Main Content Area
+  const MainContent = () => {
+    if (activeSection === 'home') {
+      return (
+        <div className="space-y-4">
+          {/* Daily Goal Card */}
+          <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold mb-2">Witaj z powrotem, {user.name.split(' ')[0]}!</h2>
+                <p>Kontynuuj swoją serię {user.streak} dni i zdobądź nowe umiejętności</p>
+              </div>
+              <div className="text-5xl">🔥</div>
+            </div>
+            <button className="mt-4 bg-white text-blue-600 px-6 py-2 rounded-lg font-semibold hover:bg-blue-50 transition-colors">
+              Rozpocznij dzisiejsze zadania
+            </button>
+          </div>
+
+          {/* Stats Grid */}
+          <div className="grid grid-cols-4 gap-4">
+            <div className="bg-white rounded-lg border p-4">
+              <div className="flex items-center justify-between mb-2">
+                <Target className="w-8 h-8 text-blue-500" />
+                <span className="text-2xl font-bold">3/5</span>
+              </div>
+              <p className="text-sm text-gray-600">Zadania dziś</p>
+            </div>
+            <div className="bg-white rounded-lg border p-4">
+              <div className="flex items-center justify-between mb-2">
+                <Zap className="w-8 h-8 text-yellow-500" />
+                <span className="text-2xl font-bold">180</span>
+              </div>
+              <p className="text-sm text-gray-600">XP zdobyte dziś</p>
+            </div>
+            <div className="bg-white rounded-lg border p-4">
+              <div className="flex items-center justify-between mb-2">
+                <Clock className="w-8 h-8 text-green-500" />
+                <span className="text-2xl font-bold">45m</span>
+              </div>
+              <p className="text-sm text-gray-600">Czas nauki</p>
+            </div>
+            <div className="bg-white rounded-lg border p-4">
+              <div className="flex items-center justify-between mb-2">
+                <Trophy className="w-8 h-8 text-purple-500" />
+                <span className="text-2xl font-bold">12</span>
+              </div>
+              <p className="text-sm text-gray-600">Osiągnięcia</p>
+            </div>
+          </div>
+
+          {/* Activity Feed */}
+          <div className="bg-white rounded-lg border">
+            <div className="p-4 border-b">
+              <h3 className="font-semibold text-gray-900">Twoja aktywność</h3>
+            </div>
+            <div className="divide-y">
+              <div className="p-4 flex items-start space-x-3">
+                <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                  <CheckCircle className="w-4 h-4 text-green-600" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm"><strong>Ukończyłeś</strong> zadanie "Podstawy JavaScript"</p>
+                  <p className="text-xs text-gray-500">2 godziny temu • +50 XP</p>
+                </div>
+              </div>
+              <div className="p-4 flex items-start space-x-3">
+                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                  <TrendingUp className="w-4 h-4 text-blue-600" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm"><strong>Awansowałeś</strong> na poziom 3</p>
+                  <p className="text-xs text-gray-500">Wczoraj o 18:30</p>
+                </div>
+              </div>
+              <div className="p-4 flex items-start space-x-3">
+                <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
+                  <Award className="w-4 h-4 text-yellow-600" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm"><strong>Zdobyłeś odznakę</strong> "Pierwszy tydzień"</p>
+                  <p className="text-xs text-gray-500">2 dni temu</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (activeSection === 'tasks') {
+      return (
+        <div className="space-y-4">
+          <div className="bg-white rounded-lg border p-6">
+            <h2 className="text-xl font-bold mb-4">Zadania do wykonania</h2>
+            
+            <div className="grid grid-cols-2 gap-4">
+              {[
+                { title: 'Algorytmy sortowania', category: 'Programowanie', xp: 100, time: '30 min', difficulty: 'średnie' },
+                { title: 'Komunikacja asertywna', category: 'Soft Skills', xp: 50, time: '15 min', difficulty: 'łatwe' },
+                { title: 'React Hooks', category: 'Frontend', xp: 150, time: '45 min', difficulty: 'trudne' },
+                { title: 'Praca w stresie', category: 'Soft Skills', xp: 75, time: '20 min', difficulty: 'średnie' },
+              ].map((task) => (
+                <div key={task.title} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <h4 className="font-semibold">{task.title}</h4>
+                      <p className="text-sm text-gray-500">{task.category}</p>
+                    </div>
+                    <span className={`text-xs px-2 py-1 rounded-full ${
+                      task.difficulty === 'łatwe' ? 'bg-green-100 text-green-700' :
+                      task.difficulty === 'średnie' ? 'bg-yellow-100 text-yellow-700' :
+                      'bg-red-100 text-red-700'
+                    }`}>
+                      {task.difficulty}
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center space-x-4 text-sm text-gray-600 mb-3">
+                    <span className="flex items-center">
+                      <Zap className="w-4 h-4 mr-1 text-yellow-500" />
+                      {task.xp} XP
+                    </span>
+                    <span className="flex items-center">
+                      <Clock className="w-4 h-4 mr-1" />
+                      {task.time}
+                    </span>
+                  </div>
+                  
+                  <button className="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600 transition-colors font-medium">
+                    Rozpocznij
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="bg-white rounded-lg border p-6">
+        <h2 className="text-xl font-bold mb-4">{activeSection}</h2>
+        <p className="text-gray-600">Sekcja w budowie...</p>
+      </div>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-100">
+      <TopBar />
+      <LeftSidebar />
+      <RightSidebar />
+      
+      {/* Main Content with proper margins */}
+      <div className="ml-64 mr-64 mt-12 p-6">
+        <MainContent />
+      </div>
+    </div>
+  );
+};
+
+export default CareerWebApp;
