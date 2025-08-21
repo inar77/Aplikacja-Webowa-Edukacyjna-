@@ -1,0 +1,306 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  AlertCircle, Trophy, Flame, TrendingDown, Clock, 
+  ChevronRight, X, Pause, RefreshCw, Target, Shield
+} from 'lucide-react';
+
+const TaskExitProtection = () => {
+  const [showExitModal, setShowExitModal] = useState(false);
+  const [taskProgress, setTaskProgress] = useState(45); // % ukończenia
+  const [userLevel, setUserLevel] = useState(3);
+  const [streak, setStreak] = useState(7);
+  const [currentXP, setCurrentXP] = useState(240);
+  const [exitWarningLevel, setExitWarningLevel] = useState(1); // 1-3 poziomy ostrzeżenia
+  
+  // System kar za przerwanie
+  const exitPenalties = {
+    beginner: { xp: 0, streak: false, message: "Możesz wrócić kiedy chcesz!" },
+    intermediate: { xp: 25, streak: false, message: "Stracisz 25 XP za przerwanie" },
+    advanced: { xp: 50, streak: true, message: "Stracisz 50 XP i serię dni!" }
+  };
+
+  const getUserPenaltyLevel = () => {
+    if (userLevel < 3) return 'beginner';
+    if (userLevel < 7) return 'intermediate';
+    return 'advanced';
+  };
+
+  const handleExitAttempt = () => {
+    setExitWarningLevel(1);
+    setShowExitModal(true);
+  };
+
+  const handleConfirmExit = () => {
+    const level = getUserPenaltyLevel();
+    const penalty = exitPenalties[level];
+    
+    // Aplikuj kary
+    if (penalty.xp > 0) {
+      setCurrentXP(prev => Math.max(0, prev - penalty.xp));
+    }
+    if (penalty.streak) {
+      setStreak(0);
+    }
+    
+    // Zapisz niedokończone zadanie
+    localStorage.setItem('abandonedTask', JSON.stringify({
+      progress: taskProgress,
+      timestamp: Date.now()
+    }));
+    
+    setShowExitModal(false);
+    // Tu redirect do głównego menu
+  };
+
+  const handleContinueTask = () => {
+    setShowExitModal(false);
+    // Bonus za pozostanie
+    if (exitWarningLevel > 1) {
+      setCurrentXP(prev => prev + 5); // Mały bonus za determinację
+    }
+  };
+
+  const handlePauseTask = () => {
+    localStorage.setItem('pausedTask', JSON.stringify({
+      progress: taskProgress,
+      timestamp: Date.now()
+    }));
+    setShowExitModal(false);
+    // Bez kar, ale zadanie pojawi się jako przypomnienie
+  };
+
+  // Modal z wielopoziomowym ostrzeżeniem
+  const ExitModal = () => {
+    const level = getUserPenaltyLevel();
+    const penalty = exitPenalties[level];
+    
+    return (
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn">
+        <div className="bg-white rounded-2xl max-w-md w-full mx-4 overflow-hidden shadow-2xl transform transition-all animate-slideUp">
+          
+          {/* Header z alertem */}
+          <div className={`p-6 ${
+            level === 'advanced' ? 'bg-gradient-to-r from-red-500 to-orange-500' :
+            level === 'intermediate' ? 'bg-gradient-to-r from-yellow-500 to-orange-500' :
+            'bg-gradient-to-r from-blue-500 to-purple-500'
+          } text-white`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="p-3 bg-white/20 rounded-full">
+                  <AlertCircle className="w-8 h-8" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold">Czy na pewno?</h2>
+                  <p className="text-white/90">Ukończyłeś już {taskProgress}% zadania!</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Progress wizualizacja */}
+          <div className="px-6 pt-4">
+            <div className="bg-gray-200 rounded-full h-4 overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-green-400 to-blue-500 transition-all duration-500"
+                style={{ width: `${taskProgress}%` }}
+              />
+            </div>
+            <p className="text-sm text-gray-600 mt-2 text-center">
+              Tylko {100 - taskProgress}% do ukończenia!
+            </p>
+          </div>
+
+          {/* Konsekwencje */}
+          <div className="p-6 space-y-4">
+            {level !== 'beginner' && (
+              <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4">
+                <h3 className="font-semibold text-red-900 mb-2 flex items-center">
+                  <TrendingDown className="w-5 h-5 mr-2" />
+                  Co stracisz:
+                </h3>
+                <ul className="space-y-2">
+                  {penalty.xp > 0 && (
+                    <li className="flex items-center text-red-700">
+                      <span className="text-lg mr-2">📉</span>
+                      <span>-{penalty.xp} XP</span>
+                    </li>
+                  )}
+                  {penalty.streak && (
+                    <li className="flex items-center text-red-700">
+                      <span className="text-lg mr-2">🔥</span>
+                      <span>Utrata {streak} dniowej serii!</span>
+                    </li>
+                  )}
+                  <li className="flex items-center text-red-700">
+                    <span className="text-lg mr-2">📊</span>
+                    <span>Spadek w rankingu</span>
+                  </li>
+                </ul>
+              </div>
+            )}
+
+            {/* Alternatywy */}
+            <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4">
+              <h3 className="font-semibold text-blue-900 mb-2">Możesz też:</h3>
+              <div className="space-y-2">
+                <button
+                  onClick={handlePauseTask}
+                  className="w-full flex items-center justify-between p-3 bg-white rounded-lg hover:bg-blue-100 transition-colors group"
+                >
+                  <div className="flex items-center">
+                    <Pause className="w-5 h-5 mr-3 text-blue-600" />
+                    <div className="text-left">
+                      <p className="font-medium">Zrób przerwę</p>
+                      <p className="text-xs text-gray-600">Wróć później bez kar</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-blue-600" />
+                </button>
+
+                <button
+                  onClick={() => {/* Przełącz na łatwiejsze */}}
+                  className="w-full flex items-center justify-between p-3 bg-white rounded-lg hover:bg-blue-100 transition-colors group"
+                >
+                  <div className="flex items-center">
+                    <RefreshCw className="w-5 h-5 mr-3 text-green-600" />
+                    <div className="text-left">
+                      <p className="font-medium">Zmień na łatwiejsze</p>
+                      <p className="text-xs text-gray-600">-10 XP, ale zachowasz serię</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-green-600" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Przyciski akcji - hierarchia wizualna */}
+          <div className="p-6 bg-gray-50 space-y-3">
+            <button
+              onClick={handleContinueTask}
+              className="w-full py-4 bg-gradient-to-r from-green-500 to-blue-500 text-white rounded-xl font-bold text-lg hover:from-green-600 hover:to-blue-600 transition-all transform hover:scale-[1.02] shadow-lg flex items-center justify-center space-x-2"
+            >
+              <Target className="w-5 h-5" />
+              <span>Wracam do zadania!</span>
+              {exitWarningLevel > 1 && <span className="text-xs">(+5 XP)</span>}
+            </button>
+
+            <button
+              onClick={handleConfirmExit}
+              className="w-full py-2 text-gray-500 text-sm hover:text-red-600 transition-colors"
+            >
+              Rezygnuję i akceptuję konsekwencje
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Mini-powiadomienie o powrocie do zadania
+  const ReturnReminder = () => {
+    const [showReminder, setShowReminder] = useState(false);
+    
+    useEffect(() => {
+      const abandoned = localStorage.getItem('abandonedTask');
+      if (abandoned) {
+        const data = JSON.parse(abandoned);
+        const hoursSince = (Date.now() - data.timestamp) / (1000 * 60 * 60);
+        if (hoursSince < 24) {
+          setShowReminder(true);
+        }
+      }
+    }, []);
+
+    if (!showReminder) return null;
+
+    return (
+      <div className="fixed bottom-4 right-4 bg-white rounded-lg shadow-xl p-4 max-w-sm animate-slideIn">
+        <div className="flex items-start space-x-3">
+          <div className="p-2 bg-yellow-100 rounded-full">
+            <AlertCircle className="w-5 h-5 text-yellow-600" />
+          </div>
+          <div className="flex-1">
+            <h4 className="font-semibold">Masz niedokończone zadanie!</h4>
+            <p className="text-sm text-gray-600 mt-1">
+              Ukończyłeś {taskProgress}%. Dokończ i zdobądź pełne XP!
+            </p>
+            <button className="mt-2 text-blue-600 font-medium text-sm hover:underline">
+              Wróć do zadania →
+            </button>
+          </div>
+          <button
+            onClick={() => setShowReminder(false)}
+            className="text-gray-400 hover:text-gray-600"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  // Blokada poziomów dla zaawansowanych
+  const LevelLockSystem = () => {
+    const [isLocked, setIsLocked] = useState(false);
+    
+    return (
+      <div className={`transition-all ${isLocked ? 'pointer-events-none opacity-50' : ''}`}>
+        {isLocked && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-40">
+            <div className="bg-white rounded-xl p-6 max-w-sm text-center">
+              <Shield className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+              <h3 className="text-xl font-bold mb-2">Obszar zablokowany</h3>
+              <p className="text-gray-600 mb-4">
+                Musisz ukończyć obecne zadanie, aby odblokować dalszą część aplikacji
+              </p>
+              <button
+                onClick={() => setIsLocked(false)}
+                className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium"
+              >
+                Wróć do zadania
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-100 p-4">
+      {/* Demo przyciski */}
+      <div className="max-w-2xl mx-auto">
+        <div className="bg-white rounded-xl p-6 mb-4">
+          <h2 className="text-xl font-bold mb-4">Test systemu blokady wyjścia</h2>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div>
+                <p className="font-medium">Twój poziom: {userLevel}</p>
+                <p className="text-sm text-gray-600">
+                  Poziom kar: {getUserPenaltyLevel()}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="font-medium">Seria: {streak} dni 🔥</p>
+                <p className="text-sm text-gray-600">XP: {currentXP}</p>
+              </div>
+            </div>
+
+            <button
+              onClick={handleExitAttempt}
+              className="w-full py-3 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors"
+            >
+              Spróbuj wyjść z zadania
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {showExitModal && <ExitModal />}
+      <ReturnReminder />
+    </div>
+  );
+};
+
+export default TaskExitProtection;
