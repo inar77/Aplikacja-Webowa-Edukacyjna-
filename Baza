@@ -1,0 +1,522 @@
+import React, { useState, useEffect, memo } from 'react';
+import { 
+  Home, Users, Briefcase, Trophy, ShoppingBag, Bell, MessageCircle, 
+  Search, ChevronRight, Flame, Star, Lock, Zap, Target, TrendingUp,
+  Award, Clock, BookOpen, ChevronUp, ChevronDown, Gift, Crown,
+  Medal, Shield, Gem, Heart, Coffee, Rocket, Sparkles, BarChart
+} from 'lucide-react';
+
+// Memoized Achievement Badge Component
+const AchievementBadge = memo(({ achievement }) => {
+  const badges = {
+    'first_week': { bg: 'from-yellow-400 to-orange-500', icon: '🔥', glow: 'shadow-orange-500/50' },
+    'speed_demon': { bg: 'from-purple-500 to-pink-500', icon: '⚡', glow: 'shadow-purple-500/50' },
+    'python_master': { bg: 'from-blue-500 to-cyan-500', icon: '🐍', glow: 'shadow-blue-500/50' },
+    'night_owl': { bg: 'from-indigo-600 to-purple-600', icon: '🦉', glow: 'shadow-indigo-500/50' },
+    'perfectionist': { bg: 'from-green-500 to-emerald-500', icon: '💎', glow: 'shadow-green-500/50' }
+  };
+  
+  const badge = badges[achievement.id] || badges['first_week'];
+  
+  return (
+    <div className="relative group cursor-pointer transform transition-all duration-300 hover:scale-110">
+      <div className={`w-16 h-16 bg-gradient-to-br ${badge.bg} rounded-full flex items-center justify-center shadow-lg ${badge.glow} shadow-2xl animate-pulse`}>
+        <span className="text-2xl">{badge.icon}</span>
+      </div>
+      <div className="absolute -bottom-1 -right-1 bg-yellow-400 text-xs px-1 rounded-full font-bold">
+        {achievement.level}
+      </div>
+      <div className="absolute opacity-0 group-hover:opacity-100 transition-opacity bottom-20 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs rounded px-2 py-1 whitespace-nowrap z-50">
+        {achievement.name}
+      </div>
+    </div>
+  );
+});
+
+const PathFinderWebApp = () => {
+  const [activeSection, setActiveSection] = useState('home');
+  const [streak, setStreak] = useState(7);
+  const [coins, setCoins] = useState(1250);
+  const [xp, setXp] = useState(2847);
+  const [userLevel, setUserLevel] = useState(24);
+  const [timeUntilBonus, setTimeUntilBonus] = useState('2h 47min');
+  const [notifications, setNotifications] = useState(3);
+  
+  // Online friends simulation
+  const [onlineFriends] = useState([
+    { id: 1, name: 'Maria K.', avatar: '👩‍💻', status: 'Uczy się React Hooks', xp: 3421, streak: 12 },
+    { id: 2, name: 'Tomek R.', avatar: '👨‍💼', status: 'Rozwiązuje quiz z Python', xp: 4102, streak: 23 },
+    { id: 3, name: 'Anna L.', avatar: '👩‍🎨', status: 'Projektuje w Figmie', xp: 2934, streak: 8 },
+    { id: 4, name: 'Piotr N.', avatar: '🧑‍💻', status: 'Debug session', xp: 3677, streak: 15 },
+    { id: 5, name: 'Kasia M.', avatar: '👩‍🔬', status: 'Data Science - ML', xp: 5234, streak: 31 }
+  ]);
+
+  // Dynamic leaderboard
+  const [leaderboard] = useState([
+    { rank: 22, name: 'Michał K.', xp: 2901, trend: 'up', avatar: '🎯' },
+    { rank: 23, name: 'Ola Z.', xp: 2873, trend: 'up', avatar: '🌟' },
+    { rank: 24, name: 'Ty', xp: 2847, trend: 'same', avatar: '🚀', isUser: true },
+    { rank: 25, name: 'Kuba W.', xp: 2834, trend: 'down', avatar: '💫' },
+    { rank: 26, name: 'Ania P.', xp: 2801, trend: 'down', avatar: '✨' }
+  ]);
+
+  // Career paths
+  const careerPaths = [
+    { 
+      id: 'frontend', 
+      name: 'Frontend Developer', 
+      icon: '🎨', 
+      progress: 67,
+      color: 'from-purple-500 to-pink-500',
+      students: '12.3k',
+      difficulty: 'Średni',
+      salary: '8-15k PLN',
+      time: '6 miesięcy'
+    },
+    { 
+      id: 'backend', 
+      name: 'Backend Developer', 
+      icon: '⚙️', 
+      progress: 45,
+      color: 'from-blue-500 to-cyan-500',
+      students: '9.7k',
+      difficulty: 'Trudny',
+      salary: '10-18k PLN',
+      time: '8 miesięcy'
+    },
+    { 
+      id: 'data', 
+      name: 'Data Scientist', 
+      icon: '📊', 
+      progress: 23,
+      color: 'from-green-500 to-emerald-500',
+      students: '7.2k',
+      difficulty: 'Ekspert',
+      salary: '12-25k PLN',
+      time: '12 miesięcy'
+    },
+    { 
+      id: 'mobile', 
+      name: 'Mobile Developer', 
+      icon: '📱', 
+      progress: 89,
+      color: 'from-orange-500 to-red-500',
+      students: '5.8k',
+      difficulty: 'Średni',
+      salary: '9-16k PLN',
+      time: '7 miesięcy'
+    },
+    { 
+      id: 'devops', 
+      name: 'DevOps Engineer', 
+      icon: '🔧', 
+      progress: 12,
+      color: 'from-gray-600 to-gray-800',
+      students: '4.2k',
+      difficulty: 'Trudny',
+      salary: '12-20k PLN',
+      time: '10 miesięcy'
+    },
+    { 
+      id: 'ux', 
+      name: 'UX/UI Designer', 
+      icon: '✨', 
+      progress: 34,
+      color: 'from-pink-500 to-rose-500',
+      students: '8.9k',
+      difficulty: 'Łatwy',
+      salary: '7-14k PLN',
+      time: '5 miesięcy'
+    }
+  ];
+
+  // Achievements
+  const achievements = [
+    { id: 'first_week', name: 'Pierwszy Tydzień', level: 3, unlocked: true },
+    { id: 'speed_demon', name: 'Speed Demon', level: 2, unlocked: true },
+    { id: 'python_master', name: 'Python Master', level: 1, unlocked: true },
+    { id: 'night_owl', name: 'Nocny Marek', level: 1, unlocked: false },
+    { id: 'perfectionist', name: 'Perfekcjonista', level: 1, unlocked: false }
+  ];
+
+  // Shop items
+  const shopItems = [
+    { id: 1, name: 'XP Boost 2x', desc: '30 minut podwójnego XP', price: 500, icon: '⚡', color: 'from-yellow-400 to-yellow-600' },
+    { id: 2, name: 'Streak Freeze', desc: 'Zachowaj serię przez 1 dzień', price: 750, icon: '🧊', color: 'from-blue-400 to-blue-600' },
+    { id: 3, name: 'Hint Package', desc: '5 podpowiedzi do zadań', price: 300, icon: '💡', color: 'from-purple-400 to-purple-600' },
+    { id: 4, name: 'Premium Avatar', desc: 'Ekskluzywna ramka avatara', price: 1000, icon: '🖼️', color: 'from-pink-400 to-pink-600' }
+  ];
+
+  // Current path
+  const currentPath = {
+    name: 'Frontend Developer',
+    stages: [
+      { id: 1, name: 'HTML/CSS', status: 'completed', icon: '🎯', xp: 500 },
+      { id: 2, name: 'JavaScript', status: 'completed', icon: '⚡', xp: 750 },
+      { id: 3, name: 'React Basics', status: 'current', icon: '⚛️', xp: 340, maxXp: 1000 },
+      { id: 4, name: 'State & Props', status: 'locked', icon: '📦', xp: 0 },
+      { id: 5, name: 'Hooks', status: 'locked', icon: '🪝', xp: 0 },
+      { id: 6, name: 'Redux', status: 'locked', icon: '🔄', xp: 0 }
+    ]
+  };
+
+  // Daily challenges
+  const dailyChallenges = [
+    { id: 1, name: 'Ukończ 3 lekcje', progress: 2, max: 3, reward: 100, icon: '📚' },
+    { id: 2, name: 'Zdobądź 500 XP', progress: 340, max: 500, reward: 50, icon: '⭐' },
+    { id: 3, name: 'Utrzymaj serię', progress: 1, max: 1, reward: 25, icon: '🔥', completed: true }
+  ];
+
+  // Competition data
+  const competitions = [
+    { 
+      id: 1, 
+      name: 'JavaScript Masters', 
+      participants: 234, 
+      prize: '1000 PLN', 
+      endsIn: '2 dni',
+      yourRank: 12,
+      icon: '🏆'
+    },
+    { 
+      id: 2, 
+      name: 'React Sprint', 
+      participants: 156, 
+      prize: 'Premium na 3 miesiące', 
+      endsIn: '5 dni',
+      yourRank: 8,
+      icon: '⚡'
+    },
+    { 
+      id: 3, 
+      name: 'Code Golf Python', 
+      participants: 89, 
+      prize: 'iPad Pro', 
+      endsIn: '1 tydzień',
+      yourRank: null,
+      icon: '🐍'
+    }
+  ];
+
+  // Timer effect
+  useEffect(() => {
+    const timer = setInterval(() => {
+      // Simple countdown update
+      setTimeUntilBonus(prev => '2h 46min');
+    }, 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Top Navigation */}
+      <header className="bg-white border-b border-gray-200 fixed top-0 left-0 right-0 z-50 shadow-sm">
+        <div className="max-w-screen-2xl mx-auto px-4">
+          <div className="flex items-center justify-between h-14">
+            {/* Left */}
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Rocket className="w-8 h-8 text-blue-600" />
+                <span className="text-xl font-bold text-gray-900">PathFinder</span>
+              </div>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input 
+                  type="text" 
+                  placeholder="Szukaj kursów, ścieżek, znajomych..." 
+                  className="pl-10 pr-4 py-2 bg-gray-100 rounded-full text-sm w-80 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            {/* Center Nav */}
+            <nav className="flex items-center gap-1">
+              <button 
+                onClick={() => setActiveSection('home')}
+                className={`px-6 py-3 rounded-lg transition-all ${
+                  activeSection === 'home' ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100 text-gray-700'
+                }`}
+              >
+                <Home className="w-5 h-5" />
+              </button>
+              <button 
+                onClick={() => setActiveSection('careers')}
+                className={`px-6 py-3 rounded-lg transition-all ${
+                  activeSection === 'careers' ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100 text-gray-700'
+                }`}
+              >
+                <Briefcase className="w-5 h-5" />
+              </button>
+              <button 
+                onClick={() => setActiveSection('competition')}
+                className={`px-6 py-3 rounded-lg transition-all relative ${
+                  activeSection === 'competition' ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100 text-gray-700'
+                }`}
+              >
+                <Trophy className="w-5 h-5" />
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                  2
+                </span>
+              </button>
+              <button 
+                onClick={() => setActiveSection('shop')}
+                className={`px-6 py-3 rounded-lg transition-all ${
+                  activeSection === 'shop' ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100 text-gray-700'
+                }`}
+              >
+                <ShoppingBag className="w-5 h-5" />
+              </button>
+            </nav>
+
+            {/* Right */}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 bg-orange-100 px-3 py-1.5 rounded-full">
+                <Flame className="w-4 h-4 text-orange-600" />
+                <span className="font-bold text-orange-600">{streak}</span>
+              </div>
+              <div className="flex items-center gap-2 bg-yellow-100 px-3 py-1.5 rounded-full cursor-pointer hover:bg-yellow-200 transition-colors">
+                <Gem className="w-4 h-4 text-yellow-600" />
+                <span className="font-bold text-yellow-600">{coins}</span>
+                <span className="text-xs text-green-600 font-bold">+25</span>
+              </div>
+              <button className="relative p-2 hover:bg-gray-100 rounded-lg">
+                <Bell className="w-5 h-5 text-gray-700" />
+                {notifications > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                    {notifications}
+                  </span>
+                )}
+              </button>
+              <button className="relative p-2 hover:bg-gray-100 rounded-lg">
+                <MessageCircle className="w-5 h-5 text-gray-700" />
+                <span className="absolute -top-1 -right-1 bg-green-500 w-2 h-2 rounded-full"></span>
+              </button>
+              <button className="flex items-center gap-2 hover:bg-gray-100 rounded-lg px-3 py-1.5">
+                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold">
+                  JK
+                </div>
+                <div className="text-left">
+                  <div className="text-sm font-semibold">Jan Kowalski</div>
+                  <div className="text-xs text-gray-500">Level {userLevel}</div>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <div className="max-w-screen-2xl mx-auto px-4 pt-20 pb-8">
+        <div className="grid grid-cols-12 gap-6">
+          {/* Left Sidebar */}
+          <aside className="col-span-3">
+            {/* User Stats */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-4">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-xl relative">
+                  JK
+                  <div className="absolute -bottom-1 -right-1 bg-yellow-400 text-gray-900 text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold">
+                    {userLevel}
+                  </div>
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900">Jan Kowalski</h3>
+                  <p className="text-sm text-gray-600">Frontend Developer Path</p>
+                </div>
+              </div>
+              <div className="mb-4">
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-gray-600">Level {userLevel}</span>
+                  <span className="font-bold">{xp}/5000 XP</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                  <div 
+                    className="bg-gradient-to-r from-blue-500 to-purple-600 h-full rounded-full transition-all duration-500 relative"
+                    style={{width: `${(xp/5000)*100}%`}}
+                  >
+                    <div className="absolute right-0 top-0 h-full w-2 bg-white opacity-50 animate-pulse"></div>
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="bg-gray-50 rounded-lg p-2">
+                  <div className="text-lg font-bold text-gray-900">{streak}</div>
+                  <div className="text-xs text-gray-600">Seria dni</div>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-2">
+                  <div className="text-lg font-bold text-gray-900">67%</div>
+                  <div className="text-xs text-gray-600">Ukończone</div>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-2">
+                  <div className="text-lg font-bold text-gray-900">12</div>
+                  <div className="text-xs text-gray-600">Odznaki</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Daily Challenges */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-bold text-gray-900">Dzienne wyzwania</h3>
+                <span className="text-xs text-gray-500">{timeUntilBonus}</span>
+              </div>
+              <div className="space-y-3">
+                {dailyChallenges.map(challenge => (
+                  <div key={challenge.id} className="relative">
+                    <div className="flex items-center gap-3">
+                      <span className="text-xl">{challenge.icon}</span>
+                      <div className="flex-1">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-sm font-medium">{challenge.name}</span>
+                          <span className="text-xs text-yellow-600 font-bold">+{challenge.reward}</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div 
+                            className={`h-full rounded-full transition-all ${
+                              challenge.completed ? 'bg-green-500' : 'bg-blue-500'
+                            }`}
+                            style={{width: `${(challenge.progress/challenge.max)*100}%`}}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    {challenge.completed && (
+                      <div className="absolute -right-2 -top-2 bg-green-500 text-white rounded-full p-1">
+                        <Star className="w-3 h-3" />
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Online Friends */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-bold text-gray-900">Znajomi online</h3>
+                <span className="text-xs bg-green-100 text-green-600 px-2 py-1 rounded-full font-semibold">
+                  {onlineFriends.length} aktywnych
+                </span>
+              </div>
+              <div className="space-y-3">
+                {onlineFriends.map(friend => (
+                  <div key={friend.id} className="flex items-center gap-3 group cursor-pointer hover:bg-gray-50 rounded-lg p-2 -m-2 transition-all">
+                    <div className="relative">
+                      <div className="text-2xl">{friend.avatar}</div>
+                      <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-gradient-to-r from-green-400 to-green-600 rounded-full border-2 border-white animate-pulse shadow-lg shadow-green-500/50"></div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-sm text-gray-900">{friend.name}</div>
+                      <div className="text-xs text-gray-500 truncate">{friend.status}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs font-bold text-gray-700">{friend.xp} XP</div>
+                      <div className="flex items-center gap-1">
+                        <Flame className="w-3 h-3 text-orange-500" />
+                        <span className="text-xs text-orange-600">{friend.streak}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </aside>
+
+          {/* Main Content Area */}
+          <main className="col-span-6">
+            {activeSection === 'home' && (
+              <>
+                <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl shadow-lg p-6 mb-6 text-white relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-10 rounded-full -mr-32 -mt-32"></div>
+                  <div className="relative z-10">
+                    <h2 className="text-2xl font-bold mb-2">Witaj z powrotem, Jan! 🚀</h2>
+                    <p className="mb-4 opacity-90">Twoja seria {streak} dni jest niesamowita! Nie przerywaj teraz!</p>
+                    <div className="flex gap-4">
+                      <button className="bg-white text-blue-600 px-6 py-2.5 rounded-lg font-bold hover:bg-gray-100 transition-all transform hover:scale-105 shadow-lg">
+                        Kontynuuj naukę
+                      </button>
+                      <button className="bg-white/20 text-white px-6 py-2.5 rounded-lg font-bold hover:bg-white/30 transition-all backdrop-blur-sm">
+                        Zobacz postępy
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-900">{currentPath.name}</h3>
+                      <p className="text-sm text-gray-600">Etap 3 z 6 - React Basics</p>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-2xl font-bold text-blue-600">67%</div>
+                      <div className="text-xs text-gray-500">ukończenia ścieżki</div>
+                    </div>
+                  </div>
+                  <div className="relative mb-8">
+                    <div className="absolute top-1/2 left-0 right-0 h-1 bg-gray-200 -translate-y-1/2"></div>
+                    <div className="absolute top-1/2 left-0 h-1 bg-gradient-to-r from-green-500 to-blue-500 -translate-y-1/2" style={{width: '40%'}}></div>
+                    <div className="relative flex justify-between">
+                      {currentPath.stages.map((stage) => (
+                        <div key={stage.id} className="flex flex-col items-center">
+                          <div className={`
+                            w-14 h-14 rounded-full flex items-center justify-center text-xl shadow-lg cursor-pointer
+                            transform transition-all duration-300 hover:scale-110
+                            ${stage.status === 'completed' ? 'bg-gradient-to-br from-green-400 to-green-600' : 
+                              stage.status === 'current' ? 'bg-gradient-to-br from-blue-400 to-blue-600 animate-pulse' : 
+                              'bg-gray-300'}
+                            ${stage.status === 'current' ? 'ring-4 ring-blue-200 ring-opacity-50' : ''}
+                          `}>
+                            {stage.status === 'locked' ? 
+                              <Lock className="w-5 h-5 text-white" /> : 
+                              <span>{stage.icon}</span>
+                            }
+                          </div>
+                          <span className="text-xs mt-2 font-medium text-gray-700">{stage.name}</span>
+                          {stage.status === 'current' && (
+                            <div className="text-xs text-blue-600 font-bold mt-1">
+                              {stage.xp}/{stage.maxXp} XP
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <button className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 rounded-lg font-bold hover:shadow-lg transition-all transform hover:scale-[1.02]">
+                    Kontynuuj: React Hooks - useState
+                  </button>
+                </div>
+
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xl font-bold text-gray-900">Twoje osiągnięcia</h3>
+                    <button className="text-blue-600 text-sm font-medium hover:underline">
+                      Zobacz wszystkie →
+                    </button>
+                  </div>
+                  <div className="flex gap-4">
+                    {achievements.filter(a => a.unlocked).map(achievement => (
+                      <AchievementBadge key={achievement.id} achievement={achievement} />
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {activeSection === 'careers' && (
+              <>
+                <h2 className="text-2xl font-bold text-gray-900 mb-6">Wybierz swoją ścieżkę kariery</h2>
+                <div className="grid grid-cols-2 gap-4">
+                  {careerPaths.map(path => (
+                    <div key={path.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-all cursor-pointer group">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="text-3xl">{path.icon}</div>
+                        <div className="text-xs bg-gray-100 px-2 py-1 rounded-full font-medium">
+                          {path.difficulty}
+                        </div>
+                      </div>
+                      <h3 className="text-lg font-bold text-gray-900 mb-2">{path.name}</h3>
+                      <div className="space-y-2 mb-4">
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <Clock className="w-4 h-4" />
+                          <span>{path.time}</span>
