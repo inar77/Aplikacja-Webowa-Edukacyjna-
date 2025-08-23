@@ -3,3 +3,672 @@ Narazie mam frontend z głownym oknem apki i zadaniami oraz listą znajomych
 
 Jest okej ale chce dodać jeszcze na dole pasek informacyjny oraz dodać sekcje po prawej stronie pod zadaniami kategorie 'zawody' w których będzie rozbite na cześci żeby mozna było łatwo odnależć 'najpopularniejsze zawody' , 'najbardziej brakujące' , 'najlepiej płatne' , 'najszybsze do nauczenia się' itd
  
+import React, { useState, useEffect } from 'react';
+import {
+  Home, Target, Trophy, ShoppingBag, Users, Zap, Clock, CheckCircle, Lock,
+  ChevronLeft, ChevronRight, Flame, Star, Circle, X, Book, Code, Briefcase,
+  MessageSquare, TrendingUp, Award, Sparkles, Bell, Settings, User, Heart,
+  Shield, Coffee, MapPin, Sword, Scale, Activity,
+  ArrowRight, Gift, ChevronUp, BarChart3, Medal, Gem, LogOut, Play,
+  Calendar, Rocket, Brain, DollarSign, AlertCircle, Timer
+} from 'lucide-react';
+
+const PathFinderApp = () => {
+  // Stan użytkownika
+  const [user, setUser] = useState(() => {
+    const saved = localStorage.getItem('pathfinderUser');
+    return saved ? JSON.parse(saved) : {
+      name: 'Jan',
+      level: 24,
+      xp: 2847,
+      xpToNext: 5000,
+      totalXp: 12847,
+      coins: 1240,
+      gems: 5,
+      currentPath: 'Elektryk',
+      streak: 7,
+      hearts: 5,
+      dailyGoal: 3,
+      dailyProgress: 1
+    };
+  });
+
+  const [currentScreen, setCurrentScreen] = useState('home');
+  const [newsTicker, setNewsTicker] = useState(0);
+  const [showNotification, setShowNotification] = useState(false);
+  const [notificationMessage, setNotificationMessage] = useState('');
+
+  // Save user data
+  useEffect(() => {
+    localStorage.setItem('pathfinderUser', JSON.stringify(user));
+  }, [user]);
+
+  // News items
+  const newsItems = [
+    "🔥 Python Master ukończył 30-dniową serię!",
+    "💼 Data Scientist +28% wzrost popytu",
+    "🎯 Nowy kurs: React Hooks już dostępny",
+    "⚡ Weekend = 2x XP! Nie przegap",
+    "🏆 Kasia W. awansowała na poziom 50!"
+  ];
+
+  // News ticker animation
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNewsTicker((prev) => (prev + 1) % newsItems.length);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Show notification
+  const showNotif = (message) => {
+    setNotificationMessage(message);
+    setShowNotification(true);
+    setTimeout(() => setShowNotification(false), 3000);
+  };
+
+  // Continue learning
+  const continueLesson = () => {
+    const xpGain = 25;
+    const coinGain = 10;
+    
+    setUser(prev => {
+      const newXp = prev.xp + xpGain;
+      const newCoins = prev.coins + coinGain;
+      
+      if (newXp >= prev.xpToNext) {
+        showNotif(`🎉 Level ${prev.level + 1}!`);
+        return {
+          ...prev,
+          level: prev.level + 1,
+          xp: newXp - prev.xpToNext,
+          xpToNext: Math.floor(prev.xpToNext * 1.2),
+          coins: newCoins + 50,
+          totalXp: prev.totalXp + xpGain
+        };
+      }
+      
+      showNotif(`+${xpGain} XP`);
+      return {
+        ...prev,
+        xp: newXp,
+        coins: newCoins,
+        totalXp: prev.totalXp + xpGain
+      };
+    });
+  };
+
+  // Career paths
+  const careerPath = {
+    name: 'Elektryk',
+    progress: 3,
+    currentStage: 'Instalacje domowe',
+    stages: [
+      { id: 1, name: 'Bezpieczeństwo', icon: '⚡', status: 'completed', xp: 500 },
+      { id: 2, name: 'Narzędzia', icon: '🔧', status: 'completed', xp: 750 },
+      { id: 3, name: 'Instalacje domowe', icon: '🏠', status: 'current', xp: 340, maxXp: 1000 },
+      { id: 4, name: 'Szafy rozdzielcze', icon: '📦', status: 'locked' },
+      { id: 5, name: 'Pomiary', icon: '📊', status: 'locked' },
+      { id: 6, name: 'Smart Home', icon: '🤖', status: 'locked' }
+    ]
+  };
+
+  // Hot jobs
+  const hotJobs = [
+    { name: 'Elektryk', salary: '8-15k', trend: 35, hot: true },
+    { name: 'Pielęgniarka', salary: '7-12k', trend: 42, hot: true },
+    { name: 'Mechatronik', salary: '10-18k', trend: 28, hot: true },
+    { name: 'Magazynier z wózkiem', salary: '5-8k', trend: 25, hot: false },
+    { name: 'Prawnik korporacyjny', salary: '15-30k', trend: 18, hot: false }
+  ];
+
+  // Seasonal challenges
+  const seasonalChallenge = {
+    name: '❄️ Zimowy Maraton',
+    description: '15 lekcji przed końcem stycznia',
+    progress: 7,
+    total: 15,
+    daysLeft: 9,
+    reward: 'Ekskluzywna odznaka + 500 monet',
+    participants: 1247
+  };
+
+  // Community mission
+  const communityMission = {
+    title: 'Razem do miliona! 🎯',
+    current: 723456,
+    goal: 1000000,
+    reward: '2x XP dla wszystkich przez weekend',
+    contributors: 3421
+  };
+
+  // Dynamic leagues
+  const currentLeague = {
+    name: 'Liga Srebrna',
+    icon: '🥈',
+    position: 24,
+    topReward: 'Awans do Złotej Ligi + 1000 monet',
+    daysLeft: 3
+  };
+
+  // Daily challenges - updated
+  const challenges = [
+    { id: 1, name: 'Ukończ 3 lekcje', current: 1, max: 3, xp: 100, icon: '📚' },
+    { id: 2, name: 'Zdobądź 500 XP', current: 240, max: 500, xp: 50, icon: '⭐' },
+    { id: 3, name: 'Utrzymaj serię', current: 1, max: 1, xp: 25, icon: '🔥', completed: true },
+    { id: 4, name: '⚡ Ekspresowe wyzwanie', current: 0, max: 5, xp: 200, icon: '⚡', time: '30 min', special: true }
+  ];
+
+  // Friends online - różne zawody
+  const friends = [
+    { name: 'Maria K.', status: 'Prawo karne - wykład', xp: 3421, avatar: '👩‍⚖️' },
+    { name: 'Tomek R.', status: 'Montaż instalacji', xp: 4102, avatar: '👷' },
+    { name: 'Ania L.', status: 'Anatomia człowieka', xp: 2934, avatar: '👩‍⚕️' },
+    { name: 'Piotr N.', status: 'Logistyka magazynu', xp: 2567, avatar: '📦' }
+  ];
+
+  // Leaderboard
+  const leaderboard = [
+    { rank: 22, name: 'Michał K.', xp: 2901, avatar: '🎯' },
+    { rank: 23, name: 'Ola Z.', xp: 2873, avatar: '✨' },
+    { rank: 24, name: 'Ty', xp: user.totalXp, avatar: '🚀', isUser: true },
+    { rank: 25, name: 'Kuba W.', xp: 2834, avatar: '💫' }
+  ];
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white border-b fixed top-0 left-0 right-0 z-50">
+        <div className="max-w-screen-xl mx-auto px-4">
+          <div className="flex items-center justify-between h-16">
+            {/* Logo & Nav */}
+            <div className="flex items-center space-x-8">
+              <div className="flex items-center space-x-2">
+                <Rocket className="w-8 h-8 text-blue-600" />
+                <span className="text-xl font-bold">PathFinder</span>
+              </div>
+              
+              <nav className="hidden md:flex space-x-1">
+                <button 
+                  onClick={() => setCurrentScreen('home')}
+                  className={`px-4 py-2 rounded-lg ${currentScreen === 'home' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'}`}
+                >
+                  <Home className="w-5 h-5" />
+                </button>
+                <button className="px-4 py-2 rounded-lg hover:bg-gray-100">
+                  <Users className="w-5 h-5" />
+                </button>
+                <button className="px-4 py-2 rounded-lg hover:bg-gray-100">
+                  <Trophy className="w-5 h-5" />
+                </button>
+                <button className="px-4 py-2 rounded-lg hover:bg-gray-100">
+                  <ShoppingBag className="w-5 h-5" />
+                </button>
+              </nav>
+            </div>
+
+            {/* Right side */}
+            <div className="flex items-center space-x-4">
+              {/* Streak */}
+              <div className="flex items-center bg-orange-100 px-3 py-1.5 rounded-full">
+                <Flame className="w-4 h-4 text-orange-600 mr-1" />
+                <span className="font-bold text-orange-600">{user.streak}</span>
+              </div>
+              
+              {/* Coins */}
+              <div className="flex items-center bg-yellow-100 px-3 py-1.5 rounded-full cursor-pointer hover:bg-yellow-200">
+                <span className="text-yellow-600 mr-1">💰</span>
+                <span className="font-bold text-yellow-700">{user.coins}</span>
+              </div>
+
+              {/* Hearts */}
+              <div className="flex items-center space-x-1">
+                {[...Array(5)].map((_, i) => (
+                  <span key={i} className={i < user.hearts ? 'text-red-500' : 'text-gray-300'}>
+                    ❤️
+                  </span>
+                ))}
+              </div>
+
+              {/* Notifications */}
+              <button className="relative p-2 hover:bg-gray-100 rounded-lg">
+                <Bell className="w-5 h-5" />
+                <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+              </button>
+
+              {/* Profile */}
+              <div className="flex items-center space-x-2 cursor-pointer">
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold">
+                  JK
+                </div>
+                <div className="hidden md:block">
+                  <p className="text-sm font-semibold">{user.name}</p>
+                  <p className="text-xs text-gray-500">Level {user.level}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Notification */}
+      {showNotification && (
+        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded-full shadow-lg z-50 animate-bounce">
+          {notificationMessage}
+        </div>
+      )}
+
+      {/* Main Content */}
+      <div className="pt-16 pb-12">
+        <div className="max-w-screen-xl mx-auto px-4 py-6">
+          <div className="grid grid-cols-12 gap-6">
+            
+            {/* Left Sidebar */}
+            <div className="col-span-3">
+              {/* Seasonal Challenge Banner */}
+              <div className="bg-gradient-to-r from-blue-500 to-cyan-500 rounded-2xl p-4 shadow-lg mb-4 text-white">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-bold">{seasonalChallenge.name}</h3>
+                  <span className="text-xs bg-white/20 px-2 py-1 rounded-full">
+                    {seasonalChallenge.daysLeft} dni
+                  </span>
+                </div>
+                <p className="text-xs mb-3 opacity-90">{seasonalChallenge.description}</p>
+                <div className="mb-2">
+                  <div className="flex justify-between text-xs mb-1">
+                    <span>{seasonalChallenge.progress}/{seasonalChallenge.total} lekcji</span>
+                    <span>{seasonalChallenge.participants} uczestników</span>
+                  </div>
+                  <div className="h-2 bg-white/30 rounded-full">
+                    <div 
+                      className="h-full bg-white rounded-full"
+                      style={{ width: `${(seasonalChallenge.progress / seasonalChallenge.total) * 100}%` }}
+                    />
+                  </div>
+                </div>
+                <p className="text-xs opacity-75">🏆 {seasonalChallenge.reward}</p>
+              </div>
+
+              {/* User Card */}
+              <div className="bg-white rounded-2xl p-4 shadow-sm mb-4">
+                <div className="flex items-center space-x-3 mb-4">
+                  <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">
+                    JK
+                  </div>
+                  <div>
+                    <h3 className="font-bold">{user.name}</h3>
+                    <p className="text-sm text-gray-500">Elektryk</p>
+                  </div>
+                </div>
+                
+                {/* XP Bar */}
+                <div className="mb-3">
+                  <div className="flex justify-between text-xs mb-1">
+                    <span>Level {user.level}</span>
+                    <span className="font-bold">{user.xp}/{user.xpToNext} XP</span>
+                  </div>
+                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-blue-500 to-purple-600"
+                      style={{ width: `${(user.xp / user.xpToNext) * 100}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Stats */}
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="bg-gray-50 rounded-lg py-2">
+                    <div className="text-lg font-bold">{user.streak}</div>
+                    <div className="text-xs text-gray-500">Seria dni</div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg py-2">
+                    <div className="text-lg font-bold">2/6</div>
+                    <div className="text-xs text-gray-500">Etapy</div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg py-2">
+                    <div className="text-lg font-bold">3</div>
+                    <div className="text-xs text-gray-500">Odznaki</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Daily Challenges - Updated */}
+              <div className="bg-white rounded-2xl p-4 shadow-sm mb-4">
+                <h3 className="font-bold mb-3">Dzienne wyzwania</h3>
+                <div className="space-y-3">
+                  {challenges.map(ch => (
+                    <div key={ch.id} className={`cursor-pointer hover:bg-gray-50 rounded-lg p-2 -m-2 ${ch.special ? 'border-2 border-yellow-400 bg-yellow-50' : ''}`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center space-x-2">
+                          <span>{ch.icon}</span>
+                          <span className="text-sm">{ch.name}</span>
+                          {ch.special && <span className="text-xs bg-yellow-200 text-yellow-800 px-2 py-0.5 rounded-full">{ch.time}</span>}
+                        </div>
+                        <span className="text-xs font-bold text-yellow-600">+{ch.xp}</span>
+                      </div>
+                      <div className="h-2 bg-gray-200 rounded-full">
+                        <div 
+                          className={`h-full rounded-full ${ch.completed ? 'bg-green-500' : ch.special ? 'bg-yellow-400' : 'bg-blue-500'}`}
+                          style={{ width: `${(ch.current / ch.max) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Friends Online */}
+              <div className="bg-white rounded-2xl p-4 shadow-sm">
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="font-bold">Znajomi online</h3>
+                  <span className="text-xs bg-green-100 text-green-600 px-2 py-1 rounded-full">
+                    {friends.length} online
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {friends.map((f, i) => (
+                    <div key={i} className="flex items-center justify-between hover:bg-gray-50 rounded-lg p-2 -m-2 cursor-pointer">
+                      <div className="flex items-center space-x-2">
+                        <div className="relative">
+                          <span className="text-2xl">{f.avatar}</span>
+                          <span className="absolute -bottom-1 -right-1 w-2 h-2 bg-green-500 rounded-full"></span>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">{f.name}</p>
+                          <p className="text-xs text-gray-500">{f.status}</p>
+                        </div>
+                      </div>
+                      <button className="text-xs text-blue-600 hover:underline">Wyzwij</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+                          {/* Main Content */}
+            <div className="col-span-6">
+              {/* Hero Card */}
+              <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-6 text-white mb-6 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-10 rounded-full -mr-32 -mt-32"></div>
+                <div className="relative">
+                  <h2 className="text-2xl font-bold mb-2">Witaj z powrotem, Jan! ⚡</h2>
+                  <p className="mb-4 opacity-90">Twoja seria {user.streak} dni jest niesamowita! Dziś czeka Cię montaż gniazdek!</p>
+                  <button 
+                    onClick={continueLesson}
+                    className="bg-white text-blue-600 px-6 py-3 rounded-xl font-bold hover:bg-gray-100 transition-all transform hover:scale-105 shadow-lg inline-flex items-center"
+                  >
+                    Kontynuuj naukę
+                    <Play className="w-4 h-4 ml-2" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Progress Path */}
+              <div className="bg-white rounded-2xl p-6 shadow-sm mb-6">
+                <div className="flex justify-between items-center mb-6">
+                  <div>
+                    <h3 className="text-xl font-bold">{careerPath.name}</h3>
+                    <p className="text-sm text-gray-500">Etap 3 z 6 - {careerPath.currentStage}</p>
+                  </div>
+                  <div className="text-right">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-3xl">🎯</span>
+                      <div>
+                        <div className="text-2xl font-bold text-blue-600">3 z 6</div>
+                        <div className="text-xs text-gray-500">etapów ukończone</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Visual Path */}
+                <div className="relative mb-6">
+                  <div className="absolute top-1/2 left-0 right-0 h-1 bg-gray-200 -translate-y-1/2"></div>
+                  <div className="absolute top-1/2 left-0 h-1 bg-gradient-to-r from-green-500 to-blue-500 -translate-y-1/2" style={{width: '40%'}}></div>
+                  <div className="relative flex justify-between">
+                    {careerPath.stages.map((stage) => (
+                      <div key={stage.id} className="flex flex-col items-center">
+                        <div className={`
+                          w-14 h-14 rounded-full flex items-center justify-center text-xl shadow-lg cursor-pointer
+                          transform transition-all duration-300 hover:scale-110
+                          ${stage.status === 'completed' ? 'bg-gradient-to-br from-green-400 to-green-600' : 
+                            stage.status === 'current' ? 'bg-gradient-to-br from-blue-400 to-blue-600 animate-pulse ring-4 ring-blue-200' : 
+                            'bg-gray-300'}
+                        `}>
+                          {stage.status === 'locked' ? 
+                            <Lock className="w-5 h-5 text-white" /> : 
+                            <span>{stage.icon}</span>
+                          }
+                        </div>
+                        <span className="text-xs mt-2">{stage.name}</span>
+                        {stage.status === 'current' && stage.xp && (
+                          <span className="text-xs text-blue-600 font-bold">{stage.xp}/{stage.maxXp}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <button 
+                  onClick={continueLesson}
+                  className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 rounded-xl font-bold hover:shadow-lg transition-all"
+                >
+                  Następny krok: Podłączanie gniazdek 230V →
+                </button>
+              </div>
+
+              {/* Career Categories */}
+              <div className="bg-white rounded-2xl p-4 shadow-sm mb-6">
+                <h3 className="font-bold mb-3">Popularne ścieżki kariery</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="border-2 border-blue-200 bg-blue-50 rounded-lg p-3 cursor-pointer hover:shadow-md transition-all">
+                    <div className="flex items-center space-x-2 mb-1">
+                      <span className="text-2xl">⚡</span>
+                      <span className="font-semibold">Elektryk</span>
+                    </div>
+                    <p className="text-xs text-gray-600">8-15k PLN • 6 miesięcy</p>
+                  </div>
+                  <div className="border rounded-lg p-3 cursor-pointer hover:shadow-md transition-all">
+                    <div className="flex items-center space-x-2 mb-1">
+                      <span className="text-2xl">⚕️</span>
+                      <span className="font-semibold">Pielęgniarka</span>
+                    </div>
+                    <p className="text-xs text-gray-600">7-12k PLN • 12 miesięcy</p>
+                  </div>
+                  <div className="border rounded-lg p-3 cursor-pointer hover:shadow-md transition-all">
+                    <div className="flex items-center space-x-2 mb-1">
+                      <span className="text-2xl">⚖️</span>
+                      <span className="font-semibold">Prawnik</span>
+                    </div>
+                    <p className="text-xs text-gray-600">10-30k PLN • 24 miesiące</p>
+                  </div>
+                  <div className="border rounded-lg p-3 cursor-pointer hover:shadow-md transition-all">
+                    <div className="flex items-center space-x-2 mb-1">
+                      <span className="text-2xl">📦</span>
+                      <span className="font-semibold">Magazynier</span>
+                    </div>
+                    <p className="text-xs text-gray-600">5-8k PLN • 3 miesiące</p>
+                  </div>
+                  <div className="border rounded-lg p-3 cursor-pointer hover:shadow-md transition-all">
+                    <div className="flex items-center space-x-2 mb-1">
+                      <span className="text-2xl">🔧</span>
+                      <span className="font-semibold">Hydraulik</span>
+                    </div>
+                    <p className="text-xs text-gray-600">7-14k PLN • 6 miesięcy</p>
+                  </div>
+                  <div className="border rounded-lg p-3 cursor-pointer hover:shadow-md transition-all">
+                    <div className="flex items-center space-x-2 mb-1">
+                      <span className="text-2xl">💻</span>
+                      <span className="font-semibold">Programista</span>
+                    </div>
+                    <p className="text-xs text-gray-600">10-25k PLN • 9 miesięcy</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Stats */}
+              <div className="grid grid-cols-4 gap-4">
+                <div className="bg-white rounded-xl p-4 text-center">
+                  <div className="text-2xl mb-1">🎯</div>
+                  <div className="text-2xl font-bold">3/5</div>
+                  <div className="text-xs text-gray-500">Zadania dziś</div>
+                </div>
+                <div className="bg-white rounded-xl p-4 text-center">
+                  <div className="text-2xl mb-1">⚡</div>
+                  <div className="text-2xl font-bold">180</div>
+                  <div className="text-xs text-gray-500">XP zdobyte dziś</div>
+                </div>
+                <div className="bg-white rounded-xl p-4 text-center">
+                  <div className="text-2xl mb-1">⏱️</div>
+                  <div className="text-2xl font-bold">45m</div>
+                  <div className="text-xs text-gray-500">Czas nauki</div>
+                </div>
+                <div className="bg-white rounded-xl p-4 text-center">
+                  <div className="text-2xl mb-1">🏆</div>
+                  <div className="text-2xl font-bold">12</div>
+                  <div className="text-xs text-gray-500">Osiągnięcia</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Sidebar */}
+            <div className="col-span-3">
+              {/* Community Mission */}
+              <div className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl p-4 shadow-lg mb-4 text-white">
+                <h3 className="font-bold mb-2">{communityMission.title}</h3>
+                <div className="text-3xl font-bold mb-2">
+                  {(communityMission.current / 1000).toFixed(0)}K / 1M XP
+                </div>
+                <div className="h-3 bg-white/30 rounded-full mb-2">
+                  <div 
+                    className="h-full bg-white rounded-full transition-all duration-500"
+                    style={{ width: `${(communityMission.current / communityMission.goal) * 100}%` }}
+                  />
+                </div>
+                <p className="text-xs opacity-90">👥 {communityMission.contributors} uczestników</p>
+                <p className="text-xs mt-2">🎁 {communityMission.reward}</p>
+              </div>
+
+              {/* League Status */}
+              <div className="bg-white rounded-2xl p-4 shadow-sm mb-4 border-2 border-silver">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-2xl">{currentLeague.icon}</span>
+                    <h3 className="font-bold">{currentLeague.name}</h3>
+                  </div>
+                  <span className="text-xs bg-gray-100 px-2 py-1 rounded-full">
+                    {currentLeague.daysLeft} dni do końca
+                  </span>
+                </div>
+                <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg p-3 mb-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium">Twoja pozycja</span>
+                    <span className="text-2xl font-bold">#{currentLeague.position}</span>
+                  </div>
+                  <div className="text-xs text-gray-600 mt-1">
+                    {currentLeague.position <= 10 ? '🔥 Świetnie! Utrzymaj pozycję!' : 
+                     currentLeague.position <= 30 ? '💪 Blisko awansu!' : 
+                     '⚡ Więcej nauki = awans!'}
+                  </div>
+                </div>
+                <div className="text-xs text-center text-gray-500">
+                  Top 10: {currentLeague.topReward}
+                </div>
+              </div>
+
+              {/* Hot Jobs */}
+              <div className="bg-white rounded-2xl p-4 shadow-sm mb-4">
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="font-bold">🔥 Gorące zawody</h3>
+                  <button className="text-xs text-blue-600">Zobacz więcej →</button>
+                </div>
+                <div className="space-y-2">
+                  {hotJobs.map((job, i) => (
+                    <div key={i} className={`p-3 rounded-lg ${job.hot ? 'bg-gradient-to-r from-orange-50 to-red-50 border border-orange-200' : 'bg-gray-50'}`}>
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="font-medium text-sm">{job.name}</span>
+                        {job.hot && <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">HOT</span>}
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-gray-600">{job.salary} PLN</span>
+                        <span className="text-xs text-green-600">↑{job.trend}%</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Leaderboard - Updated with effects */}
+              <div className="bg-white rounded-2xl p-4 shadow-sm mb-4">
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="font-bold">Ranking {currentLeague.name}</h3>
+                  <Timer className="w-4 h-4 text-gray-400" />
+                </div>
+                <div className="space-y-2">
+                  {leaderboard.map((user, index) => (
+                    <div key={user.rank} className={`
+                      flex items-center justify-between p-2 rounded-lg relative
+                      ${user.isUser ? 'bg-blue-50 border border-blue-200' : 
+                        index === 0 ? 'bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-300' :
+                        index === 1 ? 'bg-gray-50 border border-gray-300' :
+                        index === 2 ? 'bg-orange-50 border border-orange-300' :
+                        'hover:bg-gray-50'}
+                    `}>
+                      {index < 3 && (
+                        <div className="absolute -top-2 -right-2">
+                          <span className="text-lg">{['👑', '🥈', '🥉'][index]}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center space-x-2">
+                        <span className="font-bold text-sm w-6">{user.rank}.</span>
+                        <span className="text-xl">{user.avatar}</span>
+                        <span className={`text-sm ${user.isUser ? 'font-bold' : ''}`}>{user.name}</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm font-semibold">{user.xp}</span>
+                        {index === 0 && <span className="text-xs animate-pulse">🔥</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 pt-3 border-t">
+                  <div className="text-xs text-center">
+                    <span className="text-gray-500">Resetowanie: </span>
+                    <span className="font-bold text-blue-600">{currentLeague.daysLeft} dni {Math.floor(Math.random() * 24)}h</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Action */}
+              <div className="bg-gradient-to-r from-purple-100 to-blue-100 rounded-2xl p-4 text-center">
+                <div className="text-3xl mb-2">🎓</div>
+                <h4 className="font-bold mb-2">Twoje osiągnięcia</h4>
+                <div className="flex justify-center space-x-2">
+                  <span className="text-2xl">🏆</span>
+                  <span className="text-2xl">🥇</span>
+                  <span className="text-2xl">⭐</span>
+                  <span className="text-2xl opacity-30">🔒</span>
+                  <span className="text-2xl opacity-30">🔒</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* News Ticker */}
+      <div className="fixed bottom-0 left-0 right-0 bg-gray-900 text-white py-2">
+        <div className="max-w-screen-xl mx-auto px-4 flex items-center">
+          <span className="bg-red-600 text-xs px-2 py-1 rounded mr-3 animate-pulse">LIVE</span>
+          <div className="overflow-hidden flex-1">
+            <p className="text-sm animate-marquee whitespace-nowrap">
+              {newsItems[newsTicker]} • {newsItems[(newsTicker + 1) % newsItems.length]} • {newsItems[(newsTicker + 2) % newsItems.length]}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default PathFinderApp;
