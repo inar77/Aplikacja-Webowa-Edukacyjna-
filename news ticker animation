@@ -1,0 +1,177 @@
+ News ticker animation
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNewsTicker((prev) => (prev + 1) % newsItems.length);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Show notification
+  const showNotif = (message) => {
+    setNotificationMessage(message);
+    setShowNotification(true);
+    setTimeout(() => setShowNotification(false), 3000);
+  };
+
+  // Complete lesson with confetti
+  const completeLesson = () => {
+    const xpGain = 50;
+    const coinGain = 10;
+    
+    setUser(prev => {
+      const newXp = prev.xp + xpGain;
+      const newCoins = prev.coins + coinGain;
+      
+      if (newXp >= prev.xpToNext) {
+        showNotif(`🎉 Level ${prev.level + 1}!`);
+        setShowConfetti(true);
+        setTimeout(() => setShowConfetti(false), 3000);
+        return {
+          ...prev,
+          level: prev.level + 1,
+          xp: newXp - prev.xpToNext,
+          xpToNext: Math.floor(prev.xpToNext * 1.2),
+          coins: newCoins + 50,
+          totalXp: prev.totalXp + xpGain
+        };
+      }
+      
+      showNotif(`+${xpGain} XP`);
+      return {
+        ...prev,
+        xp: newXp,
+        coins: newCoins,
+        totalXp: prev.totalXp + xpGain
+      };
+    });
+  };
+
+  // Career paths
+  const careerPath = {
+    name: 'Elektryk',
+    progress: 3,
+    currentStage: 'Instalacje domowe',
+    stages: [
+      { id: 1, name: 'Bezpieczeństwo', icon: '⚡', status: 'completed', xp: 500 },
+      { id: 2, name: 'Narzędzia', icon: '🔧', status: 'completed', xp: 750 },
+      { id: 3, name: 'Instalacje domowe', icon: '🏠', status: 'current', xp: 340, maxXp: 1000 },
+      { id: 4, name: 'Szafy rozdzielcze', icon: '📦', status: 'locked' },
+      { id: 5, name: 'Pomiary', icon: '📊', status: 'locked' },
+      { id: 6, name: 'Smart Home', icon: '🤖', status: 'locked' }
+    ]
+  };
+
+  // Hot jobs with icons
+  const hotJobs = [
+    { name: 'Elektryk', salary: '8-15k', trend: 35, hot: true, icon: '⚡' },
+    { name: 'Pielęgniarka', salary: '7-12k', trend: 42, hot: true, icon: '🏥' },
+    { name: 'Mechatronik', salary: '10-18k', trend: 28, hot: true, icon: '🤖' },
+    { name: 'Magazynier', salary: '5-8k', trend: 25, hot: false, icon: '📦' },
+    { name: 'Prawnik', salary: '15-30k', trend: 18, hot: false, icon: '⚖️' }
+  ];
+
+  // Praktyczne zadania
+  const practicalTasks = [
+    {
+      id: 1,
+      title: "Pierwsza instalacja",
+      description: "Podłącz gniazdko 230V zgodnie z normami",
+      steps: [
+        { step: "Wyłącz bezpieczniki", done: true },
+        { step: "Sprawdź napięcie testerem", done: true },
+        { step: "Podłącz przewody L, N, PE", done: false },
+        { step: "Zamontuj gniazdko w puszce", done: false }
+      ],
+      reward: { xp: 150, coins: 50 },
+      difficulty: "średnie",
+      time: "30 min",
+      progress: 50
+    },
+    {
+      id: 2,
+      title: "Wymiana bezpiecznika",
+      description: "Bezpiecznie wymień bezpiecznik w rozdzielnicy",
+      steps: [
+        { step: "Zlokalizuj uszkodzony bezpiecznik", done: false },
+        { step: "Wyłącz główny wyłącznik", done: false },
+        { step: "Wymień bezpiecznik", done: false }
+      ],
+      reward: { xp: 100, coins: 30 },
+      difficulty: "łatwe",
+      time: "15 min",
+      progress: 0
+    }
+  ];
+
+  // Sklep z upgrade'ami
+  const shopUpgrades = [
+    { id: 1, name: "Złoty Multimetr", desc: "+50% XP z pomiarów", price: 200, icon: "🔧", owned: false },
+    { id: 2, name: "Pro Wkrętarka", desc: "2x szybsze zadania", price: 150, icon: "🔩", owned: false },
+    { id: 3, name: "Kask Bezpieczeństwa", desc: "+1 życie dziennie", price: 100, icon: "⛑️", owned: true },
+    { id: 4, name: "Pomocnik AI", desc: "Podpowiedzi do zadań", price: 300, icon: "🤖", owned: false }
+  ];
+
+  // Community mission
+  const communityMission = {
+    title: 'Razem do miliona! 🎯',
+    current: 723456,
+    goal: 1000000,
+    reward: '2x XP dla wszystkich przez weekend',
+    contributors: 3421
+  };
+
+  // Dynamic leagues
+  const currentLeague = {
+    name: 'Liga Srebrna',
+    icon: '🥈',
+    position: 24,
+    topReward: 'Awans do Złotej Ligi + 1000 monet',
+    daysLeft: 3
+  };
+
+  // Daily challenges - updated
+  const challenges = [
+    { id: 1, name: 'Ukończ 3 lekcje', current: 1, max: 3, xp: 100, icon: '📚' },
+    { id: 2, name: 'Zdobądź 500 XP', current: 240, max: 500, xp: 50, icon: '⭐' },
+    { id: 3, name: 'Utrzymaj serię', current: 1, max: 1, xp: 25, icon: '🔥', completed: true },
+    { id: 4, name: '⚡ Ekspresowe wyzwanie', current: 0, max: 5, xp: 200, icon: '⚡', time: '30 min', special: true }
+  ];
+
+  // Friends online - różne zawody
+  const friends = [
+    { name: 'Maria K.', status: 'Prawo karne - wykład', xp: 3421, avatar: '👩‍⚖️' },
+    { name: 'Tomek R.', status: 'Montaż instalacji', xp: 4102, avatar: '👷' },
+    { name: 'Ania L.', status: 'Anatomia człowieka', xp: 2934, avatar: '👩‍⚕️' },
+    { name: 'Piotr N.', status: 'Logistyka magazynu', xp: 2567, avatar: '📦' }
+  ];
+
+  // Leaderboard
+  const leaderboard = [
+    { rank: 22, name: 'Michał K.', xp: 2901, avatar: '🎯' },
+    { rank: 23, name: 'Ola Z.', xp: 2873, avatar: '✨' },
+    { rank: 24, name: 'Ty', xp: user.totalXp, avatar: '🚀', isUser: true },
+    { rank: 25, name: 'Kuba W.', xp: 2834, avatar: '💫' }
+  ];
+
+  return (
+    <div className={`min-h-screen ${darkMode ? 'bg-gray-900' : 'bg-gray-50'} transition-colors duration-300`}>
+      {/* Confetti Effect */}
+      {showConfetti && (
+        <div className="fixed inset-0 z-50 pointer-events-none">
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="text-6xl animate-bounce">🎉</div>
+          </div>
+          {[...Array(20)].map((_, i) => (
+            <div
+              key={i}
+              className="absolute animate-pulse"
+              style={{
+                left: `${Math.random() * 100}%`,
+                top: `${Math.random() * 100}%`,
+                animationDelay: `${Math.random() * 2}s`
+              }}
+            >
+              <span className="text-2xl">{['🎊', '✨', '⭐', '🎈'][Math.floor(Math.random() * 4)]}</span>
+            </div>
+          ))}
+        </div>
