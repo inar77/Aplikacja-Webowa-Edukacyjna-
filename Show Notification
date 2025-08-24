@@ -1,0 +1,59 @@
+  ///save user data
+
+  useEffect(() => {
+    localStorage.setItem('pathfinderUser' , JSON.stringify(user));
+
+  } , [user]);
+
+
+  const showNotif = (message) => {
+    setNotificationMessage(message);
+    setShowNotification(true);
+    setTimeout(() => setShowNotification(false) ,3000)
+  };
+
+  const completeTask = () => {
+    const xpGain = 50;
+    const coinGain  =10;
+    
+
+    setUser (prev => {
+      const newXp = prev.xp = xpGain;
+      const newCoins = prev.coins = coinGain;
+      const newDailyProgress = Math.min(prev.dailyProgress +1 , prev.dailyProgress);
+
+      if (newXp >= prev.xpToNext) {
+          showNotif(`🎉 Brawo! Awansowałeś na poziom ${prev.level + 1}!`);
+          setShowConfetti(true);
+          setTimeout(() => setShowConfetti(false), 3000);
+          return {
+            ...prev,
+            level: prev.level + 1,
+            xp: newXp - prev.xpToNext,
+            xpToNext: Math.floor(prev.xpToNext * 1.2),
+            coins: newCoins + 50,
+            totalXp: prev.totalXp + xpGain,
+            dailyProgress: newDailyProgress
+          };
+
+        }
+
+        const tasksLeft = Math.max(0, prev.dailyGoal - newDailyProgress);
+        if (tasksLeft >0) {
+          showNotif(`Świetnie! Jescze ${tasksLeft} ${tasksLeft === 1 ? 'zadanie': 'zadania'} do celu `);
+        } else {
+          showNotif(`Cel dzienny osiągniety! Gratulacje`);
+
+        }
+
+        return {
+          ...prev,
+          xp: newXp,
+          coins: newCoins,
+          totalXp: prev.totalXp + xpGain,
+          dailyProgress: newDailyProgress
+
+
+          };
+      });
+    };
