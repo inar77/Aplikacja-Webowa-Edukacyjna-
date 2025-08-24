@@ -1,0 +1,733 @@
+import React, { useState, useEffect } from 'react';
+import {
+  Home, Target, Trophy, ShoppingBag, Users, Zap, Clock, CheckCircle, Lock,
+  ChevronLeft, ChevronRight, Flame, Star, Circle, X, Book, Code, Briefcase,
+  MessageSquare, TrendingUp, Award, Sparkles, Bell, Settings, User, Heart,
+  Shield, Coffee, MapPin, Sword, Scale, Activity,
+  ArrowRight, Gift, ChevronUp, BarChart3, Medal, Gem, LogOut, Play,
+  Calendar, Rocket, Brain, DollarSign, AlertCircle, Timer
+} from 'lucide-react';
+
+const PathFinderApp = () => {
+  // Stan użytkownika
+  const [user, setUser] = useState(() => {
+    const saved = localStorage.getItem('pathfinderUser');
+    return saved ? JSON.parse(saved) : {
+      name: 'Jan',
+      level: 24,
+      xp: 2847,
+      xpToNext: 5000,
+      totalXp: 12847,
+      coins: 1240,
+      gems: 5,
+      currentPath: 'Elektryk',
+      streak: 7,
+      hearts: 5,
+      dailyGoal: 3,
+      dailyProgress: 1,
+      nextMilestone: 'Szafy rozdzielcze'
+    };
+  });
+
+  const [currentScreen, setCurrentScreen] = useState('home');
+  const [showNotification, setShowNotification] = useState(false);
+  const [notificationMessage, setNotificationMessage] = useState('');
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
+  const [activeTab, setActiveTab] = useState('zadania');
+  const [newsTicker, setNewsTicker] = useState(0);
+
+  // Personalized messages
+  const getPersonalizedMessage = () => {
+    const messages = [
+      `${user.name}, zostały Ci tylko 2 zadania do odblokowania "${user.nextMilestone}"! 💪`,
+      `Świetnie Ci idzie! Jeszcze jedno zadanie i wyprzedzisz Kubę W. w rankingu 🚀`,
+      `Wow, ${user.streak} dni z rzędu! Nie przerywaj teraz! 🔥`,
+      `Dziś piątek - idealna pora żeby dokończyć etap "Instalacje domowe" 🎯`
+    ];
+    return messages[Math.floor(Math.random() * messages.length)];
+  };
+
+  // Tomorrow's hook
+  const tomorrowHook = "Jutro o 19:00: Quiz Elektryczny z nagrodami 1000 monet! ⚡";
+
+  // News items
+  const newsItems = [
+    "🔥 Python Master ukończył 30-dniową serię!",
+    "💼 Elektryk +35% wzrost popytu na rynku pracy",
+    "🎯 Nowy kurs: Smart Home już dostępny",
+    "⚡ Weekend = 2x XP! Nie przegap okazji!",
+    "🏆 Kasia W. awansowała na poziom 50!"
+  ];
+
+  // News ticker animation
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNewsTicker((prev) => (prev + 1) % newsItems.length);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Save user data
+  useEffect(() => {
+    localStorage.setItem('pathfinderUser', JSON.stringify(user));
+  }, [user]);
+
+  // Show notification
+  const showNotif = (message) => {
+    setNotificationMessage(message);
+    setShowNotification(true);
+    setTimeout(() => setShowNotification(false), 3000);
+  };
+
+  // Complete task with emotional feedback
+  const completeTask = () => {
+    const xpGain = 50;
+    const coinGain = 10;
+    
+    setUser(prev => {
+      const newXp = prev.xp + xpGain;
+      const newCoins = prev.coins + coinGain;
+      const newDailyProgress = Math.min(prev.dailyProgress + 1, prev.dailyGoal); // Fix negative tasks
+      
+      if (newXp >= prev.xpToNext) {
+        showNotif(`🎉 Brawo! Awansowałeś na poziom ${prev.level + 1}!`);
+        setShowConfetti(true);
+        setTimeout(() => setShowConfetti(false), 3000);
+        return {
+          ...prev,
+          level: prev.level + 1,
+          xp: newXp - prev.xpToNext,
+          xpToNext: Math.floor(prev.xpToNext * 1.2),
+          coins: newCoins + 50,
+          totalXp: prev.totalXp + xpGain,
+          dailyProgress: newDailyProgress
+        };
+      }
+      
+      const tasksLeft = Math.max(0, prev.dailyGoal - newDailyProgress);
+      if (tasksLeft > 0) {
+        showNotif(`Świetnie! Jeszcze ${tasksLeft} ${tasksLeft === 1 ? 'zadanie' : 'zadania'} do celu 🎯`);
+      } else {
+        showNotif(`Cel dzienny osiągnięty! Gratulacje! 🏆`);
+      }
+      
+      return {
+        ...prev,
+        xp: newXp,
+        coins: newCoins,
+        totalXp: prev.totalXp + xpGain,
+        dailyProgress: newDailyProgress
+      };
+    });
+  };
+
+  // Main task for today
+  const todayTask = {
+    title: "Podłącz pierwsze gniazdko 230V",
+    currentStep: 3,
+    totalSteps: 4,
+    steps: [
+      { name: "Wyłącz bezpieczniki", done: true },
+      { name: "Sprawdź napięcie", done: true },
+      { name: "Podłącz przewody L, N, PE", done: false, current: true },
+      { name: "Zamontuj w puszce", done: false }
+    ],
+    whyDoIt: [
+      "Wyprzedzisz Kubę W. w rankingu",
+      `Odblokujesz "${user.nextMilestone}"`,
+      "Zdobędziesz odznakę Pierwsza Instalacja"
+    ]
+  };
+
+  // Praktyczne zadania
+  const practicalTasks = [
+    {
+      id: 1,
+      title: "Pierwsza instalacja",
+      description: "Podłącz gniazdko 230V zgodnie z normami",
+      steps: [
+        { step: "Wyłącz bezpieczniki", done: true },
+        { step: "Sprawdź napięcie testerem", done: true },
+        { step: "Podłącz przewody L, N, PE", done: false },
+        { step: "Zamontuj gniazdko w puszce", done: false }
+      ],
+      reward: { xp: 150, coins: 50 },
+      difficulty: "średnie",
+      time: "30 min",
+      progress: 50
+    },
+    {
+      id: 2,
+      title: "Wymiana bezpiecznika",
+      description: "Bezpiecznie wymień bezpiecznik w rozdzielnicy",
+      steps: [
+        { step: "Zlokalizuj uszkodzony bezpiecznik", done: false },
+        { step: "Wyłącz główny wyłącznik", done: false },
+        { step: "Wymień bezpiecznik", done: false }
+      ],
+      reward: { xp: 100, coins: 30 },
+      difficulty: "łatwe",
+      time: "15 min",
+      progress: 0
+    }
+  ];
+
+  // Sklep z upgrade'ami
+  const shopUpgrades = [
+    { id: 1, name: "Złoty Multimetr", desc: "+50% XP z pomiarów", price: 200, icon: "🔧", owned: false },
+    { id: 2, name: "Pro Wkrętarka", desc: "2x szybsze zadania", price: 150, icon: "🔩", owned: false },
+    { id: 3, name: "Kask Bezpieczeństwa", desc: "+1 życie dziennie", price: 100, icon: "⛑️", owned: true },
+    { id: 4, name: "Pomocnik AI", desc: "Podpowiedzi do zadań", price: 300, icon: "🤖", owned: false }
+  ];
+
+  // Career path with better visuals
+  const careerPath = {
+    name: 'Elektryk',
+    currentStage: 3,
+    totalStages: 6,
+    stages: [
+      { name: 'Bezpieczeństwo', icon: '⚡', status: 'completed' },
+      { name: 'Narzędzia', icon: '🔧', status: 'completed' },
+      { name: 'Instalacje', icon: '🏠', status: 'current', xp: 340, maxXp: 1000 },
+      { name: 'Szafy', icon: '📦', status: 'locked' },
+      { name: 'Pomiary', icon: '📊', status: 'locked' },
+      { name: 'Smart Home', icon: '🤖', status: 'locked' }
+    ]
+  };
+
+  // Daily challenges
+  const challenges = [
+    { id: 1, name: 'Ukończ 3 lekcje', current: user.dailyProgress, max: 3, xp: 100, icon: '📚' },
+    { id: 2, name: 'Zdobądź 500 XP', current: 240, max: 500, xp: 50, icon: '⭐' },
+    { id: 3, name: 'Utrzymaj serię', current: 1, max: 1, xp: 25, icon: '🔥', completed: true }
+  ];
+
+  // Simplified ranking with context
+  const ranking = [
+    { name: 'Kuba W.', xp: 2890, avatar: '👨', ahead: true, diff: 43 },
+    { name: 'Ty', xp: user.totalXp, avatar: '🎮', isUser: true },
+    { name: 'Ania L.', xp: 2780, avatar: '👩', behind: true, diff: 67 }
+  ];
+
+  // Live social feed
+  const socialFeed = [
+    { user: 'Tomek R.', action: 'ukończył "Wymiana bezpiecznika"', time: '5 min temu', emoji: '✅' },
+    { user: 'Maria K.', action: 'pyta o pomoc z instalacją', time: '12 min temu', emoji: '❓' },
+    { user: 'Piotr N.', action: 'wyzwał Cię na quiz!', time: '1h temu', emoji: '⚔️', cta: true }
+  ];
+
+  // Hot jobs with icons
+  const hotJobs = [
+    { name: 'Elektryk', salary: '8-15k', trend: 35, hot: true, icon: '⚡' },
+    { name: 'Pielęgniarka', salary: '7-12k', trend: 42, hot: true, icon: '🏥' },
+    { name: 'Mechatronik', salary: '10-18k', trend: 28, hot: true, icon: '🤖' },
+    { name: 'Magazynier', salary: '5-8k', trend: 25, hot: false, icon: '📦' }
+  ];
+
+  return (
+    <div className={`min-h-screen ${darkMode ? 'bg-gray-900' : 'bg-gray-50'} transition-colors duration-300`}>
+      {/* Confetti Effect */}
+      {showConfetti && (
+        <div className="fixed inset-0 z-50 pointer-events-none">
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="text-6xl animate-bounce">🎉</div>
+          </div>
+          {[...Array(20)].map((_, i) => (
+            <div
+              key={i}
+              className="absolute animate-pulse"
+              style={{
+                left: `${Math.random() * 100}%`,
+                top: `${Math.random() * 100}%`,
+                animationDelay: `${Math.random() * 2}s`
+              }}
+            >
+              <span className="text-2xl">{['🎊', '✨', '⭐', '🎈'][Math.floor(Math.random() * 4)]}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Header */}
+      <header className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-b'} fixed top-0 left-0 right-0 z-40 transition-colors`}>
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="flex items-center justify-between h-14">
+            <div className="flex items-center space-x-6">
+              <div className="flex items-center space-x-2">
+                <Rocket className="w-7 h-7 text-blue-600" />
+                <span className={`text-lg font-bold ${darkMode ? 'text-white' : ''}`}>PathFinder</span>
+              </div>
+              
+              <nav className="hidden md:flex space-x-1">
+                <button 
+                  onClick={() => setCurrentScreen('home')}
+                  className={`px-4 py-2 rounded-lg ${currentScreen === 'home' ? 'bg-blue-100 text-blue-700' : darkMode ? 'hover:bg-gray-700 text-gray-300' : 'hover:bg-gray-100'}`}
+                  title="Strona główna"
+                >
+                  <Home className="w-5 h-5" />
+                </button>
+                <button className={`px-4 py-2 rounded-lg ${darkMode ? 'hover:bg-gray-700 text-gray-300' : 'hover:bg-gray-100'}`} title="Znajomi">
+                  <Users className="w-5 h-5" />
+                </button>
+                <button className={`px-4 py-2 rounded-lg ${darkMode ? 'hover:bg-gray-700 text-gray-300' : 'hover:bg-gray-100'}`} title="Ranking">
+                  <Trophy className="w-5 h-5" />
+                </button>
+                <button className={`px-4 py-2 rounded-lg ${darkMode ? 'hover:bg-gray-700 text-gray-300' : 'hover:bg-gray-100'}`} title="Sklep">
+                  <ShoppingBag className="w-5 h-5" />
+                </button>
+              </nav>
+            </div>
+
+            <div className="flex items-center space-x-4">
+              {/* Streak with animation */}
+              <div className="flex items-center bg-orange-100 px-3 py-1.5 rounded-full">
+                <Flame className="w-4 h-4 text-orange-600 mr-1 animate-pulse" />
+                <span className="font-bold text-orange-600">{user.streak}</span>
+              </div>
+              
+              {/* Coins */}
+              <div className="flex items-center bg-yellow-100 px-3 py-1.5 rounded-full cursor-pointer hover:bg-yellow-200 transition-transform hover:scale-105" title="Twoje monety">
+                <span className="text-yellow-600 mr-1">💰</span>
+                <span className="font-bold text-yellow-700">{user.coins}</span>
+              </div>
+
+              {/* Hearts with spring animation */}
+              <div className="flex items-center space-x-1" title="Życia">
+                {[...Array(5)].map((_, i) => (
+                  <span key={i} className={`transition-transform hover:scale-125 ${i < user.hearts ? 'text-red-500' : 'text-gray-300'}`}>
+                    ❤️
+                  </span>
+                ))}
+              </div>
+
+              {/* Dark mode toggle */}
+              <button 
+                onClick={() => setDarkMode(!darkMode)}
+                className={`p-2 rounded-lg ${darkMode ? 'bg-gray-700 text-yellow-400' : 'hover:bg-gray-100'}`}
+                title="Zmień motyw"
+              >
+                {darkMode ? '🌙' : '☀️'}
+              </button>
+
+              {/* Notifications */}
+              <button className="relative p-2 hover:bg-gray-100 rounded-lg">
+                <Bell className="w-5 h-5 text-gray-700" />
+                <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+              </button>
+
+              {/* User */}
+              <div className="flex items-center space-x-2">
+                <div className="text-right">
+                  <p className={`text-sm font-semibold ${darkMode ? 'text-white' : ''}`}>{user.name}</p>
+                  <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Elektryk - poziom {user.level}</p>
+                </div>
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold">
+                  JK
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Notification */}
+      {showNotification && (
+        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded-full shadow-lg z-50 animate-bounce">
+          {notificationMessage}
+        </div>
+      )}
+
+      {/* Main Content */}
+      <div className="pt-20 pb-12 max-w-7xl mx-auto px-4">
+        <div className="grid grid-cols-12 gap-6">
+          
+          {/* Left Sidebar */}
+          <div className="col-span-3">
+            {/* Tabs */}
+            <div className="flex space-x-2 mb-4">
+              <button
+                onClick={() => setActiveTab('zadania')}
+                className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                  activeTab === 'zadania' 
+                    ? 'bg-blue-600 text-white' 
+                    : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-white text-gray-600'
+                }`}
+              >
+                📋 Zadania
+              </button>
+              <button
+                onClick={() => setActiveTab('sklep')}
+                className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                  activeTab === 'sklep' 
+                    ? 'bg-purple-600 text-white' 
+                    : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-white text-gray-600'
+                }`}
+              >
+                🛍️ Upgrady
+              </button>
+            </div>
+
+            {/* Tasks Tab */}
+            {activeTab === 'zadania' && (
+              <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl p-4 shadow-sm mb-4 transition-colors`}>
+                <h3 className={`font-bold mb-3 ${darkMode ? 'text-white' : ''}`}>Praktyczne zadania</h3>
+                <div className="space-y-3">
+                  {practicalTasks.map(task => (
+                    <div key={task.id} className={`${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg p-3 hover:shadow-md transition-all cursor-pointer`}>
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <h4 className={`font-semibold ${darkMode ? 'text-white' : ''}`}>{task.title}</h4>
+                          <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{task.description}</p>
+                        </div>
+                        <span className={`text-xs px-2 py-1 rounded-full ${
+                          task.difficulty === 'łatwe' ? 'bg-green-100 text-green-700' :
+                          task.difficulty === 'średnie' ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-red-100 text-red-700'
+                        }`}>
+                          {task.difficulty}
+                        </span>
+                      </div>
+                      
+                      {/* Progress bar */}
+                      <div className="h-2 bg-gray-200 rounded-full mb-2">
+                        <div 
+                          className="h-full bg-gradient-to-r from-blue-500 to-green-500 rounded-full transition-all"
+                          style={{ width: `${task.progress}%` }}
+                        />
+                      </div>
+
+                      {/* Rewards */}
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center space-x-3 text-xs">
+                          <span>⏱️ {task.time}</span>
+                          <span className="text-yellow-600 font-bold">+{task.reward.xp} XP</span>
+                          <span className="text-yellow-500 font-bold">+{task.reward.coins} 💰</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Shop Tab */}
+            {activeTab === 'sklep' && (
+              <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl p-4 shadow-sm mb-4 transition-colors`}>
+                <h3 className={`font-bold mb-3 ${darkMode ? 'text-white' : ''}`}>Ulepszenia warsztatu</h3>
+                <div className="space-y-3">
+                  {shopUpgrades.map(item => (
+                    <div key={item.id} className={`${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg p-3 ${item.owned ? 'opacity-60' : 'hover:shadow-md cursor-pointer'} transition-all`}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <span className="text-2xl">{item.icon}</span>
+                          <div>
+                            <h4 className={`font-semibold text-sm ${darkMode ? 'text-white' : ''}`}>
+                              {item.name} {item.owned && '✓'}
+                            </h4>
+                            <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{item.desc}</p>
+                          </div>
+                        </div>
+                        {!item.owned && (
+                          <button className="bg-yellow-500 text-white px-3 py-1 rounded-lg text-sm hover:bg-yellow-600 transition-transform hover:scale-105">
+                            {item.price} 💰
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Daily Challenges */}
+            <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl p-4 shadow-sm`}>
+              <h3 className={`font-bold mb-3 ${darkMode ? 'text-white' : ''}`}>Dzienne wyzwania</h3>
+              <div className="space-y-3">
+                {challenges.map(ch => (
+                  <div key={ch.id} className={`cursor-pointer hover:bg-gray-50 rounded-lg p-2 -m-2 ${darkMode ? 'hover:bg-gray-700' : ''}`}>
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center space-x-2">
+                        <span>{ch.icon}</span>
+                        <span className={`text-sm ${darkMode ? 'text-gray-300' : ''}`}>{ch.name}</span>
+                      </div>
+                      <span className="text-xs font-bold text-yellow-600">+{ch.xp}</span>
+                    </div>
+                    <div className="h-2 bg-gray-200 rounded-full">
+                      <div 
+                        className={`h-full rounded-full ${ch.completed ? 'bg-green-500' : 'bg-blue-500'}`}
+                        style={{ width: `${(ch.current / ch.max) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Main Column - Focus on primary task */}
+          <div className="col-span-6">
+            {/* Personalized greeting */}
+            <div className="mb-4">
+              <h1 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'} mb-2`}>
+                {getPersonalizedMessage()}
+              </h1>
+              <p className={`${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                {user.dailyGoal - user.dailyProgress > 0 
+                  ? `Masz ${Math.max(0, user.dailyGoal - user.dailyProgress)} ${user.dailyGoal - user.dailyProgress === 1 ? 'zadanie' : 'zadania'} do dzisiejszego celu`
+                  : 'Gratulacje! Osiągnąłeś dzienny cel! 🏆'
+                }
+              </p>
+            </div>
+
+            {/* PRIMARY TASK - BIG FOCUS */}
+            <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-8 text-white mb-6 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-10 rounded-full -mr-32 -mt-32"></div>
+              
+              <div className="relative">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-3xl font-bold mb-2">🎯 Twoje zadanie na dziś</h2>
+                    <p className="text-xl opacity-90">{todayTask.title}</p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-4xl font-bold">{todayTask.currentStep}/{todayTask.totalSteps}</div>
+                    <div className="text-sm opacity-75">kroki</div>
+                  </div>
+                </div>
+
+                {/* Steps progress */}
+                <div className="bg-white/20 rounded-lg p-4 mb-6">
+                  {todayTask.steps.map((step, idx) => (
+                    <div key={idx} className="flex items-center mb-2 last:mb-0">
+                      <span className={`text-lg mr-3 ${step.done ? '✅' : step.current ? '👉' : '⭕'}`}></span>
+                      <span className={`${step.done ? 'line-through opacity-60' : step.current ? 'font-bold' : 'opacity-60'}`}>
+                        {step.name}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Big CTA */}
+                <button 
+                  onClick={completeTask}
+                  className="w-full bg-white text-blue-600 py-4 rounded-xl font-bold text-lg hover:bg-gray-100 transition-all transform hover:scale-105 shadow-lg"
+                >
+                  ROZPOCZNIJ ZADANIE →
+                </button>
+
+                {/* Why do it */}
+                <div className="mt-6 space-y-2">
+                  <p className="text-sm font-semibold opacity-90">Ukończ to zadanie, żeby:</p>
+                  {todayTask.whyDoIt.map((reason, idx) => (
+                    <div key={idx} className="flex items-center text-sm opacity-80">
+                      <span className="mr-2">→</span>
+                      {reason}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Improved career path visual */}
+            <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl p-6 shadow-sm mb-6`}>
+              <div className="flex justify-between items-center mb-6">
+                <h3 className={`text-lg font-bold ${darkMode ? 'text-white' : ''}`}>Twoja droga: {careerPath.name}</h3>
+                <div className="flex items-center space-x-2">
+                  <span className="text-2xl">🎯</span>
+                  <div>
+                    <div className="text-xl font-bold text-blue-600">{careerPath.currentStage} z {careerPath.totalStages}</div>
+                    <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>etapów ukończone</div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Visual path with better design */}
+              <div className="relative">
+                <div className="absolute top-8 left-0 right-0 h-1 bg-gray-200 dark:bg-gray-600"></div>
+                <div className="absolute top-8 left-0 h-1 bg-gradient-to-r from-green-500 to-blue-500" style={{ width: `${(careerPath.currentStage / careerPath.totalStages) * 100}%` }}></div>
+                
+                <div className="relative flex justify-between">
+                  {careerPath.stages.map((stage, idx) => (
+                    <div key={idx} className="flex flex-col items-center relative">
+                      <div className={`
+                        w-16 h-16 rounded-2xl flex items-center justify-center text-2xl shadow-lg cursor-pointer
+                        transform transition-all duration-300 hover:scale-110
+                        ${stage.status === 'completed' ? 'bg-gradient-to-br from-green-400 to-green-600 shadow-green-200' : 
+                          stage.status === 'current' ? 'bg-gradient-to-br from-blue-400 to-blue-600 shadow-blue-200' : 
+                          'bg-gray-300 shadow-gray-200'}
+                      `}>
+                        {stage.status === 'current' && (
+                          <div className="absolute -inset-1 bg-blue-400 rounded-2xl opacity-75 animate-ping"></div>
+                        )}
+                        <div className="relative">
+                          {stage.status === 'locked' ? '🔒' : stage.icon}
+                        </div>
+                      </div>
+                      <span className={`text-xs mt-2 font-medium ${darkMode ? 'text-gray-300' : ''}`}>{stage.name}</span>
+                      {stage.status === 'current' && stage.xp && (
+                        <div className="mt-1 text-center">
+                          <div className="w-16 h-1 bg-gray-200 rounded-full mx-auto">
+                            <div 
+                              className="h-full bg-blue-500 rounded-full"
+                              style={{ width: `${(stage.xp / stage.maxXp) * 100}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-blue-600 font-bold">{stage.xp}/{stage.maxXp}</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              <div className="mt-6 bg-blue-50 dark:bg-gray-700 rounded-lg p-3">
+                <p className={`text-sm ${darkMode ? 'text-blue-300' : 'text-blue-900'}`}>
+                  💡 Za 2 zadania odblokowujesz: <strong>"{user.nextMilestone}"</strong>
+                </p>
+              </div>
+            </div>
+
+            {/* Tomorrow hook */}
+            <div className="bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-gray-700 dark:to-gray-600 rounded-xl p-4 border border-yellow-300 dark:border-gray-500">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <span className="text-2xl">📅</span>
+                  <div>
+                    <p className={`font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Nie przegap jutro!</p>
+                    <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>{tomorrowHook}</p>
+                  </div>
+                </div>
+                <button className="bg-yellow-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-yellow-600 transition-transform hover:scale-105">
+                  Ustaw przypomnienie
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column - Secondary info */}
+          <div className="col-span-3 space-y-6">
+            {/* Simplified ranking with context */}
+            <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl p-4 shadow-sm`}>
+              <h3 className={`font-bold mb-3 ${darkMode ? 'text-white' : ''}`}>Twoja pozycja</h3>
+              {ranking.map((user, idx) => (
+                <div key={idx} className={`
+                  flex items-center justify-between p-2 rounded-lg mb-2
+                  ${user.isUser ? 'bg-blue-50 dark:bg-blue-900/30 border-2 border-blue-300' : ''}
+                `}>
+                  <div className="flex items-center space-x-3">
+                    <span className="text-2xl">{user.avatar}</span>
+                    <div>
+                      <p className={`font-medium ${darkMode ? 'text-white' : ''}`}>{user.name}</p>
+                      {user.ahead && <p className="text-xs text-orange-600">{user.diff} XP przed Tobą</p>}
+                      {user.behind && <p className="text-xs text-green-600">{user.diff} XP za Tobą</p>}
+                    </div>
+                  </div>
+                  <span className={`font-bold ${darkMode ? 'text-gray-300' : ''}`}>{user.xp}</span>
+                </div>
+              ))}
+              <div className="mt-3 bg-orange-50 dark:bg-orange-900/30 rounded-lg p-3">
+                <p className={`text-sm ${darkMode ? 'text-orange-300' : 'text-orange-900'}`}>
+                  💪 Jedno zadanie i wyprzedzasz Kubę!
+                </p>
+              </div>
+            </div>
+
+            {/* Live social feed */}
+            <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl p-4 shadow-sm`}>
+              <h3 className={`font-bold mb-3 ${darkMode ? 'text-white' : ''}`}>Co się dzieje?</h3>
+              <div className="space-y-3">
+                {socialFeed.map((item, idx) => (
+                  <div key={idx} className="flex items-start space-x-3">
+                    <span className="text-xl">{item.emoji}</span>
+                    <div className="flex-1">
+                      <p className={`text-sm ${darkMode ? 'text-gray-300' : ''}`}>
+                        <strong>{item.user}</strong> {item.action}
+                      </p>
+                      <p className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>{item.time}</p>
+                      {item.cta && (
+                        <button className="text-xs text-blue-600 hover:underline mt-1">
+                          Przyjmij wyzwanie →
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Hot Jobs */}
+            <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl p-4 shadow-sm`}>
+              <div className="flex justify-between items-center mb-3">
+                <h3 className={`font-bold ${darkMode ? 'text-white' : ''}`}>🔥 Gorące zawody</h3>
+                <button className="text-xs text-blue-600">Zobacz więcej →</button>
+              </div>
+              <div className="space-y-2">
+                {hotJobs.map((job, i) => (
+                  <div key={i} className={`p-3 rounded-lg cursor-pointer transition-all hover:shadow-md ${
+                    job.hot ? 'bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 border border-orange-200 dark:border-orange-700' : 
+                    'bg-gray-50 dark:bg-gray-700'
+                  }`}>
+                    <div className="flex justify-between items-start mb-1">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-xl">{job.icon}</span>
+                        <span className={`font-medium text-sm ${darkMode ? 'text-white' : ''}`}>{job.name}</span>
+                      </div>
+                      {job.hot && <span className="text-xs bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300 px-2 py-0.5 rounded-full font-bold animate-pulse">HOT</span>}
+                    </div>
+                    <div className="flex justify-between items-center ml-7">
+                      <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{job.salary} PLN</span>
+                      <span className="text-xs text-green-600 dark:text-green-400 font-bold">↑{job.trend}%</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Quick stats - emotional */}
+            <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl p-4 shadow-sm`}>
+              <h3 className={`font-bold mb-3 ${darkMode ? 'text-white' : ''}`}>Twój dzień</h3>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className={`${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Zadania</span>
+                  <span className={`font-bold ${darkMode ? 'text-white' : ''}`}>
+                    {user.dailyProgress} z {user.dailyGoal} ✅
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className={`${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Do awansu</span>
+                  <span className={`font-bold ${darkMode ? 'text-white' : ''}`}>
+                    Jeszcze {Math.max(0, 3 - user.dailyProgress)} {Math.max(0, 3 - user.dailyProgress) === 1 ? 'zadanie' : 'zadania'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className={`${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Czas nauki</span>
+                  <span className={`font-bold ${darkMode ? 'text-white' : ''}`}>45 minut 💪</span>
+                </div>
+              </div>
+              <div className="mt-3 pt-3 border-t dark:border-gray-700">
+                <p className={`text-xs text-center ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                  Jesteś w TOP 30% najaktywniejszych dziś!
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* News ticker - stays */}
+      <div className="fixed bottom-0 left-0 right-0 bg-gray-900 text-white py-2">
+        <div className="max-w-7xl mx-auto px-4 flex items-center">
+          <span className="bg-red-600 text-xs px-2 py-1 rounded mr-3 animate-pulse">LIVE</span>
+          <div className="overflow-hidden flex-1">
+            <p className="text-sm animate-marquee whitespace-nowrap">
+              {newsItems[newsTicker]} • {newsItems[(newsTicker + 1) % newsItems.length]} • {newsItems[(newsTicker + 2) % newsItems.length]}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default PathFinderApp;
