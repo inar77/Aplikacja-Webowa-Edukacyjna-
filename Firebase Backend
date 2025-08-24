@@ -1,0 +1,688 @@
+// ============================================
+// FIREBASE CONFIGURATION & INITIALIZATION
+// ============================================
+
+import { initializeApp } from 'firebase/app';
+import { 
+  getAuth, 
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  GoogleAuthProvider,
+  signInWithPopup
+} from 'firebase/auth';
+import { 
+  getFirestore,
+  doc,
+  setDoc,
+  getDoc,
+  updateDoc,
+  collection,
+  query,
+  where,
+  orderBy,
+  limit,
+  getDocs,
+  addDoc,
+  serverTimestamp,
+  increment,
+  arrayUnion,
+  arrayRemove,
+  onSnapshot
+} from 'firebase/firestore';
+import { 
+  getStorage,
+  ref,
+  uploadBytes,
+  getDownloadURL,
+  deleteObject
+} from 'firebase/storage';
+
+// Firebase config (zastąp swoimi danymi z Firebase Console)
+const firebaseConfig = {
+  apiKey: "your-api-key",
+  authDomain: "your-auth-domain",
+  projectId: "your-project-id",
+  storageBucket: "your-storage-bucket",
+  messagingSenderId: "your-sender-id",
+  appId: "your-app-id"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+export const auth = getAuth(app);
+export const db = getFirestore(app);
+export const storage = getStorage(app);
+
+// ============================================
+// USER MANAGEMENT
+// ============================================
+
+export const userService = {
+  // Create new user
+  async createUser(email, password, name) {
+    try {
+      // Create auth user
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const userId = userCredential.user.uid;
+      
+      // Create user profile in Firestore
+      await setDoc(doc(db, 'users', userId), {
+        profile: {
+          name,
+          email,
+          avatar: '👤',
+          color: 'from-blue-500 to-purple-600',
+          createdAt: serverTimestamp(),
+          lastActive: serverTimestamp(),
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          preferences: {
+            notifications: true,
+            darkMode: false,
+            language: 'pl'
+          }
+        },
+        progress: {
+          level: 1,
+          xp: 0,
+          xpToNext: 100,
+          totalXp: 0,
+          coins: 100, // Bonus startowy
+          gems: 5,
+          hearts: 5,
+          heartResetAt: new Date(new Date().setHours(24, 0, 0, 0))
+        },
+        learning: {
+          currentPath: null,
+          currentModule: null,
+          currentLesson: null,
+          completedLessons: [],
+          startedAt: serverTimestamp(),
+          placementTestScore: null,
+          learningSpeed: 'normal'
+        },
+        gamification: {
+          streak: 0,
+          longestStreak: 0,
+          lastStreakDate: null,
+          dailyGoal: 3,
+          dailyProgress: 0,
+          achievements: [],
+          ranking: null,
+          weeklyXp: 0,
+          badges: []
+        },
+        social: {
+          friends: [],
+          following: [],
+          followers: [],
+          blockedUsers: []
+        }
+      });
+      
+      return { success: true, userId };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  },
+
+  // Login user
+  async login(email, password) {
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      await this.updateLastActive(userCredential.user.uid);
+      return { success: true, userId: userCredential.user.uid };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  },
+
+  // Google login
+  async loginWithGoogle() {
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+      
+      // Check if user exists in Firestore
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      
+      if (!userDoc.exists()) {
+        // Create new user profile
+        await this.createUserProfile(user.uid, user.displayName || 'User', user.email);
+      }
+      
+      await this.updateLastActive(user.uid);
+      return { success: true, userId: user.uid };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  },
+
+  // Update last active
+  async updateLastActive(userId) {
+    await updateDoc(doc(db, 'users', userId), {
+      'profile.lastActive': serverTimestamp()
+    });
+  },
+
+  // Get user data
+  async getUserData(userId) {
+    const userDoc = await getDoc(doc(db, 'users', userId));
+    if (userDoc.exists()) {
+      return userDoc.data();
+    }
+    return null;
+  },
+
+  // Update user progress
+  async updateProgress(userId, xpGained, coinsGained = 0) {
+    const userRef = doc(db, 'users', userId);
+    const userData = await this.getUserData(userId);
+    
+    if (!userData) return;
+    
+    const newXp = userData.progress.xp + xpGained;
+    const levelUp = newXp >= userData.progress.xpToNext;
+    
+    const updates = {
+      'progress.xp': levelUp ? newXp - userData.progress.xpToNext : newXp,
+      'progress.totalXp': increment(xpGained),
+      'progress.coins': increment(coinsGained),
+      'gamification.weeklyXp': increment(xpGained)
+    };
+    
+    if (levelUp) {
+      updates['progress.level'] = increment(1);
+      updates['progress.xpToNext'] = Math.floor(userData.progress.xpToNext * 1.2);
+      updates['progress.coins'] = increment(50); // Level up bonus
+      
+      // Add achievement
+      await this.addAchievement(userId, `level_${userData.progress.level + 1}`);
+    }
+    
+    await updateDoc(userRef, updates);
+    
+    return { levelUp, newLevel: levelUp ? userData.progress.level + 1 : null };
+  }
+};
+
+// ============================================
+// LESSONS & PROGRESS
+// ============================================
+
+export const lessonService = {
+  // Get lesson data
+  async getLesson(lessonId) {
+    const lessonDoc = await getDoc(doc(db, 'lessons', lessonId));
+    if (lessonDoc.exists()) {
+      return { id: lessonDoc.id, ...lessonDoc.data() };
+    }
+    return null;
+  },
+
+  // Start lesson
+  async startLesson(userId, lessonId) {
+    const progressRef = doc(db, 'userProgress', `${userId}_${lessonId}`);
+    
+    await setDoc(progressRef, {
+      userId,
+      lessonId,
+      startedAt: serverTimestamp(),
+      completedAt: null,
+      attempts: 1,
+      score: 0,
+      xpEarned: 0,
+      coinsEarned: 0,
+      steps: [],
+      quiz: null,
+      feedback: null
+    }, { merge: true });
+    
+    // Update current lesson in user profile
+    await updateDoc(doc(db, 'users', userId), {
+      'learning.currentLesson': lessonId
+    });
+  },
+
+  // Complete lesson step
+  async completeStep(userId, lessonId, stepId, proofId = null) {
+    const progressRef = doc(db, 'userProgress', `${userId}_${lessonId}`);
+    
+    await updateDoc(progressRef, {
+      steps: arrayUnion({
+        stepId,
+        completed: true,
+        proofId,
+        completedAt: serverTimestamp()
+      })
+    });
+  },
+
+  // Complete lesson
+  async completeLesson(userId, lessonId, score = 100) {
+    const lesson = await this.getLesson(lessonId);
+    if (!lesson) return;
+    
+    const progressRef = doc(db, 'userProgress', `${userId}_${lessonId}`);
+    
+    await updateDoc(progressRef, {
+      completedAt: serverTimestamp(),
+      score,
+      xpEarned: lesson.metadata.xpReward,
+      coinsEarned: lesson.metadata.coinReward
+    });
+    
+    // Update user progress
+    await userService.updateProgress(userId, lesson.metadata.xpReward, lesson.metadata.coinReward);
+    
+    // Add to completed lessons
+    await updateDoc(doc(db, 'users', userId), {
+      'learning.completedLessons': arrayUnion(lessonId),
+      'gamification.dailyProgress': increment(1)
+    });
+    
+    // Check for achievements
+    await this.checkLessonAchievements(userId, lessonId);
+  },
+
+  // Check achievements
+  async checkLessonAchievements(userId, lessonId) {
+    const userData = await userService.getUserData(userId);
+    const completedCount = userData.learning.completedLessons.length;
+    
+    // First lesson achievement
+    if (completedCount === 1) {
+      await userService.addAchievement(userId, 'first_lesson');
+    }
+    
+    // 10 lessons achievement
+    if (completedCount === 10) {
+      await userService.addAchievement(userId, 'ten_lessons');
+    }
+    
+    // Path completion check
+    // ... więcej logiki
+  }
+};
+
+// ============================================
+// PROOFS & UPLOADS
+// ============================================
+
+export const proofService = {
+  // Upload proof
+  async uploadProof(userId, lessonId, stepId, file) {
+    try {
+      // Create unique filename
+      const timestamp = Date.now();
+      const filename = `${userId}/${lessonId}/${stepId}_${timestamp}_${file.name}`;
+      const storageRef = ref(storage, `proofs/${filename}`);
+      
+      // Upload file
+      const snapshot = await uploadBytes(storageRef, file);
+      const downloadURL = await getDownloadURL(snapshot.ref);
+      
+      // Save proof metadata to Firestore
+      const proofData = {
+        userId,
+        lessonId,
+        stepId,
+        file: {
+          url: downloadURL,
+          type: file.type,
+          size: file.size,
+          thumbnail: downloadURL // W przyszłości można generować miniaturki
+        },
+        metadata: {
+          uploadedAt: serverTimestamp(),
+          deviceInfo: navigator.userAgent
+        },
+        verification: {
+          status: 'pending',
+          verifiedBy: null,
+          verifiedAt: null,
+          feedback: null,
+          aiScore: null
+        },
+        social: {
+          likes: 0,
+          comments: 0,
+          shared: false,
+          reports: 0
+        }
+      };
+      
+      const proofRef = await addDoc(collection(db, 'proofs'), proofData);
+      
+      // Update lesson progress
+      await lessonService.completeStep(userId, lessonId, stepId, proofRef.id);
+      
+      return { success: true, proofId: proofRef.id, url: downloadURL };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  },
+
+  // Get proofs for gallery
+  async getGalleryProofs(lessonId, limit = 10) {
+    const q = query(
+      collection(db, 'proofs'),
+      where('lessonId', '==', lessonId),
+      where('verification.status', '==', 'approved'),
+      orderBy('social.likes', 'desc'),
+      limit(limit)
+    );
+    
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  },
+
+  // Like proof
+  async likeProof(proofId, userId) {
+    await updateDoc(doc(db, 'proofs', proofId), {
+      'social.likes': increment(1),
+      'social.likedBy': arrayUnion(userId)
+    });
+  }
+};
+
+// ============================================
+// RANKINGS & LEADERBOARD
+// ============================================
+
+export const rankingService = {
+  // Get weekly leaderboard
+  async getWeeklyLeaderboard(limit = 100) {
+    const weekId = this.getCurrentWeekId();
+    
+    const q = query(
+      collection(db, 'users'),
+      orderBy('gamification.weeklyXp', 'desc'),
+      limit(limit)
+    );
+    
+    const snapshot = await getDocs(q);
+    const leaderboard = [];
+    
+    snapshot.docs.forEach((doc, index) => {
+      const data = doc.data();
+      leaderboard.push({
+        userId: doc.id,
+        name: data.profile.name,
+        avatar: data.profile.avatar,
+        xp: data.gamification.weeklyXp,
+        position: index + 1,
+        streak: data.gamification.streak,
+        level: data.progress.level
+      });
+    });
+    
+    return leaderboard;
+  },
+
+  // Get user position
+  async getUserPosition(userId) {
+    const leaderboard = await this.getWeeklyLeaderboard();
+    const userPosition = leaderboard.find(u => u.userId === userId);
+    
+    if (!userPosition) return null;
+    
+    const position = userPosition.position;
+    const ahead = position > 1 ? leaderboard[position - 2] : null;
+    const behind = position < leaderboard.length ? leaderboard[position] : null;
+    
+    return {
+      current: userPosition,
+      ahead,
+      behind,
+      total: leaderboard.length
+    };
+  },
+
+  // Reset weekly rankings
+  async resetWeeklyRankings() {
+    // This would be called by a scheduled Cloud Function
+    const users = await getDocs(collection(db, 'users'));
+    
+    const batch = db.batch();
+    users.docs.forEach(doc => {
+      batch.update(doc.ref, {
+        'gamification.weeklyXp': 0
+      });
+    });
+    
+    await batch.commit();
+  },
+
+  getCurrentWeekId() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const week = Math.ceil((now - new Date(year, 0, 1)) / 604800000);
+    return `${year}-${week}`;
+  }
+};
+
+// ============================================
+// REAL-TIME LISTENERS
+// ============================================
+
+export const realtimeService = {
+  // Listen to user changes
+  subscribeToUser(userId, callback) {
+    return onSnapshot(doc(db, 'users', userId), (doc) => {
+      if (doc.exists()) {
+        callback(doc.data());
+      }
+    });
+  },
+
+  // Listen to notifications
+  subscribeToNotifications(userId, callback) {
+    const q = query(
+      collection(db, 'notifications'),
+      where('userId', '==', userId),
+      where('read', '==', false),
+      orderBy('createdAt', 'desc')
+    );
+    
+    return onSnapshot(q, (snapshot) => {
+      const notifications = [];
+      snapshot.forEach(doc => {
+        notifications.push({ id: doc.id, ...doc.data() });
+      });
+      callback(notifications);
+    });
+  },
+
+  // Listen to live chat
+  subscribeToChat(callback) {
+    const q = query(
+      collection(db, 'chat'),
+      orderBy('createdAt', 'desc'),
+      limit(50)
+    );
+    
+    return onSnapshot(q, (snapshot) => {
+      const messages = [];
+      snapshot.forEach(doc => {
+        messages.push({ id: doc.id, ...doc.data() });
+      });
+      callback(messages.reverse());
+    });
+  }
+};
+
+// ============================================
+// STREAK & DAILY MANAGEMENT
+// ============================================
+
+export const streakService = {
+  // Check and update streak
+  async updateStreak(userId) {
+    const userData = await userService.getUserData(userId);
+    if (!userData) return;
+    
+    const today = new Date().toDateString();
+    const lastStreak = userData.gamification.lastStreakDate;
+    
+    if (lastStreak === today) {
+      // Already updated today
+      return userData.gamification.streak;
+    }
+    
+    const yesterday = new Date(Date.now() - 86400000).toDateString();
+    
+    let newStreak;
+    if (lastStreak === yesterday) {
+      // Continue streak
+      newStreak = userData.gamification.streak + 1;
+    } else {
+      // Reset streak
+      newStreak = 1;
+    }
+    
+    const longestStreak = Math.max(newStreak, userData.gamification.longestStreak);
+    
+    await updateDoc(doc(db, 'users', userId), {
+      'gamification.streak': newStreak,
+      'gamification.longestStreak': longestStreak,
+      'gamification.lastStreakDate': today
+    });
+    
+    // Check streak achievements
+    if (newStreak === 7) {
+      await userService.addAchievement(userId, 'week_streak');
+    }
+    if (newStreak === 30) {
+      await userService.addAchievement(userId, 'month_streak');
+    }
+    
+    return newStreak;
+  },
+
+  // Reset daily progress
+  async resetDailyProgress() {
+    // This would be called by a scheduled Cloud Function at midnight
+    const users = await getDocs(collection(db, 'users'));
+    
+    const batch = db.batch();
+    users.docs.forEach(doc => {
+      batch.update(doc.ref, {
+        'gamification.dailyProgress': 0,
+        'progress.hearts': 5,
+        'progress.heartResetAt': new Date(new Date().setHours(24, 0, 0, 0))
+      });
+    });
+    
+    await batch.commit();
+  }
+};
+
+// ============================================
+// INITIALIZATION & AUTH STATE
+// ============================================
+
+export const initializeApp = (onUserChange) => {
+  // Listen to auth state changes
+  onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      // User is signed in
+      const userData = await userService.getUserData(user.uid);
+      await streakService.updateStreak(user.uid);
+      onUserChange({ isAuthenticated: true, userId: user.uid, data: userData });
+    } else {
+      // User is signed out
+      onUserChange({ isAuthenticated: false, userId: null, data: null });
+    }
+  });
+};
+
+// ============================================
+// USAGE EXAMPLE IN REACT
+// ============================================
+
+/*
+// In your React app:
+
+import { useEffect, useState } from 'react';
+import { 
+  initializeApp, 
+  userService, 
+  lessonService,
+  proofService,
+  rankingService,
+  realtimeService 
+} from './firebase-backend';
+
+function App() {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Initialize Firebase and listen to auth
+    initializeApp((authState) => {
+      setUser(authState);
+      setLoading(false);
+    });
+  }, []);
+
+  // Login
+  const handleLogin = async (email, password) => {
+    const result = await userService.login(email, password);
+    if (!result.success) {
+      alert(result.error);
+    }
+  };
+
+  // Complete lesson
+  const handleCompleteLesson = async () => {
+    if (!user?.userId) return;
+    
+    await lessonService.completeLesson(user.userId, 'install-1', 95);
+    // UI will update automatically through real-time listener
+  };
+
+  // Upload proof
+  const handleUploadProof = async (file) => {
+    if (!user?.userId) return;
+    
+    const result = await proofService.uploadProof(
+      user.userId, 
+      'install-1', 
+      1, 
+      file
+    );
+    
+    if (result.success) {
+      console.log('Proof uploaded:', result.url);
+    }
+  };
+
+  // Subscribe to real-time updates
+  useEffect(() => {
+    if (!user?.userId) return;
+    
+    // Listen to user data changes
+    const unsubUser = realtimeService.subscribeToUser(user.userId, (data) => {
+      setUser(prev => ({ ...prev, data }));
+    });
+    
+    // Listen to notifications
+    const unsubNotif = realtimeService.subscribeToNotifications(user.userId, (notifs) => {
+      console.log('New notifications:', notifs);
+    });
+    
+    return () => {
+      unsubUser();
+      unsubNotif();
+    };
+  }, [user?.userId]);
+
+  if (loading) return <div>Loading...</div>;
+  if (!user?.isAuthenticated) return <LoginScreen onLogin={handleLogin} />;
+  
+  return <YourApp user={user.data} />;
+}
+*/
