@@ -1,0 +1,177 @@
+import React, { useState } from 'react';
+import { 
+  Bell, 
+  Search, 
+  MessageSquare, 
+  Settings,
+  Zap,
+  Coins,
+  Trophy,
+  Menu,
+  X
+} from 'lucide-react';
+
+const TopBar = ({ user, onMenuToggle, isMenuOpen }) => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  
+  // Mock notifications
+  const notifications = [
+    { id: 1, type: 'achievement', text: 'Nowa odznaka: "Pierwszy Krok"!', time: '5 min', unread: true },
+    { id: 2, type: 'friend', text: 'Marek ukończył zadanie JavaScript', time: '1h', unread: true },
+    { id: 3, type: 'challenge', text: 'Nowe wyzwanie dnia dostępne!', time: '2h', unread: false },
+  ];
+
+  const unreadCount = notifications.filter(n => n.unread).length;
+
+  return (
+    <header className="fixed top-0 left-0 right-0 bg-blue-600 text-white shadow-lg z-50">
+      <div className="flex items-center justify-between px-4 py-2">
+        {/* Left Section */}
+        <div className="flex items-center space-x-4">
+          {/* Mobile menu toggle */}
+          <button 
+            onClick={onMenuToggle}
+            className="lg:hidden p-2 hover:bg-blue-700 rounded-lg transition-colors"
+          >
+            {isMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+          
+          {/* Logo */}
+          <div className="flex items-center space-x-2">
+            <div className="text-2xl">🎯</div>
+            <span className="font-bold text-xl hidden sm:inline">PathFinder</span>
+          </div>
+          
+          {/* Search */}
+          <div className="hidden md:flex items-center bg-blue-700 rounded-lg px-3 py-1.5 w-64">
+            <Search className="w-4 h-4 mr-2 opacity-70" />
+            <input
+              type="text"
+              placeholder="Szukaj kursów, zadań..."
+              className="bg-transparent placeholder-blue-200 text-white outline-none w-full text-sm"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {/* Center Section - User Stats */}
+        <div className="hidden lg:flex items-center space-x-6">
+          {/* XP */}
+          <div className="flex items-center space-x-2">
+            <Zap className="w-5 h-5 text-yellow-300" />
+            <span className="font-semibold">{user?.xp || 0} XP</span>
+          </div>
+          
+          {/* Level */}
+          <div className="flex items-center space-x-2">
+            <Trophy className="w-5 h-5 text-yellow-300" />
+            <span className="font-semibold">Poziom {user?.level || 1}</span>
+          </div>
+          
+          {/* Coins */}
+          <div className="flex items-center space-x-2">
+            <Coins className="w-5 h-5 text-yellow-300" />
+            <span className="font-semibold">{user?.coins || 0}</span>
+          </div>
+        </div>
+
+        {/* Right Section */}
+        <div className="flex items-center space-x-3">
+          {/* Messages */}
+          <button className="p-2 hover:bg-blue-700 rounded-lg transition-colors relative hidden sm:block">
+            <MessageSquare className="w-5 h-5" />
+            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+          </button>
+          
+          {/* Notifications */}
+          <div className="relative">
+            <button 
+              onClick={() => setNotificationsOpen(!notificationsOpen)}
+              className="p-2 hover:bg-blue-700 rounded-lg transition-colors relative"
+            >
+              <Bell className="w-5 h-5" />
+              {unreadCount > 0 && (
+                <span className="absolute top-1 right-1 bg-red-500 text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                  {unreadCount}
+                </span>
+              )}
+            </button>
+            
+            {/* Notifications Dropdown */}
+            {notificationsOpen && (
+              <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl overflow-hidden z-50">
+                <div className="bg-gray-50 px-4 py-3 border-b">
+                  <h3 className="font-semibold text-gray-900">Powiadomienia</h3>
+                </div>
+                <div className="max-h-96 overflow-y-auto">
+                  {notifications.map(notif => (
+                    <div 
+                      key={notif.id} 
+                      className={`px-4 py-3 border-b hover:bg-gray-50 cursor-pointer ${
+                        notif.unread ? 'bg-blue-50' : ''
+                      }`}
+                    >
+                      <div className="flex items-start">
+                        <div className="text-2xl mr-3">
+                          {notif.type === 'achievement' ? '🏆' : 
+                           notif.type === 'friend' ? '👥' : '🎯'}
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm text-gray-900">{notif.text}</p>
+                          <p className="text-xs text-gray-500 mt-1">{notif.time} temu</p>
+                        </div>
+                        {notif.unread && (
+                          <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="px-4 py-2 bg-gray-50">
+                  <button className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+                    Zobacz wszystkie
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          {/* Settings */}
+          <button className="p-2 hover:bg-blue-700 rounded-lg transition-colors hidden sm:block">
+            <Settings className="w-5 h-5" />
+          </button>
+          
+          {/* User Avatar */}
+          <div className="flex items-center space-x-2 pl-2">
+            <div className="w-8 h-8 bg-blue-700 rounded-full flex items-center justify-center font-bold">
+              {user?.name?.charAt(0) || 'U'}
+            </div>
+            <span className="hidden sm:inline text-sm font-medium">
+              {user?.name || 'Użytkownik'}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile Stats Bar */}
+      <div className="lg:hidden bg-blue-700 px-4 py-2 flex items-center justify-around text-sm">
+        <div className="flex items-center space-x-1">
+          <Zap className="w-4 h-4 text-yellow-300" />
+          <span>{user?.xp || 0} XP</span>
+        </div>
+        <div className="flex items-center space-x-1">
+          <Trophy className="w-4 h-4 text-yellow-300" />
+          <span>Poziom {user?.level || 1}</span>
+        </div>
+        <div className="flex items-center space-x-1">
+          <Coins className="w-4 h-4 text-yellow-300" />
+          <span>{user?.coins || 0}</span>
+        </div>
+      </div>
+    </header>
+  );
+};
+
+export default TopBar;
