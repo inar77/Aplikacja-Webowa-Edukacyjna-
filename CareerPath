@@ -1,0 +1,437 @@
+// CareerPath.jsx
+import React, { useState } from 'react';
+import { 
+  Trophy, Lock, Star, ChevronRight, Award, Crown, Shield, 
+  Zap, Target, TrendingUp, CheckCircle, AlertCircle, Briefcase,
+  Code, Database, Globe, Smartphone, Brain, Gavel, Users, Heart
+} from 'lucide-react';
+
+const CareerPath = ({ user }) => {
+  const [selectedPath, setSelectedPath] = useState('frontend');
+  const [showRankDetails, setShowRankDetails] = useState(false);
+  
+  // System rang - jak w grach (CS:GO, Valorant style)
+  const ranks = [
+    { id: 1, name: 'Nowicjusz', icon: '🌱', minLevel: 0, color: 'gray', badge: '▰' },
+    { id: 2, name: 'Praktykant', icon: '📚', minLevel: 3, color: 'gray', badge: '▰▰' },
+    { id: 3, name: 'Junior', icon: '⭐', minLevel: 6, color: 'green', badge: '▰▰▰' },
+    { id: 4, name: 'Junior+', icon: '⭐⭐', minLevel: 10, color: 'green', badge: '▰▰▰▰' },
+    { id: 5, name: 'Mid', icon: '💎', minLevel: 15, color: 'blue', badge: '▰▰▰▰▰' },
+    { id: 6, name: 'Mid+', icon: '💎💎', minLevel: 20, color: 'blue', badge: '▱▰▰▰▰▰' },
+    { id: 7, name: 'Senior', icon: '🏆', minLevel: 25, color: 'purple', badge: '▱▱▰▰▰▰' },
+    { id: 8, name: 'Senior+', icon: '🏆🏆', minLevel: 30, color: 'purple', badge: '▱▱▱▰▰▰' },
+    { id: 9, name: 'Expert', icon: '🔥', minLevel: 35, color: 'orange', badge: '▱▱▱▱▰▰' },
+    { id: 10, name: 'Master', icon: '👑', minLevel: 40, color: 'red', badge: '▱▱▱▱▱▰' },
+    { id: 11, name: 'Grandmaster', icon: '🌟', minLevel: 50, color: 'gold', badge: '▱▱▱▱▱▱' }
+  ];
+
+  // Różne ścieżki kariery z etapami
+  const careerPaths = {
+    frontend: {
+      title: 'Frontend Developer',
+      icon: Globe,
+      description: 'Twórz interfejsy użytkownika',
+      color: 'blue',
+      stages: [
+        { id: 1, name: 'HTML & CSS Podstawy', requiredLevel: 0, xp: 100, skills: ['HTML', 'CSS'], completed: true },
+        { id: 2, name: 'JavaScript Essentials', requiredLevel: 3, xp: 150, skills: ['JS Basics', 'DOM'], completed: true },
+        { id: 3, name: 'React Podstawy', requiredLevel: 6, xp: 200, skills: ['Components', 'State'], completed: false, current: true },
+        { id: 4, name: 'React Advanced', requiredLevel: 10, xp: 250, skills: ['Hooks', 'Context'], completed: false },
+        { id: 5, name: 'TypeScript', requiredLevel: 15, xp: 300, skills: ['Types', 'Interfaces'], completed: false },
+        { id: 6, name: 'Next.js', requiredLevel: 20, xp: 350, skills: ['SSR', 'SSG'], completed: false },
+        { id: 7, name: 'Performance & Testing', requiredLevel: 25, xp: 400, skills: ['Jest', 'Optimization'], completed: false }
+      ]
+    },
+    backend: {
+      title: 'Backend Developer',
+      icon: Database,
+      description: 'Buduj serwery i API',
+      color: 'green',
+      stages: [
+        { id: 1, name: 'Node.js Basics', requiredLevel: 0, xp: 100, skills: ['Node', 'NPM'], completed: false },
+        { id: 2, name: 'Express.js', requiredLevel: 3, xp: 150, skills: ['Routing', 'Middleware'], completed: false },
+        { id: 3, name: 'Databases SQL', requiredLevel: 6, xp: 200, skills: ['PostgreSQL', 'Queries'], completed: false },
+        { id: 4, name: 'NoSQL & MongoDB', requiredLevel: 10, xp: 250, skills: ['MongoDB', 'Mongoose'], completed: false },
+        { id: 5, name: 'REST API Design', requiredLevel: 15, xp: 300, skills: ['REST', 'Auth'], completed: false },
+        { id: 6, name: 'GraphQL', requiredLevel: 20, xp: 350, skills: ['Queries', 'Mutations'], completed: false },
+        { id: 7, name: 'Microservices', requiredLevel: 25, xp: 400, skills: ['Docker', 'K8s'], completed: false }
+      ]
+    },
+    mobile: {
+      title: 'Mobile Developer',
+      icon: Smartphone,
+      description: 'Twórz aplikacje mobilne',
+      color: 'purple',
+      stages: [
+        { id: 1, name: 'React Native Basics', requiredLevel: 0, xp: 100, skills: ['Components', 'Styling'], completed: false },
+        { id: 2, name: 'Navigation', requiredLevel: 3, xp: 150, skills: ['Stack', 'Tab Nav'], completed: false },
+        { id: 3, name: 'State Management', requiredLevel: 6, xp: 200, skills: ['Redux', 'Context'], completed: false },
+        { id: 4, name: 'Native Modules', requiredLevel: 10, xp: 250, skills: ['Camera', 'Storage'], completed: false },
+        { id: 5, name: 'Performance', requiredLevel: 15, xp: 300, skills: ['Optimization', 'Profiling'], completed: false },
+        { id: 6, name: 'Publishing', requiredLevel: 20, xp: 350, skills: ['App Store', 'Play Store'], completed: false }
+      ]
+    },
+    ai: {
+      title: 'AI/ML Engineer',
+      icon: Brain,
+      description: 'Uczenie maszynowe i AI',
+      color: 'red',
+      stages: [
+        { id: 1, name: 'Python Basics', requiredLevel: 0, xp: 100, skills: ['Python', 'NumPy'], completed: false },
+        { id: 2, name: 'Data Science', requiredLevel: 5, xp: 200, skills: ['Pandas', 'Matplotlib'], completed: false },
+        { id: 3, name: 'Machine Learning', requiredLevel: 10, xp: 300, skills: ['Sklearn', 'Models'], completed: false },
+        { id: 4, name: 'Deep Learning', requiredLevel: 15, xp: 400, skills: ['TensorFlow', 'Neural Networks'], completed: false },
+        { id: 5, name: 'Computer Vision', requiredLevel: 20, xp: 500, skills: ['OpenCV', 'Image Processing'], completed: false },
+        { id: 6, name: 'NLP', requiredLevel: 25, xp: 600, skills: ['BERT', 'Transformers'], completed: false }
+      ]
+    }
+  };
+
+  // Oblicz aktualną rangę użytkownika
+  const getCurrentRank = (level) => {
+    for (let i = ranks.length - 1; i >= 0; i--) {
+      if (level >= ranks[i].minLevel) {
+        return ranks[i];
+      }
+    }
+    return ranks[0];
+  };
+
+  const getNextRank = (level) => {
+    const currentRank = getCurrentRank(level);
+    const nextIndex = ranks.findIndex(r => r.id === currentRank.id) + 1;
+    return ranks[nextIndex] || null;
+  };
+
+  const userLevel = user?.level || 3;
+  const currentRank = getCurrentRank(userLevel);
+  const nextRank = getNextRank(userLevel);
+  const currentPath = careerPaths[selectedPath];
+  
+  // Oblicz postęp do następnej rangi
+  const progressToNextRank = nextRank 
+    ? ((userLevel - currentRank.minLevel) / (nextRank.minLevel - currentRank.minLevel)) * 100
+    : 100;
+
+  // Oblicz statystyki ścieżki
+  const completedStages = currentPath.stages.filter(s => s.completed).length;
+  const totalStages = currentPath.stages.length;
+  const pathProgress = (completedStages / totalStages) * 100;
+
+  const getRankColor = (color) => {
+    const colors = {
+      gray: 'from-gray-400 to-gray-600',
+      green: 'from-green-400 to-green-600',
+      blue: 'from-blue-400 to-blue-600',
+      purple: 'from-purple-400 to-purple-600',
+      orange: 'from-orange-400 to-orange-600',
+      red: 'from-red-500 to-red-700',
+      gold: 'from-yellow-400 to-amber-600'
+    };
+    return colors[color] || colors.gray;
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header z rangą */}
+      <div className="bg-white rounded-lg border p-6">
+        <div className="flex justify-between items-start">
+          <div>
+            <h2 className="text-2xl font-bold mb-2">Twoja Ścieżka Kariery</h2>
+            <p className="text-gray-600">Zdobywaj umiejętności i awansuj w rankingu</p>
+          </div>
+          
+          {/* Aktualna ranga */}
+          <div className="text-center">
+            <div className={`inline-flex items-center px-4 py-2 rounded-lg bg-gradient-to-r ${getRankColor(currentRank.color)} text-white`}>
+              <span className="text-2xl mr-2">{currentRank.icon}</span>
+              <div className="text-left">
+                <p className="text-xs opacity-90">Twoja ranga</p>
+                <p className="font-bold">{currentRank.name}</p>
+              </div>
+            </div>
+            <button 
+              onClick={() => setShowRankDetails(!showRankDetails)}
+              className="text-xs text-blue-600 hover:text-blue-700 mt-2"
+            >
+              Zobacz wszystkie rangi →
+            </button>
+          </div>
+        </div>
+
+        {/* Progress do następnej rangi */}
+        {nextRank && (
+          <div className="mt-6 bg-gray-50 rounded-lg p-4">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-sm font-medium">Postęp do rangi: {nextRank.name}</span>
+              <span className="text-sm text-gray-600">
+                Poziom {userLevel}/{nextRank.minLevel}
+              </span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-3">
+              <div 
+                className={`h-3 rounded-full bg-gradient-to-r ${getRankColor(nextRank.color)} transition-all duration-500`}
+                style={{ width: `${progressToNextRank}%` }}
+              />
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              Pozostało {nextRank.minLevel - userLevel} poziomów do awansu
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* System rang - rozwinięcie */}
+      {showRankDetails && (
+        <div className="bg-white rounded-lg border p-6">
+          <h3 className="font-bold mb-4">System Rang</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {ranks.map(rank => {
+              const isUnlocked = userLevel >= rank.minLevel;
+              const isCurrent = rank.id === currentRank.id;
+              
+              return (
+                <div 
+                  key={rank.id}
+                  className={`border rounded-lg p-3 transition-all ${
+                    isCurrent ? 'border-blue-500 bg-blue-50 shadow-md' :
+                    isUnlocked ? 'border-gray-300 bg-white' :
+                    'border-gray-200 bg-gray-50 opacity-60'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xl">{rank.icon}</span>
+                      <div>
+                        <p className={`font-semibold ${isCurrent ? 'text-blue-600' : ''}`}>
+                          {rank.name}
+                        </p>
+                        <p className="text-xs text-gray-500">Poziom {rank.minLevel}+</p>
+                      </div>
+                    </div>
+                    {isUnlocked ? (
+                      <CheckCircle className="w-5 h-5 text-green-500" />
+                    ) : (
+                      <Lock className="w-5 h-5 text-gray-400" />
+                    )}
+                  </div>
+                  <div className="mt-2 text-xs font-mono text-gray-600">{rank.badge}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Wybór ścieżki */}
+      <div className="bg-white rounded-lg border p-6">
+        <h3 className="font-bold mb-4">Wybierz specjalizację</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+          {Object.entries(careerPaths).map(([key, path]) => {
+            const Icon = path.icon;
+            const isSelected = selectedPath === key;
+            
+            return (
+              <button
+                key={key}
+                onClick={() => setSelectedPath(key)}
+                className={`border rounded-lg p-4 text-left transition-all ${
+                  isSelected 
+                    ? 'border-blue-500 bg-blue-50 shadow-md' 
+                    : 'border-gray-300 hover:border-gray-400 hover:shadow'
+                }`}
+              >
+                <Icon className={`w-8 h-8 mb-2 ${
+                  isSelected ? 'text-blue-600' : 'text-gray-600'
+                }`} />
+                <h4 className="font-semibold text-sm">{path.title}</h4>
+                <p className="text-xs text-gray-600 mt-1">{path.description}</p>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Ścieżka rozwoju */}
+      <div className="bg-white rounded-lg border p-6">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="font-bold text-lg">Etapy rozwoju: {currentPath.title}</h3>
+          <div className="text-right">
+            <p className="text-sm text-gray-600">Ukończono</p>
+            <p className="text-xl font-bold">{completedStages}/{totalStages}</p>
+          </div>
+        </div>
+
+        {/* Progress bar całej ścieżki */}
+        <div className="mb-6">
+          <div className="flex justify-between text-sm mb-2">
+            <span>Postęp ścieżki</span>
+            <span className="font-bold">{Math.round(pathProgress)}%</span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div 
+              className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 rounded-full transition-all duration-500"
+              style={{ width: `${pathProgress}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Lista etapów */}
+        <div className="relative">
+          {/* Linia łącząca */}
+          <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gray-200"></div>
+          
+          <div className="space-y-4">
+            {currentPath.stages.map((stage, index) => {
+              const isCompleted = stage.completed;
+              const isCurrent = stage.current;
+              const isLocked = userLevel < stage.requiredLevel;
+              
+              return (
+                <div key={stage.id} className="relative flex items-start space-x-4">
+                  {/* Ikona statusu */}
+                  <div className={`relative z-10 w-12 h-12 rounded-full flex items-center justify-center border-2 ${
+                    isCompleted ? 'bg-green-500 border-green-500' :
+                    isCurrent ? 'bg-blue-500 border-blue-500 animate-pulse' :
+                    isLocked ? 'bg-gray-300 border-gray-300' :
+                    'bg-white border-gray-400'
+                  }`}>
+                    {isCompleted ? (
+                      <CheckCircle className="w-6 h-6 text-white" />
+                    ) : isCurrent ? (
+                      <Target className="w-6 h-6 text-white" />
+                    ) : isLocked ? (
+                      <Lock className="w-5 h-5 text-white" />
+                    ) : (
+                      <span className="text-lg font-bold text-gray-600">{index + 1}</span>
+                    )}
+                  </div>
+
+                  {/* Zawartość etapu */}
+                  <div className={`flex-1 border rounded-lg p-4 ${
+                    isCompleted ? 'bg-green-50 border-green-200' :
+                    isCurrent ? 'bg-blue-50 border-blue-300 shadow-md' :
+                    isLocked ? 'bg-gray-50 border-gray-200 opacity-60' :
+                    'bg-white border-gray-300 hover:shadow-md transition-shadow'
+                  }`}>
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <h4 className="font-semibold">{stage.name}</h4>
+                        <p className="text-xs text-gray-600 mt-1">
+                          Wymagany poziom: {stage.requiredLevel}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-lg font-bold text-yellow-600">+{stage.xp} XP</span>
+                      </div>
+                    </div>
+                    
+                    {/* Umiejętności */}
+                    <div className="flex flex-wrap gap-1 mb-3">
+                      {stage.skills.map(skill => (
+                        <span key={skill} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
+                    
+                    {/* Akcje */}
+                    {!isLocked && !isCompleted && (
+                      <button className={`text-sm px-3 py-1 rounded font-medium ${
+                        isCurrent 
+                          ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      }`}>
+                        {isCurrent ? 'Kontynuuj naukę' : 'Rozpocznij'}
+                      </button>
+                    )}
+                    
+                    {isCompleted && (
+                      <div className="flex items-center text-green-600 text-sm">
+                        <CheckCircle className="w-4 h-4 mr-1" />
+                        Ukończono
+                      </div>
+                    )}
+                    
+                    {isLocked && (
+                      <div className="flex items-center text-gray-500 text-sm">
+                        <Lock className="w-4 h-4 mr-1" />
+                        Zablokowane (poziom {stage.requiredLevel})
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Nagrody za ukończenie ścieżki */}
+        <div className="mt-8 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-6 border border-purple-200">
+          <h4 className="font-bold mb-3 flex items-center">
+            <Crown className="w-5 h-5 text-purple-600 mr-2" />
+            Nagroda za ukończenie ścieżki
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="text-center">
+              <span className="text-2xl">🏆</span>
+              <p className="text-sm font-medium mt-1">Tytuł: {currentPath.title}</p>
+            </div>
+            <div className="text-center">
+              <span className="text-2xl">💎</span>
+              <p className="text-sm font-medium mt-1">1000 XP bonus</p>
+            </div>
+            <div className="text-center">
+              <span className="text-2xl">🎯</span>
+              <p className="text-sm font-medium mt-1">Unikalna odznaka</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Top 10 w rankingu */}
+      <div className="bg-white rounded-lg border p-6">
+        <h3 className="font-bold mb-4 flex items-center">
+          <Trophy className="w-5 h-5 text-yellow-500 mr-2" />
+          Top 10 - {currentPath.title}
+        </h3>
+        <div className="space-y-2">
+          {[
+            { name: 'MasterCoder', level: 45, rank: 'Master' },
+            { name: 'DevNinja', level: 38, rank: 'Expert' },
+            { name: 'CodeWarrior', level: 32, rank: 'Senior+' },
+            { name: 'Ty', level: userLevel, rank: currentRank.name, isUser: true },
+            { name: 'TechGuru', level: 28, rank: 'Senior' },
+          ].sort((a, b) => b.level - a.level).slice(0, 5).map((player, index) => (
+            <div 
+              key={index}
+              className={`flex items-center justify-between p-3 rounded-lg ${
+                player.isUser ? 'bg-blue-50 border border-blue-200' : 'hover:bg-gray-50'
+              }`}
+            >
+              <div className="flex items-center space-x-3">
+                <span className={`text-lg font-bold w-6 ${
+                  index === 0 ? 'text-yellow-500' : 
+                  index === 1 ? 'text-gray-400' : 
+                  index === 2 ? 'text-orange-600' : 'text-gray-600'
+                }`}>
+                  {index + 1}.
+                </span>
+                <div>
+                  <p className="font-medium">
+                    {player.name}
+                    {player.isUser && <span className="ml-1 text-blue-600">(Ty)</span>}
+                  </p>
+                  <p className="text-xs text-gray-600">{player.rank} • Poziom {player.level}</p>
+                </div>
+              </div>
+              {index === 0 && <Crown className="w-5 h-5 text-yellow-500" />}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default CareerPath;
