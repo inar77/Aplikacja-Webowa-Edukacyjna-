@@ -1,0 +1,624 @@
+// components/Lessons/PracticalLesson.jsx
+import React, { useState, useEffect } from 'react';
+import { 
+  ChevronRight, ChevronLeft, CheckCircle, Circle, AlertTriangle, 
+  Info, Play, Pause, RotateCcw, Volume2, VolumeX, Shield,
+  Zap, Clock, Award, BookOpen, Video, Image, FileText,
+  AlertCircle, Lightbulb, Tool, ChevronDown, ChevronUp
+} from 'lucide-react';
+
+const PracticalLesson = ({ lesson, onComplete, onProgress }) => {
+  const [currentStep, setCurrentStep] = useState(0);
+  const [completedSteps, setCompletedSteps] = useState([]);
+  const [showQuiz, setShowQuiz] = useState(false);
+  const [quizAnswers, setQuizAnswers] = useState({});
+  const [showResults, setShowResults] = useState(false);
+  const [videoPlaying, setVideoPlaying] = useState(false);
+  const [expandedTips, setExpandedTips] = useState(false);
+  const [safetyChecked, setSafetyChecked] = useState(false);
+
+  // Przykładowa lekcja - Wymiana gniazdka elektrycznego
+  const lessonData = lesson || {
+    id: 'electric_socket',
+    title: 'Wymiana gniazdka elektrycznego',
+    category: 'Elektryk',
+    difficulty: 'średnie',
+    duration: '45 min',
+    xpReward: 150,
+    tools: ['Śrubokręt', 'Tester napięcia', 'Szczypce', 'Nowe gniazdko'],
+    steps: [
+      {
+        id: 1,
+        title: 'Wyłącz zasilanie',
+        description: 'Wyłącz bezpiecznik główny w skrzynce elektrycznej',
+        media: { type: 'image', url: '/images/breaker.jpg' },
+        safety: 'KRYTYCZNE: Zawsze wyłączaj prąd przed pracą!',
+        tips: ['Oznacz bezpiecznik taśmą', 'Poinformuj domowników'],
+        checkItems: [
+          { id: 'c1', text: 'Bezpiecznik wyłączony', required: true },
+          { id: 'c2', text: 'Tester napięcia przygotowany', required: true }
+        ]
+      },
+      {
+        id: 2,
+        title: 'Sprawdź brak napięcia',
+        description: 'Użyj testera napięcia aby upewnić się, że nie ma prądu',
+        media: { type: 'video', url: 'https://example.com/test-voltage.mp4' },
+        safety: 'Zawsze sprawdzaj testerem, nawet po wyłączeniu bezpiecznika',
+        tips: ['Sprawdź tester na działającym gniazdku najpierw', 'Testuj wszystkie przewody'],
+        checkItems: [
+          { id: 'c3', text: 'Brak napięcia potwierdzone', required: true }
+        ]
+      },
+      {
+        id: 3,
+        title: 'Odkręć stare gniazdko',
+        description: 'Odkręć śruby mocujące i delikatnie wyciągnij gniazdko ze ściany',
+        media: { type: 'animation', url: '/animations/unscrew.gif' },
+        tips: ['Zrób zdjęcie połączeń przed rozłączeniem', 'Zachowaj śruby'],
+        checkItems: [
+          { id: 'c4', text: 'Śruby odkręcone', required: false },
+          { id: 'c5', text: 'Zdjęcie połączeń zrobione', required: true }
+        ]
+      },
+      {
+        id: 4,
+        title: 'Rozłącz przewody',
+        description: 'Poluzuj zaciski i rozłącz przewody (L-fazowy, N-neutralny, PE-ochronny)',
+        media: { type: 'diagram', url: '/diagrams/wiring.svg' },
+        safety: 'Pamiętaj o kolejności: żółto-zielony (PE), niebieski (N), brązowy (L)',
+        tips: ['Oznacz przewody jeśli nie mają kolorów', 'Sprawdź stan izolacji'],
+        checkItems: [
+          { id: 'c6', text: 'Przewody rozłączone', required: true },
+          { id: 'c7', text: 'Przewody oznaczone', required: false }
+        ]
+      },
+      {
+        id: 5,
+        title: 'Podłącz nowe gniazdko',
+        description: 'Podłącz przewody do nowego gniazdka zgodnie ze schematem',
+        media: { type: 'video', url: 'https://example.com/connect-wires.mp4' },
+        safety: 'Upewnij się, że przewody są dobrze dokręcone w zaciskach',
+        tips: ['PE zawsze pierwszy', 'Nie zostawiaj gołych przewodów'],
+        checkItems: [
+          { id: 'c8', text: 'PE (żółto-zielony) podłączony', required: true },
+          { id: 'c9', text: 'N (niebieski) podłączony', required: true },
+          { id: 'c10', text: 'L (brązowy) podłączony', required: true }
+        ]
+      },
+      {
+        id: 6,
+        title: 'Zamontuj gniazdko',
+        description: 'Umieść gniazdko w puszce i przykręć śrubami',
+        media: { type: 'image', url: '/images/mount-socket.jpg' },
+        tips: ['Wyrównaj poziomo', 'Nie dokręcaj za mocno'],
+        checkItems: [
+          { id: 'c11', text: 'Gniazdko zamontowane', required: true },
+          { id: 'c12', text: 'Śruby dokręcone', required: true }
+        ]
+      },
+      {
+        id: 7,
+        title: 'Test działania',
+        description: 'Włącz zasilanie i przetestuj gniazdko testerem i urządzeniem',
+        media: { type: 'video', url: 'https://example.com/test-socket.mp4' },
+        safety: 'Stój z dala podczas pierwszego włączenia prądu',
+        tips: ['Testuj najpierw małym urządzeniem', 'Sprawdź czy gniazdko nie nagrzewa się'],
+        checkItems: [
+          { id: 'c13', text: 'Zasilanie włączone', required: true },
+          { id: 'c14', text: 'Test testerem OK', required: true },
+          { id: 'c15', text: 'Test urządzeniem OK', required: true }
+        ]
+      }
+    ],
+    quiz: {
+      questions: [
+        {
+          id: 'q1',
+          question: 'Co należy zrobić jako pierwszy krok przed wymianą gniazdka?',
+          type: 'single',
+          options: [
+            { id: 'a1', text: 'Odkręcić gniazdko' },
+            { id: 'a2', text: 'Wyłączyć zasilanie', correct: true },
+            { id: 'a3', text: 'Kupić nowe gniazdko' },
+            { id: 'a4', text: 'Zdjąć osłonę' }
+          ]
+        },
+        {
+          id: 'q2',
+          question: 'Które przewody występują w typowym gniazdku?',
+          type: 'multiple',
+          options: [
+            { id: 'b1', text: 'L - fazowy (brązowy)', correct: true },
+            { id: 'b2', text: 'N - neutralny (niebieski)', correct: true },
+            { id: 'b3', text: 'PE - ochronny (żółto-zielony)', correct: true },
+            { id: 'b4', text: 'R - rezerwowy (czerwony)', correct: false }
+          ]
+        },
+        {
+          id: 'q3',
+          question: 'Ułóż kroki w prawidłowej kolejności',
+          type: 'order',
+          items: [
+            { id: 'o1', text: 'Wyłącz zasilanie', order: 1 },
+            { id: 'o2', text: 'Sprawdź brak napięcia', order: 2 },
+            { id: 'o3', text: 'Odkręć stare gniazdko', order: 3 },
+            { id: 'o4', text: 'Podłącz nowe gniazdko', order: 4 },
+            { id: 'o5', text: 'Test działania', order: 5 }
+          ]
+        }
+      ]
+    },
+    commonMistakes: [
+      'Nie sprawdzenie napięcia testerem',
+      'Złe podłączenie przewodów (zamiana L i N)',
+      'Za słabe dokręcenie zacisków',
+      'Pozostawienie odkrytych przewodów'
+    ]
+  };
+
+  const step = lessonData.steps[currentStep];
+  const progress = ((completedSteps.length / lessonData.steps.length) * 100).toFixed(0);
+
+  const handleStepComplete = (stepIndex) => {
+    const step = lessonData.steps[stepIndex];
+    const requiredChecks = step.checkItems.filter(item => item.required);
+    const allRequired = requiredChecks.every(item => 
+      document.getElementById(item.id)?.checked
+    );
+
+    if (!allRequired) {
+      alert('Zaznacz wszystkie wymagane punkty przed kontynuacją!');
+      return;
+    }
+
+    if (!completedSteps.includes(stepIndex)) {
+      setCompletedSteps([...completedSteps, stepIndex]);
+      onProgress?.(stepIndex + 1, lessonData.steps.length);
+    }
+
+    if (stepIndex < lessonData.steps.length - 1) {
+      setCurrentStep(stepIndex + 1);
+    } else {
+      setShowQuiz(true);
+    }
+  };
+
+  const handleQuizSubmit = () => {
+    let score = 0;
+    const totalQuestions = lessonData.quiz.questions.length;
+
+    lessonData.quiz.questions.forEach(question => {
+      if (question.type === 'single') {
+        const answer = quizAnswers[question.id];
+        if (question.options.find(opt => opt.id === answer)?.correct) {
+          score++;
+        }
+      } else if (question.type === 'multiple') {
+        const answers = quizAnswers[question.id] || [];
+        const correctAnswers = question.options.filter(opt => opt.correct).map(opt => opt.id);
+        if (JSON.stringify(answers.sort()) === JSON.stringify(correctAnswers.sort())) {
+          score++;
+        }
+      }
+    });
+
+    const percentage = (score / totalQuestions) * 100;
+    setShowResults({ score, total: totalQuestions, percentage });
+
+    if (percentage >= 70) {
+      onComplete?.(lessonData.xpReward);
+    }
+  };
+
+  const MediaDisplay = ({ media }) => {
+    if (media.type === 'video') {
+      return (
+        <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
+          <video className="w-full h-full" controls>
+            <source src={media.url} type="video/mp4" />
+          </video>
+          <div className="absolute top-2 right-2 bg-red-600 text-white px-2 py-1 rounded text-xs">
+            WIDEO
+          </div>
+        </div>
+      );
+    } else if (media.type === 'image') {
+      return (
+        <div className="relative rounded-lg overflow-hidden bg-gray-100">
+          <img src={media.url} alt={step.title} className="w-full h-64 object-cover" />
+          <div className="absolute top-2 right-2 bg-blue-600 text-white px-2 py-1 rounded text-xs">
+            ZDJĘCIE
+          </div>
+        </div>
+      );
+    } else if (media.type === 'animation') {
+      return (
+        <div className="relative rounded-lg overflow-hidden bg-gray-100">
+          <img src={media.url} alt={step.title} className="w-full h-64 object-contain" />
+          <div className="absolute top-2 right-2 bg-purple-600 text-white px-2 py-1 rounded text-xs">
+            ANIMACJA
+          </div>
+        </div>
+      );
+    } else if (media.type === 'diagram') {
+      return (
+        <div className="relative rounded-lg overflow-hidden bg-white border-2 border-gray-200 p-4">
+          <img src={media.url} alt={step.title} className="w-full h-64 object-contain" />
+          <div className="absolute top-2 right-2 bg-green-600 text-white px-2 py-1 rounded text-xs">
+            SCHEMAT
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  if (showResults) {
+    return (
+      <div className="max-w-4xl mx-auto p-6">
+        <div className="bg-white rounded-lg shadow-lg p-8 text-center">
+          <div className="mb-6">
+            {showResults.percentage >= 70 ? (
+              <>
+                <CheckCircle className="w-20 h-20 text-green-500 mx-auto mb-4" />
+                <h2 className="text-2xl font-bold text-green-600">Gratulacje!</h2>
+              </>
+            ) : (
+              <>
+                <AlertCircle className="w-20 h-20 text-red-500 mx-auto mb-4" />
+                <h2 className="text-2xl font-bold text-red-600">Spróbuj ponownie</h2>
+              </>
+            )}
+          </div>
+          
+          <p className="text-lg mb-4">
+            Wynik: <span className="font-bold">{showResults.score}/{showResults.total}</span> ({showResults.percentage}%)
+          </p>
+          
+          {showResults.percentage >= 70 && (
+            <div className="bg-green-50 rounded-lg p-4 mb-6">
+              <p className="text-green-800 font-medium">Zdobyłeś {lessonData.xpReward} XP!</p>
+            </div>
+          )}
+          
+          <button 
+            onClick={() => window.location.reload()}
+            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700"
+          >
+            Zakończ lekcję
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (showQuiz) {
+    return (
+      <div className="max-w-4xl mx-auto p-6">
+        <div className="bg-white rounded-lg shadow-lg p-6">
+          <h2 className="text-2xl font-bold mb-6">Quiz sprawdzający</h2>
+          
+          <div className="space-y-6">
+            {lessonData.quiz.questions.map((question, idx) => (
+              <div key={question.id} className="border rounded-lg p-4">
+                <h3 className="font-semibold mb-3">
+                  {idx + 1}. {question.question}
+                </h3>
+                
+                {question.type === 'single' && (
+                  <div className="space-y-2">
+                    {question.options.map(option => (
+                      <label key={option.id} className="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer">
+                        <input
+                          type="radio"
+                          name={question.id}
+                          value={option.id}
+                          onChange={(e) => setQuizAnswers({
+                            ...quizAnswers,
+                            [question.id]: e.target.value
+                          })}
+                          className="mr-3"
+                        />
+                        <span>{option.text}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+                
+                {question.type === 'multiple' && (
+                  <div className="space-y-2">
+                    <p className="text-sm text-gray-600 mb-2">Zaznacz wszystkie poprawne odpowiedzi</p>
+                    {question.options.map(option => (
+                      <label key={option.id} className="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer">
+                        <input
+                          type="checkbox"
+                          value={option.id}
+                          onChange={(e) => {
+                            const current = quizAnswers[question.id] || [];
+                            if (e.target.checked) {
+                              setQuizAnswers({
+                                ...quizAnswers,
+                                [question.id]: [...current, option.id]
+                              });
+                            } else {
+                              setQuizAnswers({
+                                ...quizAnswers,
+                                [question.id]: current.filter(id => id !== option.id)
+                              });
+                            }
+                          }}
+                          className="mr-3"
+                        />
+                        <span>{option.text}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+                
+                {question.type === 'order' && (
+                  <div className="space-y-2">
+                    <p className="text-sm text-gray-600 mb-2">Przeciągnij elementy w odpowiedniej kolejności</p>
+                    {question.items.map((item, index) => (
+                      <div key={item.id} className="flex items-center p-3 bg-gray-50 rounded">
+                        <span className="mr-3 font-bold">{index + 1}.</span>
+                        <span>{item.text}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          
+          <button
+            onClick={handleQuizSubmit}
+            className="mt-6 w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 font-medium"
+          >
+            Sprawdź odpowiedzi
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-6xl mx-auto p-6">
+      {/* Header */}
+      <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+        <div className="flex justify-between items-start mb-4">
+          <div>
+            <h1 className="text-2xl font-bold mb-2">{lessonData.title}</h1>
+            <div className="flex items-center space-x-4 text-sm text-gray-600">
+              <span className="flex items-center">
+                <Clock className="w-4 h-4 mr-1" />
+                {lessonData.duration}
+              </span>
+              <span className="flex items-center">
+                <Zap className="w-4 h-4 mr-1 text-yellow-500" />
+                {lessonData.xpReward} XP
+              </span>
+              <span className={`px-2 py-1 rounded text-xs font-medium ${
+                lessonData.difficulty === 'łatwe' ? 'bg-green-100 text-green-700' :
+                lessonData.difficulty === 'średnie' ? 'bg-yellow-100 text-yellow-700' :
+                'bg-red-100 text-red-700'
+              }`}>
+                {lessonData.difficulty}
+              </span>
+            </div>
+          </div>
+          
+          {/* Progress */}
+          <div className="text-center">
+            <div className="text-3xl font-bold text-blue-600">{progress}%</div>
+            <p className="text-xs text-gray-600">Ukończono</p>
+          </div>
+        </div>
+
+        {/* Progress Bar */}
+        <div className="w-full bg-gray-200 rounded-full h-2">
+          <div 
+            className="bg-gradient-to-r from-blue-500 to-green-500 h-2 rounded-full transition-all duration-500"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Main Content */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Safety Warning */}
+          {step.safety && !safetyChecked && (
+            <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4">
+              <div className="flex items-start space-x-3">
+                <AlertTriangle className="w-6 h-6 text-red-600 flex-shrink-0 mt-1" />
+                <div className="flex-1">
+                  <h3 className="font-bold text-red-800 mb-1">⚠️ UWAGA - Bezpieczeństwo!</h3>
+                  <p className="text-red-700">{step.safety}</p>
+                  <button 
+                    onClick={() => setSafetyChecked(true)}
+                    className="mt-3 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 text-sm"
+                  >
+                    Rozumiem i będę ostrożny
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Current Step */}
+          <div className="bg-white rounded-lg shadow-lg p-6">
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-xl font-bold">
+                  Krok {currentStep + 1}: {step.title}
+                </h2>
+                <span className="text-sm text-gray-500">
+                  {currentStep + 1} z {lessonData.steps.length}
+                </span>
+              </div>
+              <p className="text-gray-700">{step.description}</p>
+            </div>
+
+            {/* Media */}
+            <div className="mb-6">
+              <MediaDisplay media={step.media} />
+            </div>
+
+            {/* Checklist */}
+            <div className="bg-gray-50 rounded-lg p-4 mb-6">
+              <h3 className="font-semibold mb-3 flex items-center">
+                <CheckCircle className="w-5 h-5 text-green-600 mr-2" />
+                Lista kontrolna
+              </h3>
+              <div className="space-y-2">
+                {step.checkItems.map(item => (
+                  <label key={item.id} className="flex items-center cursor-pointer hover:bg-gray-100 p-2 rounded">
+                    <input
+                      type="checkbox"
+                      id={item.id}
+                      className="mr-3 w-5 h-5 text-blue-600"
+                    />
+                    <span className={item.required ? 'font-medium' : ''}>
+                      {item.text}
+                      {item.required && <span className="text-red-500 ml-1">*</span>}
+                    </span>
+                  </label>
+                ))}
+              </div>
+              <p className="text-xs text-gray-500 mt-2">* Wymagane do kontynuacji</p>
+            </div>
+
+            {/* Tips */}
+            {step.tips && step.tips.length > 0 && (
+              <div className="bg-blue-50 rounded-lg p-4 mb-6">
+                <button
+                  onClick={() => setExpandedTips(!expandedTips)}
+                  className="w-full flex items-center justify-between font-semibold text-blue-800"
+                >
+                  <span className="flex items-center">
+                    <Lightbulb className="w-5 h-5 mr-2" />
+                    Wskazówki ({step.tips.length})
+                  </span>
+                  {expandedTips ? <ChevronUp /> : <ChevronDown />}
+                </button>
+                {expandedTips && (
+                  <ul className="mt-3 space-y-1">
+                    {step.tips.map((tip, idx) => (
+                      <li key={idx} className="text-sm text-blue-700 flex items-start">
+                        <span className="mr-2">💡</span>
+                        <span>{tip}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            {/* Navigation */}
+            <div className="flex justify-between">
+              <button
+                onClick={() => setCurrentStep(Math.max(0, currentStep - 1))}
+                disabled={currentStep === 0}
+                className={`flex items-center px-4 py-2 rounded-lg ${
+                  currentStep === 0 
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                <ChevronLeft className="w-5 h-5 mr-1" />
+                Poprzedni
+              </button>
+              
+              <button
+                onClick={() => handleStepComplete(currentStep)}
+                className="flex items-center px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                {currentStep === lessonData.steps.length - 1 ? 'Zakończ i przejdź do quizu' : 'Następny krok'}
+                <ChevronRight className="w-5 h-5 ml-1" />
+              </button>
+            </div>
+          </div>
+
+          {/* Common Mistakes */}
+          <div className="bg-yellow-50 rounded-lg p-4">
+            <h3 className="font-semibold mb-3 flex items-center">
+              <AlertCircle className="w-5 h-5 text-yellow-600 mr-2" />
+              Najczęstsze błędy
+            </h3>
+            <ul className="space-y-1">
+              {lessonData.commonMistakes.map((mistake, idx) => (
+                <li key={idx} className="text-sm text-yellow-800 flex items-start">
+                  <span className="text-yellow-600 mr-2">⚠️</span>
+                  <span>{mistake}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+
+        {/* Sidebar */}
+        <div className="space-y-6">
+          {/* Tools Needed */}
+          <div className="bg-white rounded-lg shadow-lg p-6">
+            <h3 className="font-semibold mb-3 flex items-center">
+              <Tool className="w-5 h-5 text-gray-600 mr-2" />
+              Potrzebne narzędzia
+            </h3>
+            <ul className="space-y-2">
+              {lessonData.tools.map((tool, idx) => (
+                <li key={idx} className="flex items-center text-sm">
+                  <CheckCircle className="w-4 h-4 text-green-500 mr-2" />
+                  <span>{tool}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Steps Overview */}
+          <div className="bg-white rounded-lg shadow-lg p-6">
+            <h3 className="font-semibold mb-3">Przegląd kroków</h3>
+            <div className="space-y-2">
+              {lessonData.steps.map((s, idx) => (
+                <button
+                  key={s.id}
+                  onClick={() => setCurrentStep(idx)}
+                  className={`w-full text-left p-2 rounded flex items-center ${
+                    idx === currentStep ? 'bg-blue-100 text-blue-700' :
+                    completedSteps.includes(idx) ? 'bg-green-50 text-green-700' :
+                    'hover:bg-gray-50'
+                  }`}
+                >
+                  {completedSteps.includes(idx) ? (
+                    <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
+                  ) : idx === currentStep ? (
+                    <Circle className="w-4 h-4 mr-2 text-blue-500" />
+                  ) : (
+                    <Circle className="w-4 h-4 mr-2 text-gray-400" />
+                  )}
+                  <span className="text-sm">{idx + 1}. {s.title}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Safety Reminder */}
+          <div className="bg-red-50 rounded-lg p-4">
+            <h3 className="font-semibold text-red-800 mb-2 flex items-center">
+              <Shield className="w-5 h-5 mr-2" />
+              Pamiętaj o bezpieczeństwie!
+            </h3>
+            <ul className="text-sm text-red-700 space-y-1">
+              <li>• Zawsze wyłączaj prąd</li>
+              <li>• Używaj odpowiednich narzędzi</li>
+              <li>• Noś okulary ochronne</li>
+              <li>• W razie wątpliwości - pytaj</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default PracticalLesson;
