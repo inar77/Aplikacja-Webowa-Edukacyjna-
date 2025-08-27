@@ -1,0 +1,73 @@
+// components/Career/PathSelector.jsx
+import React from 'react';
+import { Globe, Database, Smartphone, Brain, ChevronRight } from 'lucide-react';
+
+const PathSelector = ({ paths, selectedPath, onSelectPath }) => {
+  const pathIcons = {
+    frontend: Globe,
+    backend: Database,
+    mobile: Smartphone,
+    ai: Brain
+  };
+
+  return (
+    <div className="bg-white rounded-lg border p-6 hover:shadow-lg transition-shadow duration-300">
+      <h3 className="font-bold mb-4 flex items-center">
+        <ChevronRight className="w-5 h-5 text-blue-600 mr-2" />
+        Wybierz swoją specjalizację
+      </h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+        {Object.entries(paths).map(([key, path], index) => {
+          const Icon = pathIcons[key];
+          const isSelected = selectedPath === key;
+          
+          return (
+            <button
+              key={key}
+              onClick={() => onSelectPath(key)}
+              className={`
+                border rounded-lg p-4 text-left transition-all duration-300 transform
+                ${isSelected 
+                  ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50 shadow-lg scale-105' 
+                  : 'border-gray-300 hover:border-blue-400 hover:shadow-md hover:scale-102 hover:bg-gray-50'}
+                animate-fade-in-${index}
+              `}
+              style={{ animationDelay: `${index * 100}ms` }}
+            >
+              <div className="relative">
+                <Icon className={`w-8 h-8 mb-2 transition-colors duration-300 ${
+                  isSelected ? 'text-blue-600' : 'text-gray-600 hover:text-blue-500'
+                }`} />
+                {isSelected && (
+                  <div className="absolute -top-2 -right-2 bg-blue-500 text-white rounded-full p-1">
+                    <CheckCircle className="w-3 h-3" />
+                  </div>
+                )}
+              </div>
+              <h4 className="font-semibold text-sm mb-1">{path.title}</h4>
+              <p className="text-xs text-gray-600">{path.description}</p>
+              {isSelected && (
+                <div className="mt-2 text-xs text-blue-600 font-medium">
+                  Aktywna ścieżka
+                </div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+      
+      <style jsx>{`
+        @keyframes fade-in {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in-0 { animation: fade-in 0.5s ease-out 0ms both; }
+        .animate-fade-in-1 { animation: fade-in 0.5s ease-out 100ms both; }
+        .animate-fade-in-2 { animation: fade-in 0.5s ease-out 200ms both; }
+        .animate-fade-in-3 { animation: fade-in 0.5s ease-out 300ms both; }
+      `}</style>
+    </div>
+  );
+};
+
+export default PathSelector;
