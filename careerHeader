@@ -1,0 +1,92 @@
+// components/Career/CareerHeader.jsx
+import React from 'react';
+import { Trophy, TrendingUp } from 'lucide-react';
+
+const CareerHeader = ({ currentRank, nextRank, userLevel, progressToNextRank, onToggleRanks }) => {
+  const getRankColor = (color) => {
+    const colors = {
+      gray: 'from-gray-400 to-gray-600',
+      green: 'from-green-400 to-green-600',
+      blue: 'from-blue-400 to-blue-600',
+      purple: 'from-purple-400 to-purple-600',
+      orange: 'from-orange-400 to-orange-600',
+      red: 'from-red-500 to-red-700',
+      gold: 'from-yellow-400 to-amber-600'
+    };
+    return colors[color] || colors.gray;
+  };
+
+  return (
+    <div className="bg-white rounded-lg border p-6 hover:shadow-lg transition-shadow duration-300">
+      <div className="flex justify-between items-start">
+        <div className="animate-fade-in">
+          <h2 className="text-2xl font-bold mb-2 flex items-center">
+            <Trophy className="w-7 h-7 text-yellow-500 mr-2" />
+            Twoja Ścieżka Kariery
+          </h2>
+          <p className="text-gray-600">Zdobywaj umiejętności i awansuj w rankingu</p>
+        </div>
+        
+        {/* Aktualna ranga z animacją */}
+        <div className="text-center transform hover:scale-105 transition-transform duration-200">
+          <div className={`inline-flex items-center px-4 py-2 rounded-lg bg-gradient-to-r ${getRankColor(currentRank.color)} text-white shadow-lg`}>
+            <span className="text-2xl mr-2 animate-pulse">{currentRank.icon}</span>
+            <div className="text-left">
+              <p className="text-xs opacity-90">Twoja ranga</p>
+              <p className="font-bold text-lg">{currentRank.name}</p>
+            </div>
+          </div>
+          <button 
+            onClick={onToggleRanks}
+            className="text-xs text-blue-600 hover:text-blue-700 mt-2 hover:underline transition-all"
+          >
+            Zobacz wszystkie rangi →
+          </button>
+        </div>
+      </div>
+
+      {/* Progress do następnej rangi z animacją */}
+      {nextRank && (
+        <div className="mt-6 bg-gradient-to-r from-gray-50 to-blue-50 rounded-lg p-4 border border-blue-100">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-sm font-medium flex items-center">
+              <TrendingUp className="w-4 h-4 text-blue-600 mr-1" />
+              Postęp do rangi: <span className="ml-1 font-bold">{nextRank.name}</span>
+            </span>
+            <span className="text-sm text-gray-600">
+              Poziom <span className="font-bold text-blue-600">{userLevel}</span>/{nextRank.minLevel}
+            </span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+            <div 
+              className={`h-3 rounded-full bg-gradient-to-r ${getRankColor(nextRank.color)} transition-all duration-1000 ease-out animate-progress-fill`}
+              style={{ width: `${progressToNextRank}%` }}
+            />
+          </div>
+          <p className="text-xs text-gray-500 mt-2">
+            Pozostało <span className="font-bold">{nextRank.minLevel - userLevel}</span> poziomów do awansu
+          </p>
+        </div>
+      )}
+      
+      <style jsx>{`
+        @keyframes fade-in {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes progress-fill {
+          from { width: 0; }
+          to { width: ${progressToNextRank}%; }
+        }
+        .animate-fade-in {
+          animation: fade-in 0.5s ease-out;
+        }
+        .animate-progress-fill {
+          animation: progress-fill 1s ease-out;
+        }
+      `}</style>
+    </div>
+  );
+};
+
+export default CareerHeader;
