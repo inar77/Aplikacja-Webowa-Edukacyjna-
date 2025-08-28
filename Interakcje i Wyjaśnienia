@@ -1,0 +1,711 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Lightbulb, Brain, Zap, Heart, Volume2, VolumeX, Settings,
+  ChevronRight, ChevronLeft, BookOpen, MessageSquare, ThumbsUp, 
+  ThumbsDown, Star, Award, Target, Clock, HelpCircle, Sparkles,
+  RotateCw, Flag, Share2, Bookmark, Edit3, CheckCircle, XCircle,
+  TrendingUp, Coffee, Gamepad2, Music, Sun, Moon, Eye, EyeOff,
+  Send, Mic, Camera, Image, FileText, Hash, AtSign, Smile
+} from 'lucide-react';
+
+// ============================================
+// SMART EXPLANATION SYSTEM
+// ============================================
+const ExplanationSystem = {
+  // Wyjaśnienia dla różnych typów pytań
+  javascript: {
+    const: {
+      explanation: "const = stała wartość, której nie można zmienić",
+      mnemonic: "🔒 const = CONSTant = stały jak skała",
+      tip: "Pomyśl: const = beton - raz wylany, nie zmienisz",
+      visual: "const ❌➡️ (nie można przypisać ponownie)",
+      example: "const PI = 3.14; // PI zawsze = 3.14"
+    },
+    let: {
+      explanation: "let = zmienna w bloku, można zmienić wartość",
+      mnemonic: "🔄 let = LET me change it = pozwól mi to zmienić",
+      tip: "let it be... different każdego dnia",
+      visual: "let ✅➡️ (można zmienić)",
+      example: "let age = 25; age = 26; // ✅ OK"
+    },
+    var: {
+      explanation: "var = stara zmienna, działa globalnie",
+      mnemonic: "👴 var = VARy old = bardzo stary sposób",
+      tip: "var = vintage - używali dziadkowie JS",
+      visual: "var 🌍 (globalna)",
+      example: "var old = true; // ⚠️ lepiej użyj let/const"
+    },
+    typeof_null: {
+      explanation: "typeof null = 'object' to błąd JS od 1995!",
+      mnemonic: "🐛 null jest object? To bug-feature!",
+      tip: "Zapamiętaj: null to dziwak - mówi że jest obiektem",
+      visual: "typeof null === 'object' // 🤷‍♂️",
+      example: "// To historyczny błąd, już za późno naprawić"
+    },
+    array_methods: {
+      map: {
+        explanation: "map = transformuje każdy element",
+        mnemonic: "🗺️ MAP = Make Array Pretty",
+        tip: "map = mapa: przekształca A→B",
+        visual: "[1,2,3].map(x=>x*2) = [2,4,6]"
+      },
+      filter: {
+        explanation: "filter = wybiera tylko pasujące",
+        mnemonic: "☕ FILTER = jak filtr do kawy",
+        tip: "filter = filtruje śmieci, zostawia dobre",
+        visual: "[1,2,3].filter(x=>x>1) = [2,3]"
+      }
+    }
+  },
+  
+  css: {
+    flexbox: {
+      explanation: "flex = elastyczny układ elementów",
+      mnemonic: "💪 FLEX = pokazuje muskuły układu",
+      tip: "flex = elastyczny jak guma",
+      visual: "display: flex → [□□□] układa w linii"
+    },
+    grid: {
+      explanation: "grid = siatka jak w Excelu",
+      mnemonic: "📊 GRID = arkusz kalkulacyjny",
+      tip: "grid = kratka jak w zeszycie",
+      visual: "display: grid → [□□]\n              [□□]"
+    }
+  },
+
+  react: {
+    useState: {
+      explanation: "useState = pamięć komponentu",
+      mnemonic: "🧠 useState = use Brain State",
+      tip: "useState = schowek na dane w komponencie",
+      visual: "const [value, setValue] = useState(0)",
+      example: "// value = obecna wartość\n// setValue = funkcja do zmiany"
+    },
+    useEffect: {
+      explanation: "useEffect = efekty uboczne po renderze",
+      mnemonic: "🎬 useEffect = Action after render",
+      tip: "useEffect = 'po wszystkim zrób to'",
+      visual: "useEffect(() => { /* po renderze */ }, [])"
+    }
+  }
+};
+
+// ============================================
+// ENHANCED QUIZ WITH EXPLANATIONS
+// ============================================
+const EnhancedQuiz = () => {
+  const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [selectedAnswer, setSelectedAnswer] = useState(null);
+  const [showExplanation, setShowExplanation] = useState(false);
+  const [userSettings, setUserSettings] = useState({
+    autoPlaySound: true,
+    showMnemonic: true,
+    difficulty: 'normal',
+    theme: 'light',
+    fontSize: 'medium',
+    hintsEnabled: true,
+    timerEnabled: true,
+    vibrationEnabled: true
+  });
+  const [userFeedback, setUserFeedback] = useState(null);
+  const [customNote, setCustomNote] = useState('');
+  const [showNoteInput, setShowNoteInput] = useState(false);
+  const [savedNotes, setSavedNotes] = useState({});
+  const [streak, setStreak] = useState(0);
+  const [hearts, setHearts] = useState(3);
+  const [hintsUsed, setHintsUsed] = useState(0);
+  const [showHint, setShowHint] = useState(false);
+
+  const questions = [
+    {
+      id: 1,
+      question: "Które słowo kluczowe używamy do deklaracji stałej w JavaScript?",
+      options: [
+        { text: 'let', key: 'let' },
+        { text: 'const', key: 'const' },
+        { text: 'var', key: 'var' },
+        { text: 'define', key: 'define' }
+      ],
+      correct: 1,
+      explanationKey: 'javascript.const',
+      hint: "Szukaj słowa które kojarzy się ze 'stałością'",
+      category: 'javascript',
+      difficulty: 'easy'
+    },
+    {
+      id: 2,
+      question: "Co zwraca typeof null w JavaScript?",
+      options: [
+        { text: "'null'", key: 'null' },
+        { text: "'undefined'", key: 'undefined' },
+        { text: "'object'", key: 'object' },
+        { text: "'boolean'", key: 'boolean' }
+      ],
+      correct: 2,
+      explanationKey: 'javascript.typeof_null',
+      hint: "To słynny błąd JavaScript - nie jest tym czym się wydaje!",
+      category: 'javascript',
+      difficulty: 'hard'
+    },
+    {
+      id: 3,
+      question: "Która metoda NIE modyfikuje oryginalnej tablicy?",
+      options: [
+        { text: 'push()', key: 'push' },
+        { text: 'pop()', key: 'pop' },
+        { text: 'map()', key: 'map' },
+        { text: 'sort()', key: 'sort' }
+      ],
+      correct: 2,
+      explanationKey: 'javascript.array_methods.map',
+      hint: "Która metoda zwraca NOWĄ tablicę?",
+      category: 'javascript',
+      difficulty: 'medium'
+    }
+  ];
+
+  const currentQ = questions[currentQuestion];
+
+  // Get explanation based on answer
+  const getExplanation = (questionKey, answerKey) => {
+    const keys = questionKey.split('.');
+    let explanation = ExplanationSystem;
+    
+    for (const key of keys) {
+      explanation = explanation[key];
+      if (!explanation) break;
+    }
+    
+    return explanation || {
+      explanation: "Brak wyjaśnienia",
+      mnemonic: "",
+      tip: "",
+      visual: ""
+    };
+  };
+
+  const handleAnswer = (index) => {
+    setSelectedAnswer(index);
+    setShowExplanation(true);
+    
+    const isCorrect = index === currentQ.correct;
+    
+    if (isCorrect) {
+      setStreak(streak + 1);
+      playSound('correct');
+      triggerHapticFeedback('success');
+    } else {
+      setStreak(0);
+      setHearts(Math.max(0, hearts - 1));
+      playSound('wrong');
+      triggerHapticFeedback('error');
+    }
+  };
+
+  const playSound = (type) => {
+    if (!userSettings.autoPlaySound) return;
+    
+    // Simulate sound
+    console.log(`Playing ${type} sound`);
+    
+    // In real app:
+    // const audio = new Audio(`/sounds/${type}.mp3`);
+    // audio.play();
+  };
+
+  const triggerHapticFeedback = (type) => {
+    if (!userSettings.vibrationEnabled) return;
+    
+    if ('vibrate' in navigator) {
+      if (type === 'success') {
+        navigator.vibrate([50, 50, 50]); // Short pattern
+      } else {
+        navigator.vibrate(200); // Longer vibration
+      }
+    }
+  };
+
+  const useHint = () => {
+    if (hintsUsed >= 2) return;
+    
+    setShowHint(true);
+    setHintsUsed(hintsUsed + 1);
+    
+    // Highlight wrong answers after 2 seconds
+    if (hintsUsed === 0) {
+      setTimeout(() => {
+        // Visual hint logic
+      }, 2000);
+    }
+  };
+
+  const saveCustomNote = () => {
+    setSavedNotes({
+      ...savedNotes,
+      [currentQ.id]: customNote
+    });
+    setShowNoteInput(false);
+    setCustomNote('');
+  };
+
+  const shareQuestion = () => {
+    const text = `Czy wiesz? ${currentQ.question}\nSprawdź się w PathFinder! 🎯`;
+    
+    if (navigator.share) {
+      navigator.share({
+        title: 'Quiz PathFinder',
+        text: text,
+        url: window.location.href
+      });
+    } else {
+      navigator.clipboard.writeText(text);
+      alert('Skopiowano do schowka!');
+    }
+  };
+
+  const reportIssue = () => {
+    alert('Dziękujemy za zgłoszenie! Sprawdzimy to pytanie.');
+  };
+
+  const nextQuestion = () => {
+    if (currentQuestion < questions.length - 1) {
+      setCurrentQuestion(currentQuestion + 1);
+      setSelectedAnswer(null);
+      setShowExplanation(false);
+      setShowHint(false);
+      setHintsUsed(0);
+    }
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto p-4">
+      {/* User Controls Bar */}
+      <div className="bg-white rounded-t-2xl shadow-lg p-4 flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          {/* Hearts */}
+          <div className="flex space-x-1">
+            {[...Array(3)].map((_, i) => (
+              <Heart 
+                key={i}
+                className={`w-6 h-6 ${i < hearts ? 'text-red-500 fill-current' : 'text-gray-300'}`}
+              />
+            ))}
+          </div>
+          
+          {/* Streak */}
+          {streak > 0 && (
+            <div className="flex items-center bg-orange-100 px-3 py-1 rounded-full">
+              <Flame className="w-4 h-4 text-orange-500 mr-1" />
+              <span className="font-bold text-orange-600">{streak}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Settings */}
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setUserSettings({...userSettings, autoPlaySound: !userSettings.autoPlaySound})}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            {userSettings.autoPlaySound ? (
+              <Volume2 className="w-5 h-5 text-gray-600" />
+            ) : (
+              <VolumeX className="w-5 h-5 text-gray-400" />
+            )}
+          </button>
+          
+          <button
+            onClick={() => setUserSettings({...userSettings, theme: userSettings.theme === 'light' ? 'dark' : 'light'})}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            {userSettings.theme === 'light' ? (
+              <Sun className="w-5 h-5 text-yellow-500" />
+            ) : (
+              <Moon className="w-5 h-5 text-gray-600" />
+            )}
+          </button>
+          
+          <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+            <Settings className="w-5 h-5 text-gray-600" />
+          </button>
+        </div>
+      </div>
+
+      {/* Main Quiz Card */}
+      <div className="bg-white shadow-lg p-6">
+        {/* Question */}
+        <div className="mb-6">
+          <div className="flex items-start justify-between mb-4">
+            <h3 className="text-xl font-semibold text-gray-900 flex-1">
+              {currentQ.question}
+            </h3>
+            
+            {/* Quick Actions */}
+            <div className="flex items-center space-x-2 ml-4">
+              <button
+                onClick={() => setShowNoteInput(!showNoteInput)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Dodaj notatkę"
+              >
+                <Edit3 className="w-4 h-4 text-gray-600" />
+              </button>
+              
+              <button
+                onClick={shareQuestion}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Udostępnij"
+              >
+                <Share2 className="w-4 h-4 text-gray-600" />
+              </button>
+              
+              <button
+                onClick={reportIssue}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Zgłoś problem"
+              >
+                <Flag className="w-4 h-4 text-gray-600" />
+              </button>
+            </div>
+          </div>
+
+          {/* Difficulty Badge */}
+          <div className="flex items-center space-x-2 mb-4">
+            <span className={`
+              px-2 py-1 rounded-full text-xs font-medium
+              ${currentQ.difficulty === 'easy' ? 'bg-green-100 text-green-700' :
+                currentQ.difficulty === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                'bg-red-100 text-red-700'}
+            `}>
+              {currentQ.difficulty === 'easy' ? 'Łatwe' :
+               currentQ.difficulty === 'medium' ? 'Średnie' : 'Trudne'}
+            </span>
+            
+            <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+              {currentQ.category}
+            </span>
+          </div>
+
+          {/* Custom Note Input */}
+          {showNoteInput && (
+            <div className="mb-4 p-3 bg-yellow-50 rounded-lg">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="text"
+                  value={customNote}
+                  onChange={(e) => setCustomNote(e.target.value)}
+                  placeholder="Twoja notatka..."
+                  className="flex-1 px-3 py-2 bg-white border border-yellow-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                />
+                <button
+                  onClick={saveCustomNote}
+                  className="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors"
+                >
+                  <Send className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Saved Note Display */}
+          {savedNotes[currentQ.id] && (
+            <div className="mb-4 p-3 bg-blue-50 rounded-lg flex items-start space-x-2">
+              <Bookmark className="w-4 h-4 text-blue-600 mt-0.5" />
+              <p className="text-sm text-blue-700">{savedNotes[currentQ.id]}</p>
+            </div>
+          )}
+
+          {/* Hint Section */}
+          {!showExplanation && (
+            <div className="flex items-center justify-between mb-4">
+              <button
+                onClick={useHint}
+                disabled={hintsUsed >= 2}
+                className={`
+                  px-4 py-2 rounded-lg font-medium text-sm transition-colors
+                  ${hintsUsed >= 2 
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                  }
+                `}
+              >
+                <Lightbulb className="w-4 h-4 inline mr-2" />
+                Podpowiedź ({2 - hintsUsed}/2)
+              </button>
+              
+              {showHint && (
+                <div className="flex-1 ml-4 p-2 bg-purple-50 rounded-lg">
+                  <p className="text-sm text-purple-700">💡 {currentQ.hint}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Answer Options */}
+        <div className="space-y-3 mb-6">
+          {currentQ.options.map((option, index) => {
+            const isSelected = selectedAnswer === index;
+            const isCorrect = index === currentQ.correct;
+            const showCorrect = showExplanation && isCorrect;
+            const showWrong = showExplanation && isSelected && !isCorrect;
+            
+            return (
+              <button
+                key={index}
+                onClick={() => !showExplanation && handleAnswer(index)}
+                disabled={showExplanation}
+                className={`
+                  w-full p-4 rounded-lg border-2 text-left transition-all
+                  ${showCorrect ? 'bg-green-50 border-green-500 transform scale-105' : ''}
+                  ${showWrong ? 'bg-red-50 border-red-500 shake' : ''}
+                  ${!showExplanation && isSelected ? 'bg-blue-50 border-blue-500' : ''}
+                  ${!showExplanation && !isSelected ? 'border-gray-200 hover:border-gray-300 hover:bg-gray-50' : ''}
+                  ${showExplanation ? 'cursor-default' : 'cursor-pointer'}
+                `}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <span className={`
+                      w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold
+                      ${showCorrect ? 'bg-green-500 text-white' :
+                        showWrong ? 'bg-red-500 text-white' :
+                        isSelected ? 'bg-blue-500 text-white' :
+                        'bg-gray-200 text-gray-700'}
+                    `}>
+                      {String.fromCharCode(65 + index)}
+                    </span>
+                    <span className="font-medium">{option.text}</span>
+                  </div>
+                  
+                  {showExplanation && (
+                    <div>
+                      {showCorrect && <CheckCircle className="w-5 h-5 text-green-500" />}
+                      {showWrong && <XCircle className="w-5 h-5 text-red-500" />}
+                    </div>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Explanation Section */}
+        {showExplanation && (
+          <div className="space-y-4 mb-6">
+            {/* Main Explanation */}
+            <div className={`
+              p-4 rounded-lg
+              ${selectedAnswer === currentQ.correct 
+                ? 'bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200' 
+                : 'bg-gradient-to-r from-red-50 to-pink-50 border border-red-200'}
+            `}>
+              <div className="flex items-start space-x-3">
+                <div className="flex-shrink-0 mt-1">
+                  {selectedAnswer === currentQ.correct ? (
+                    <CheckCircle className="w-6 h-6 text-green-600" />
+                  ) : (
+                    <XCircle className="w-6 h-6 text-red-600" />
+                  )}
+                </div>
+                
+                <div className="flex-1">
+                  <h4 className={`font-bold text-lg mb-2 ${
+                    selectedAnswer === currentQ.correct ? 'text-green-800' : 'text-red-800'
+                  }`}>
+                    {selectedAnswer === currentQ.correct 
+                      ? '🎉 Świetnie! Dobra odpowiedź!' 
+                      : '💪 Nie tym razem, ale się uczysz!'}
+                  </h4>
+                  
+                  {/* Correct Answer Explanation */}
+                  <div className="space-y-3">
+                    {(() => {
+                      const correctOption = currentQ.options[currentQ.correct];
+                      const explanation = getExplanation(currentQ.explanationKey, correctOption.key);
+                      
+                      return (
+                        <>
+                          {/* Quick Explanation */}
+                          <div className="bg-white/50 rounded-lg p-3">
+                            <p className="font-semibold text-gray-900 mb-1">
+                              ✅ {correctOption.text}
+                            </p>
+                            <p className="text-gray-700">
+                              {explanation.explanation}
+                            </p>
+                          </div>
+                          
+                          {/* Mnemonic */}
+                          {userSettings.showMnemonic && explanation.mnemonic && (
+                            <div className="bg-purple-100 rounded-lg p-3">
+                              <div className="flex items-start space-x-2">
+                                <Brain className="w-5 h-5 text-purple-600 mt-0.5" />
+                                <div>
+                                  <p className="font-semibold text-purple-900 text-sm mb-1">
+                                    Sposób na zapamiętanie:
+                                  </p>
+                                  <p className="text-purple-700">
+                                    {explanation.mnemonic}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Visual Aid */}
+                          {explanation.visual && (
+                            <div className="bg-blue-100 rounded-lg p-3">
+                              <code className="text-blue-800 font-mono text-sm">
+                                {explanation.visual}
+                              </code>
+                            </div>
+                          )}
+                          
+                          {/* Pro Tip */}
+                          {explanation.tip && (
+                            <div className="bg-yellow-100 rounded-lg p-3">
+                              <div className="flex items-start space-x-2">
+                                <Zap className="w-5 h-5 text-yellow-600 mt-0.5" />
+                                <div>
+                                  <p className="font-semibold text-yellow-900 text-sm mb-1">
+                                    Pro tip:
+                                  </p>
+                                  <p className="text-yellow-700">
+                                    {explanation.tip}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Example */}
+                          {explanation.example && (
+                            <div className="bg-gray-100 rounded-lg p-3">
+                              <p className="font-semibold text-gray-700 text-sm mb-1">
+                                Przykład:
+                              </p>
+                              <pre className="text-gray-600 font-mono text-sm">
+                                {explanation.example}
+                              </pre>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* User Feedback */}
+            <div className="bg-gray-50 rounded-lg p-4">
+              <p className="text-sm font-semibold text-gray-700 mb-3">
+                Czy to wyjaśnienie było pomocne?
+              </p>
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={() => setUserFeedback('helpful')}
+                  className={`
+                    flex items-center space-x-2 px-4 py-2 rounded-lg transition-all
+                    ${userFeedback === 'helpful' 
+                      ? 'bg-green-500 text-white' 
+                      : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'}
+                  `}
+                >
+                  <ThumbsUp className="w-4 h-4" />
+                  <span>Tak, super!</span>
+                </button>
+                
+                <button
+                  onClick={() => setUserFeedback('not-helpful')}
+                  className={`
+                    flex items-center space-x-2 px-4 py-2 rounded-lg transition-all
+                    ${userFeedback === 'not-helpful' 
+                      ? 'bg-red-500 text-white' 
+                      : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'}
+                  `}
+                >
+                  <ThumbsDown className="w-4 h-4" />
+                  <span>Można lepiej</span>
+                </button>
+                
+                <button className="flex items-center space-x-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                  <MessageSquare className="w-4 h-4" />
+                  <span>Dodaj komentarz</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Next Button */}
+        {showExplanation && (
+          <button
+            onClick={nextQuestion}
+            className="w-full py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg font-medium hover:from-blue-600 hover:to-purple-700 transition-all transform hover:scale-105"
+          >
+            Następne pytanie
+            <ChevronRight className="inline w-5 h-5 ml-2" />
+          </button>
+        )}
+      </div>
+
+      {/* User Progress Bar */}
+      <div className="bg-white rounded-b-2xl shadow-lg p-4">
+        <div className="flex items-center justify-between text-sm mb-2">
+          <span className="text-gray-600">Pytanie {currentQuestion + 1} z {questions.length}</span>
+          <span className="font-semibold text-blue-600">
+            {Math.round(((currentQuestion + 1) / questions.length) * 100)}% ukończone
+          </span>
+        </div>
+        <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+          <div 
+            className="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-500"
+            style={{ width: `${((currentQuestion + 1) / questions.length) * 100}%` }}
+          />
+        </div>
+      </div>
+
+      {/* CSS for shake animation */}
+      <style jsx>{`
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-5px); }
+          75% { transform: translateX(5px); }
+        }
+        
+        .shake {
+          animation: shake 0.3s ease-in-out;
+        }
+      `}</style>
+    </div>
+  );
+};
+
+// ============================================
+// USER CUSTOMIZATION PANEL
+// ============================================
+const UserCustomizationPanel = ({ settings, onSettingsChange }) => {
+  const [activeTab, setActiveTab] = useState('display');
+
+  const tabs = [
+    { id: 'display', label: 'Wyświetlanie', icon: Eye },
+    { id: 'learning', label: 'Nauka', icon: BookOpen },
+    { id: 'gamification', label: 'Gry', icon: Gamepad2 },
+    { id: 'notifications', label: 'Powiadomienia', icon: Bell }
+  ];
+
+  return (
+    <div className="max-w-2xl mx-auto p-6">
+      <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-6 text-white">
+          <h2 className="text-2xl font-bold mb-2">
+            Dostosuj aplikację do siebie 🎨
+          </h2>
+          <p className="text-white/90">
+            Kontroluj każdy aspekt swojej nauki
+          </p>
+        </div>
+
+        {/*
