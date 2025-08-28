@@ -521,3 +521,656 @@ const CompactCareerMap = () => {
 };
 
 export default CompactCareerMap;
+
+
+
+/////WERSJA ULEPSZONA ALE NIE DZIAŁA
+import React, { useState, useEffect, useReducer, useRef } from 'react';
+import { 
+  Home, Code, Database, Globe, Smartphone, Brain, Palette, Shield,
+  Cpu, GitBranch, Package, Zap, Trophy, Star, Lock, CheckCircle,
+  ChevronLeft, ChevronRight, Flame, Target, Award, Calendar,
+  TrendingUp, Gift, Crown, Medal, Sparkles, Heart
+} from 'lucide-react';
+
+// Style CSS dla animacji (dodaj do global.css lub App.css)
+const animationStyles = `
+  @keyframes fadeInBounce {
+    0% {
+      opacity: 0;
+      transform: scale(0.3) translateY(20px);
+    }
+    50% {
+      opacity: 0.8;
+      transform: scale(1.05) translateY(-5px);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+
+  @keyframes drawLine {
+    from {
+      stroke-dashoffset: 100;
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  @keyframes pulse {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 0.8;
+    }
+    50% {
+      transform: scale(1.1);
+      opacity: 0.4;
+    }
+  }
+
+  @keyframes slideUp {
+    from {
+      transform: translateY(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes confetti {
+    0% {
+      transform: translateY(0) rotate(0deg);
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(100px) rotate(720deg);
+      opacity: 0;
+    }
+  }
+
+  .animate-fadeInBounce {
+    animation: fadeInBounce 0.6s ease-out forwards;
+  }
+
+  .animate-drawLine {
+    stroke-dasharray: 100;
+    animation: drawLine 1s ease-out forwards;
+  }
+
+  .animate-pulse-custom {
+    animation: pulse 2s infinite;
+  }
+
+  .animate-slideUp {
+    animation: slideUp 0.3s ease-out forwards;
+  }
+
+  .animate-confetti {
+    animation: confetti 1s ease-out forwards;
+  }
+`;
+
+// Achievements system
+const ACHIEVEMENTS = [
+  { id: 'first_step', name: 'Pierwszy Krok', desc: 'Ukończ pierwszą lekcję', icon: '🎯', xp: 50 },
+  { id: 'streak_3', name: 'Wytrwały', desc: '3 dni z rzędu', icon: '🔥', xp: 100 },
+  { id: 'streak_7', name: 'Tygodniowy Wojownik', desc: '7 dni z rzędu', icon: '⚡', xp: 200 },
+  { id: 'streak_30', name: 'Mistrz Miesięczny', desc: '30 dni z rzędu', icon: '👑', xp: 500 },
+  { id: 'path_complete', name: 'Znawca Ścieżki', desc: 'Ukończ całą ścieżkę', icon: '🏆', xp: 300 },
+  { id: 'multi_path', name: 'Poliglota', desc: 'Rozpocznij 3 różne ścieżki', icon: '🌟', xp: 250 },
+  { id: 'speed_demon', name: 'Błyskawica', desc: 'Ukończ 5 lekcji jednego dnia', icon: '⚡', xp: 150 },
+  { id: 'perfect_week', name: 'Perfekcjonista', desc: 'Ukończ cel przez 7 dni', icon: '💎', xp: 300 },
+  { id: 'level_10', name: 'Dziesiątka', desc: 'Osiągnij poziom 10', icon: '🎖️', xp: 400 },
+  { id: 'boss_slayer', name: 'Pogromca Bossów', desc: 'Pokonaj pierwszy Boss Level', icon: '⚔️', xp: 600 }
+];
+
+// Daily Goals
+const DAILY_GOALS = [
+  { id: 'casual', name: 'Casualowy', nodes: 1, xp: 10, icon: '🐢' },
+  { id: 'regular', name: 'Regularny', nodes: 2, xp: 20, icon: '🚶' },
+  { id: 'serious', name: 'Poważny', nodes: 3, xp: 30, icon: '🏃' },
+  { id: 'insane', name: 'Szalony', nodes: 5, xp: 50, icon: '🚀' }
+];
+
+// Reducer do zarządzania stanem
+const gameStateReducer = (state, action) => {
+  switch (action.type) {
+    case 'COMPLETE_NODE':
+      const today = new Date().toDateString();
+      const todayCompleted = state.todayProgress.date === today 
+        ? state.todayProgress.completed + 1 
+        : 1;
+      
+      const newStreak = state.todayProgress.date === today || isYesterday(state.lastActiveDate)
+        ? state.streak + (state.todayProgress.completed === 0 ? 1 : 0)
+        : 1;
+      
+      return {
+        ...state,
+        completedNodes: [...state.completedNodes, action.payload.nodeId],
+        totalXP: state.totalXP + action.payload.xp,
+        todayProgress: {
+          date: today,
+          completed: todayCompleted,
+          xpEarned: state.todayProgress.xpEarned + action.payload.xp
+        },
+        streak: newStreak,
+        lastActiveDate: new Date(),
+        level: Math.floor((state.totalXP + action.payload.xp) / 100)
+      };
+    
+    case 'UNLOCK_ACHIEVEMENT':
+      return {
+        ...state,
+        achievements: [...state.achievements, action.payload],
+        totalXP: state.totalXP + action.payload.xp
+      };
+    
+    case 'SET_DAILY_GOAL':
+      return {
+        ...state,
+        dailyGoal: action.payload
+      };
+    
+    case 'RESET_DAILY':
+      return {
+        ...state,
+        todayProgress: {
+          date: new Date().toDateString(),
+          completed: 0,
+          xpEarned: 0
+        }
+      };
+    
+    case 'ADD_HEARTS':
+      return {
+        ...state,
+        hearts: Math.min(state.hearts + action.payload, 5)
+      };
+    
+    case 'LOSE_HEART':
+      return {
+        ...state,
+        hearts: Math.max(state.hearts - 1, 0)
+      };
+    
+    default:
+      return state;
+  }
+};
+
+// Helper functions
+const isYesterday = (date) => {
+  if (!date) return false;
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  return date.toDateString() === yesterday.toDateString();
+};
+
+// Map data pozostaje taka sama jak wcześniej
+const CAREER_MAP = {
+  rows: [
+    [{ id: 'start', icon: '🏠', title: 'Start', col: 1, status: 'completed', xp: 0 }],
+    [
+      { id: 'html', icon: '🌐', title: 'HTML/CSS', col: 0, status: 'available', xp: 100, path: 'frontend' },
+      { id: 'python', icon: '🐍', title: 'Python', col: 1, status: 'available', xp: 100, path: 'backend' },
+      { id: 'design', icon: '🎨', title: 'Design', col: 2, status: 'available', xp: 100, path: 'creative' }
+    ],
+    [
+      { id: 'javascript', icon: '⚡', title: 'JavaScript', col: 0, status: 'locked', xp: 150, path: 'frontend', requires: ['html'] },
+      { id: 'django', icon: '🛡️', title: 'Django', col: 1, status: 'locked', xp: 150, path: 'backend', requires: ['python'] },
+      { id: 'figma', icon: '📐', title: 'Figma', col: 2, status: 'locked', xp: 150, path: 'creative', requires: ['design'] }
+    ],
+    [
+      { id: 'react', icon: '⚛️', title: 'React', col: 0, status: 'locked', xp: 200, path: 'frontend', requires: ['javascript'] },
+      { id: 'data-science', icon: '📊', title: 'Data Science', col: 1, status: 'locked', xp: 200, path: 'backend', requires: ['python', 'django'] },
+      { id: 'ux-pro', icon: '✨', title: 'UX Pro', col: 2, status: 'locked', xp: 200, path: 'creative', requires: ['figma'] }
+    ],
+    [
+      { id: 'fullstack', icon: '🔧', title: 'Full-Stack', col: 0, status: 'locked', xp: 300, path: 'hybrid', requires: ['react', 'django'] },
+      { id: 'mobile', icon: '📱', title: 'Mobile Dev', col: 2, status: 'locked', xp: 300, path: 'mobile', requires: ['react'] }
+    ],
+    [
+      { id: 'ai-ml', icon: '🤖', title: 'AI/ML', col: 1, status: 'locked', xp: 400, path: 'ai', requires: ['data-science', 'fullstack'] }
+    ],
+    [
+      { id: 'architect', icon: '👑', title: 'Architect', col: 1, status: 'locked', xp: 500, path: 'master', isBoss: true, requires: ['ai-ml', 'mobile'] }
+    ]
+  ],
+  connections: [
+    { from: 'start', to: 'html' },
+    { from: 'start', to: 'python' },
+    { from: 'start', to: 'design' },
+    { from: 'html', to: 'javascript' },
+    { from: 'javascript', to: 'react' },
+    { from: 'python', to: 'django' },
+    { from: 'python', to: 'data-science' },
+    { from: 'django', to: 'data-science' },
+    { from: 'design', to: 'figma' },
+    { from: 'figma', to: 'ux-pro' },
+    { from: 'react', to: 'fullstack' },
+    { from: 'django', to: 'fullstack' },
+    { from: 'react', to: 'mobile' },
+    { from: 'data-science', to: 'ai-ml' },
+    { from: 'fullstack', to: 'ai-ml' },
+    { from: 'ux-pro', to: 'mobile' },
+    { from: 'ai-ml', to: 'architect' },
+    { from: 'mobile', to: 'architect' }
+  ]
+};
+
+// Główny komponent
+const EnhancedCareerMap = () => {
+  // Initial state
+  const initialState = {
+    completedNodes: ['start'],
+    totalXP: 0,
+    streak: 0,
+    hearts: 5,
+    level: 1,
+    achievements: [],
+    dailyGoal: DAILY_GOALS[1], // Regular
+    todayProgress: {
+      date: new Date().toDateString(),
+      completed: 0,
+      xpEarned: 0
+    },
+    lastActiveDate: new Date()
+  };
+
+  const [state, dispatch] = useReducer(gameStateReducer, initialState);
+  const [selectedNode, setSelectedNode] = useState(null);
+  const [mapNodes, setMapNodes] = useState([]);
+  const [showAchievement, setShowAchievement] = useState(null);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [currentRow, setCurrentRow] = useState(0);
+  const [animateNodes, setAnimateNodes] = useState(false);
+
+  // Inject animation styles
+  useEffect(() => {
+    const styleElement = document.createElement('style');
+    styleElement.textContent = animationStyles;
+    document.head.appendChild(styleElement);
+    return () => document.head.removeChild(styleElement);
+  }, []);
+
+  // Initialize map with animations
+  useEffect(() => {
+    const nodes = [];
+    CAREER_MAP.rows.forEach((row, rowIndex) => {
+      row.forEach(node => {
+        nodes.push({
+          ...node,
+          row: rowIndex,
+          status: updateNodeStatus(node, state),
+          animationDelay: rowIndex * 100 + node.col * 50
+        });
+      });
+    });
+    setMapNodes(nodes);
+    
+    // Trigger entrance animations
+    setTimeout(() => setAnimateNodes(true), 100);
+  }, [state.completedNodes]);
+
+  // Check for achievements
+  useEffect(() => {
+    checkAchievements();
+  }, [state]);
+
+  const updateNodeStatus = (node, gameState) => {
+    if (gameState.completedNodes.includes(node.id)) {
+      return 'completed';
+    }
+    
+    if (node.requires) {
+      const allRequirementsMet = node.requires.every(req => 
+        gameState.completedNodes.includes(req)
+      );
+      return allRequirementsMet ? 'available' : 'locked';
+    }
+    
+    const connectedCompleted = CAREER_MAP.connections.some(conn => 
+      conn.to === node.id && gameState.completedNodes.includes(conn.from)
+    );
+    
+    return connectedCompleted ? 'available' : node.status;
+  };
+
+  const checkAchievements = () => {
+    const unlockedAchievements = state.achievements.map(a => a.id);
+    
+    // First step
+    if (state.completedNodes.length === 2 && !unlockedAchievements.includes('first_step')) {
+      unlockAchievement('first_step');
+    }
+    
+    // Streak achievements
+    if (state.streak >= 3 && !unlockedAchievements.includes('streak_3')) {
+      unlockAchievement('streak_3');
+    }
+    if (state.streak >= 7 && !unlockedAchievements.includes('streak_7')) {
+      unlockAchievement('streak_7');
+    }
+    if (state.streak >= 30 && !unlockedAchievements.includes('streak_30')) {
+      unlockAchievement('streak_30');
+    }
+    
+    // Speed demon
+    if (state.todayProgress.completed >= 5 && !unlockedAchievements.includes('speed_demon')) {
+      unlockAchievement('speed_demon');
+    }
+    
+    // Level 10
+    if (state.level >= 10 && !unlockedAchievements.includes('level_10')) {
+      unlockAchievement('level_10');
+    }
+  };
+
+  const unlockAchievement = (achievementId) => {
+    const achievement = ACHIEVEMENTS.find(a => a.id === achievementId);
+    if (achievement) {
+      dispatch({ type: 'UNLOCK_ACHIEVEMENT', payload: achievement });
+      setShowAchievement(achievement);
+      setShowConfetti(true);
+      
+      setTimeout(() => {
+        setShowAchievement(null);
+        setShowConfetti(false);
+      }, 3000);
+    }
+  };
+
+  const handleNodeClick = (node) => {
+    if (node.status === 'locked') {
+      // Lose a heart for clicking locked node
+      dispatch({ type: 'LOSE_HEART' });
+      alert(`🔒 "${node.title}" jest zablokowane! Straciłeś ❤️`);
+      return;
+    }
+    
+    if (state.hearts === 0) {
+      alert('💔 Brak serc! Poczekaj na odnowienie lub kup więcej.');
+      return;
+    }
+    
+    setSelectedNode(node);
+  };
+
+  const completeNode = (nodeId) => {
+    const node = mapNodes.find(n => n.id === nodeId);
+    if (node) {
+      dispatch({ 
+        type: 'COMPLETE_NODE', 
+        payload: { nodeId: nodeId, xp: node.xp }
+      });
+      
+      // Check if daily goal is met
+      if (state.todayProgress.completed + 1 >= state.dailyGoal.nodes) {
+        setShowConfetti(true);
+        setTimeout(() => setShowConfetti(false), 2000);
+      }
+    }
+    setSelectedNode(null);
+  };
+
+  const renderConnection = (from, to, index) => {
+    const fromNode = mapNodes.find(n => n.id === from);
+    const toNode = mapNodes.find(n => n.id === to);
+    
+    if (!fromNode || !toNode) return null;
+    
+    const isActive = state.completedNodes.includes(from) || 
+                    (fromNode.status === 'available' && toNode.status === 'available');
+    
+    const x1 = 16.66 + (fromNode.col * 33.33);
+    const y1 = 10 + (fromNode.row * 15);
+    const x2 = 16.66 + (toNode.col * 33.33);
+    const y2 = 10 + (toNode.row * 15);
+    
+    return (
+      <line
+        key={`${from}-${to}`}
+        x1={`${x1}%`}
+        y1={`${y1}%`}
+        x2={`${x2}%`}
+        y2={`${y2}%`}
+        stroke={isActive ? '#10b981' : '#cbd5e1'}
+        strokeWidth={isActive ? '3' : '2'}
+        strokeDasharray={toNode.status === 'locked' ? '5,5' : '0'}
+        className={animateNodes ? 'animate-drawLine' : ''}
+        style={{ animationDelay: `${index * 100}ms` }}
+      />
+    );
+  };
+
+  const renderNode = (node) => {
+    const x = 16.66 + (node.col * 33.33);
+    const y = 10 + (node.row * 15);
+    
+    let bgColor = '';
+    let ringColor = '';
+    
+    switch(node.status) {
+      case 'completed':
+        bgColor = '#10b981';
+        ringColor = '#22c55e';
+        break;
+      case 'available':
+        bgColor = node.isBoss ? '#fbbf24' : '#3b82f6';
+        ringColor = node.isBoss ? '#f59e0b' : '#60a5fa';
+        break;
+      case 'locked':
+        bgColor = '#9ca3af';
+        ringColor = '#d1d5db';
+        break;
+      default:
+        bgColor = '#e5e7eb';
+        ringColor = '#f3f4f6';
+    }
+    
+    return (
+      <g
+        key={node.id}
+        transform={`translate(${x * 6}, ${y * 6.67})`}
+        onClick={() => handleNodeClick(node)}
+        className={`cursor-pointer ${animateNodes ? 'animate-fadeInBounce' : 'opacity-0'}`}
+        style={{ animationDelay: `${node.animationDelay}ms` }}
+      >
+        {node.status === 'available' && (
+          <circle
+            cx="0"
+            cy="0"
+            r="35"
+            fill={ringColor}
+            opacity="0.3"
+            className="animate-pulse-custom"
+          />
+        )}
+        
+        <circle cx="0" cy="0" r="28" fill={ringColor} />
+        <circle cx="0" cy="0" r="24" fill={bgColor} />
+        
+        <text x="0" y="5" textAnchor="middle" fontSize="20" className="select-none">
+          {node.status === 'locked' ? '🔒' : node.icon}
+        </text>
+        
+        {node.xp > 0 && node.status !== 'locked' && (
+          <g transform="translate(20, -20)">
+            <circle cx="0" cy="0" r="10" fill="#fbbf24" />
+            <text x="0" y="4" textAnchor="middle" fontSize="10" fill="#92400e" fontWeight="bold">
+              {node.xp}
+            </text>
+          </g>
+        )}
+        
+        <text x="0" y="45" textAnchor="middle" fontSize="11" fill="#374151" fontWeight="600">
+          {node.title}
+        </text>
+      </g>
+    );
+  };
+
+  return (
+    <div className="w-full h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex flex-col">
+      {/* Header with streak and daily goal */}
+      <div className="bg-white shadow-lg p-4 z-10">
+        <div className="flex justify-between items-center mb-2">
+          <div className="flex items-center space-x-2">
+            <h1 className="text-xl font-bold text-gray-800">Ścieżka Kariery</h1>
+            <span className="text-sm text-gray-600">Poziom {state.level}</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            {/* Hearts */}
+            <div className="flex">
+              {[...Array(5)].map((_, i) => (
+                <Heart 
+                  key={i} 
+                  className={`w-5 h-5 ${i < state.hearts ? 'text-red-500 fill-current' : 'text-gray-300'}`}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex justify-between items-center">
+          {/* Streak */}
+          <div className="flex items-center bg-orange-100 px-3 py-1 rounded-lg">
+            <Flame className="w-4 h-4 text-orange-500 mr-1" />
+            <span className="text-sm font-bold text-orange-700">{state.streak} dni</span>
+          </div>
+          
+          {/* Daily Goal Progress */}
+          <div className="flex-1 mx-3">
+            <div className="flex items-center justify-between text-xs mb-1">
+              <span>Dzienny cel: {state.dailyGoal.name}</span>
+              <span>{state.todayProgress.completed}/{state.dailyGoal.nodes}</span>
+            </div>
+            <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-300"
+                style={{ width: `${(state.todayProgress.completed / state.dailyGoal.nodes) * 100}%` }}
+              />
+            </div>
+          </div>
+          
+          {/* XP */}
+          <div className="bg-yellow-100 px-3 py-1 rounded-lg">
+            <span className="text-sm font-bold text-yellow-700">⚡ {state.totalXP} XP</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Achievements Bar */}
+      <div className="bg-gray-100 px-4 py-2 flex space-x-2 overflow-x-auto">
+        {ACHIEVEMENTS.slice(0, 5).map(achievement => {
+          const isUnlocked = state.achievements.some(a => a.id === achievement.id);
+          return (
+            <div
+              key={achievement.id}
+              className={`flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center ${
+                isUnlocked ? 'bg-yellow-400' : 'bg-gray-300'
+              }`}
+              title={achievement.name}
+            >
+              <span className="text-xl">{isUnlocked ? achievement.icon : '❓'}</span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Map */}
+      <div className="flex-1 relative overflow-hidden">
+        <svg className="w-full h-full" viewBox="0 0 600 600">
+          <g className="connections">
+            {CAREER_MAP.connections.map((conn, i) => renderConnection(conn.from, conn.to, i))}
+          </g>
+          <g className="nodes">
+            {mapNodes.map(node => renderNode(node))}
+          </g>
+        </svg>
+      </div>
+
+      {/* Selected Node Panel */}
+      {selectedNode && (
+        <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-2xl p-6 z-30 animate-slideUp">
+          <div className="flex justify-between items-start mb-4">
+            <div>
+              <div className="flex items-center space-x-3 mb-2">
+                <span className="text-3xl">{selectedNode.icon}</span>
+                <h2 className="text-2xl font-bold text-gray-800">{selectedNode.title}</h2>
+              </div>
+              <div className="flex items-center space-x-4 text-sm">
+                <span className="flex items-center">
+                  <Zap className="w-4 h-4 text-yellow-500 mr-1" />
+                  {selectedNode.xp} XP
+                </span>
+                <span className="flex items-center">
+                  <Target className="w-4 h-4 text-blue-500 mr-1" />
+                  {selectedNode.isBoss ? 'Boss Level' : `Poziom ${selectedNode.row}`}
+                </span>
+              </div>
+            </div>
+            <button onClick={() => setSelectedNode(null)} className="text-gray-400 text-2xl">
+              ×
+            </button>
+          </div>
+          
+          {selectedNode.status === 'available' ? (
+            <button
+              onClick={() => completeNode(selectedNode.id)}
+              className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white font-bold py-3 rounded-xl hover:from-blue-600 hover:to-purple-700 transition-all transform hover:scale-105"
+            >
+              Rozpocznij lekcję →
+            </button>
+          ) : (
+            <button className="w-full bg-green-500 text-white font-bold py-3 rounded-xl">
+              ✅ Ukończone
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Achievement Popup */}
+      {showAchievement && (
+        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50">
+          <div className="bg-yellow-400 text-yellow-900 px-6 py-4 rounded-2xl shadow-2xl animate-fadeInBounce">
+            <div className="flex items-center space-x-3">
+              <span className="text-4xl">{showAchievement.icon}</span>
+              <div>
+                <h3 className="font-bold text-lg">{showAchievement.name}</h3>
+                <p className="text-sm">{showAchievement.desc}</p>
+                <p className="text-xs mt-1">+{showAchievement.xp} XP</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confetti Effect */}
+      {showConfetti && (
+        <div className="fixed inset-0 pointer-events-none z-50">
+          {[...Array(20)].map((_, i) => (
+            <div
+              key={i}
+              className="absolute animate-confetti"
+              style={{
+                left: `${Math.random() * 100}%`,
+                top: '0',
+                animationDelay: `${Math.random() * 0.5}s`
+              }}
+            >
+              {['🎉', '⭐', '✨', '🎊'][Math.floor(Math.random() * 4)]}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default EnhancedCareerMap;
