@@ -1,0 +1,523 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  Home, Code, Database, Globe, Smartphone, Brain, Palette, Shield,
+  Cpu, GitBranch, Package, Zap, Trophy, Star, Lock, CheckCircle,
+  ChevronLeft, ChevronRight, Info, Flag, Sparkles, Award
+} from 'lucide-react';
+
+// Kompaktowa struktura mapy - maksymalnie 3 kolumny dla mobilności
+const CAREER_MAP = {
+  rows: [
+    // Rząd 1 - START
+    [
+      { id: 'start', icon: '🏠', title: 'Start', col: 1, status: 'completed', xp: 0 }
+    ],
+    // Rząd 2 - Pierwsze rozgałęzienie
+    [
+      { id: 'html', icon: '🌐', title: 'HTML/CSS', col: 0, status: 'available', xp: 100, path: 'frontend' },
+      { id: 'python', icon: '🐍', title: 'Python', col: 1, status: 'available', xp: 100, path: 'backend' },
+      { id: 'design', icon: '🎨', title: 'Design', col: 2, status: 'available', xp: 100, path: 'creative' }
+    ],
+    // Rząd 3 - Drugi poziom
+    [
+      { id: 'javascript', icon: '⚡', title: 'JavaScript', col: 0, status: 'locked', xp: 150, path: 'frontend', requires: ['html'] },
+      { id: 'django', icon: '🛡️', title: 'Django', col: 1, status: 'locked', xp: 150, path: 'backend', requires: ['python'] },
+      { id: 'figma', icon: '📐', title: 'Figma', col: 2, status: 'locked', xp: 150, path: 'creative', requires: ['design'] }
+    ],
+    // Rząd 4 - Wybór specjalizacji
+    [
+      { id: 'react', icon: '⚛️', title: 'React', col: 0, status: 'locked', xp: 200, path: 'frontend', requires: ['javascript'] },
+      { id: 'data-science', icon: '📊', title: 'Data Science', col: 1, status: 'locked', xp: 200, path: 'backend', requires: ['python', 'django'] },
+      { id: 'ux-pro', icon: '✨', title: 'UX Pro', col: 2, status: 'locked', xp: 200, path: 'creative', requires: ['figma'] }
+    ],
+    // Rząd 5 - Połączenie ścieżek
+    [
+      { id: 'fullstack', icon: '🔧', title: 'Full-Stack', col: 0, status: 'locked', xp: 300, path: 'hybrid', requires: ['react', 'django'] },
+      { id: 'mobile', icon: '📱', title: 'Mobile Dev', col: 2, status: 'locked', xp: 300, path: 'mobile', requires: ['react'] }
+    ],
+    // Rząd 6 - Zaawansowane
+    [
+      { id: 'ai-ml', icon: '🤖', title: 'AI/ML', col: 1, status: 'locked', xp: 400, path: 'ai', requires: ['data-science', 'fullstack'] }
+    ],
+    // Rząd 7 - BOSS
+    [
+      { id: 'architect', icon: '👑', title: 'Architect', col: 1, status: 'locked', xp: 500, path: 'master', isBoss: true, requires: ['ai-ml', 'mobile'] }
+    ]
+  ],
+  
+  // Połączenia między węzłami
+  connections: [
+    // Z Start
+    { from: 'start', to: 'html' },
+    { from: 'start', to: 'python' },
+    { from: 'start', to: 'design' },
+    
+    // Frontend path
+    { from: 'html', to: 'javascript' },
+    { from: 'javascript', to: 'react' },
+    
+    // Backend path
+    { from: 'python', to: 'django' },
+    { from: 'python', to: 'data-science' },
+    { from: 'django', to: 'data-science' },
+    
+    // Design path
+    { from: 'design', to: 'figma' },
+    { from: 'figma', to: 'ux-pro' },
+    
+    // Cross connections
+    { from: 'react', to: 'fullstack' },
+    { from: 'django', to: 'fullstack' },
+    { from: 'react', to: 'mobile' },
+    { from: 'data-science', to: 'ai-ml' },
+    { from: 'fullstack', to: 'ai-ml' },
+    { from: 'ux-pro', to: 'mobile' },
+    
+    // To Boss
+    { from: 'ai-ml', to: 'architect' },
+    { from: 'mobile', to: 'architect' }
+  ]
+};
+
+// System adaptacyjnego uczenia
+class AdaptiveLearningSystem {
+  constructor() {
+    this.userMetrics = {
+      mistakePatterns: {},
+      completionTimes: {},
+      difficultyAdjustment: 0,
+      preferredPaths: [],
+      strugglingTopics: []
+    };
+  }
+
+  // Analizuj błędy użytkownika
+  analyzeMistake(lessonId, mistakeType, context) {
+    if (!this.userMetrics.mistakePatterns[lessonId]) {
+      this.userMetrics.mistakePatterns[lessonId] = [];
+    }
+    
+    this.userMetrics.mistakePatterns[lessonId].push({
+      type: mistakeType,
+      context: context,
+      timestamp: Date.now()
+    });
+    
+    // Dostosuj poziom trudności
+    this.adjustDifficulty(lessonId);
+  }
+
+  // Dostosuj trudność na podstawie wyników
+  adjustDifficulty(lessonId) {
+    const mistakes = this.userMetrics.mistakePatterns[lessonId] || [];
+    const recentMistakes = mistakes.filter(m => 
+      Date.now() - m.timestamp < 24 * 60 * 60 * 1000 // ostatnie 24h
+    );
+    
+    if (recentMistakes.length > 5) {
+      this.userMetrics.difficultyAdjustment = Math.max(-2, this.userMetrics.difficultyAdjustment - 1);
+      return 'easier';
+    } else if (recentMistakes.length === 0) {
+      this.userMetrics.difficultyAdjustment = Math.min(2, this.userMetrics.difficultyAdjustment + 1);
+      return 'harder';
+    }
+    return 'maintain';
+  }
+
+  // Generuj spersonalizowane ćwiczenia
+  generateExercise(lessonId, exerciseType) {
+    const difficulty = this.userMetrics.difficultyAdjustment;
+    const mistakes = this.userMetrics.mistakePatterns[lessonId] || [];
+    
+    // Analiza najczęstszych błędów
+    const commonMistakes = this.findCommonMistakes(mistakes);
+    
+    return {
+      type: exerciseType,
+      difficulty: difficulty,
+      focusAreas: commonMistakes,
+      adaptiveHints: this.generateHints(commonMistakes),
+      skipPunctuation: true, // Ignoruj interpunkcję
+      fuzzyMatching: true    // Akceptuj nieprecyzyjne odpowiedzi
+    };
+  }
+
+  findCommonMistakes(mistakes) {
+    const typeCount = {};
+    mistakes.forEach(m => {
+      typeCount[m.type] = (typeCount[m.type] || 0) + 1;
+    });
+    return Object.keys(typeCount).sort((a, b) => typeCount[b] - typeCount[a]);
+  }
+
+  generateHints(mistakeTypes) {
+    const hints = {
+      'syntax': 'Zwróć uwagę na składnię - nawiasy i średniki',
+      'logic': 'Przemyśl kolejność operacji',
+      'naming': 'Pamiętaj o konwencjach nazewnictwa',
+      'typing': 'Nie martw się literówkami - skupmy się na logice'
+    };
+    
+    return mistakeTypes.map(type => hints[type] || 'Spróbuj podejść do problemu z innej strony');
+  }
+}
+
+// Główny komponent mapy
+const CompactCareerMap = () => {
+  const [userProgress, setUserProgress] = useState({
+    completedNodes: ['start'],
+    currentNode: 'start',
+    totalXP: 0,
+    unlockedPaths: []
+  });
+  
+  const [selectedNode, setSelectedNode] = useState(null);
+  const [mapNodes, setMapNodes] = useState([]);
+  const [learningSystem] = useState(new AdaptiveLearningSystem());
+  const [currentRow, setCurrentRow] = useState(0);
+  const [maxVisibleRows] = useState(4); // Dla widoku mobilnego
+
+  // Inicjalizacja mapy
+  useEffect(() => {
+    const nodes = [];
+    CAREER_MAP.rows.forEach((row, rowIndex) => {
+      row.forEach(node => {
+        nodes.push({
+          ...node,
+          row: rowIndex,
+          status: updateNodeStatus(node, userProgress)
+        });
+      });
+    });
+    setMapNodes(nodes);
+  }, [userProgress]);
+
+  // Aktualizuj status węzła
+  const updateNodeStatus = (node, progress) => {
+    if (progress.completedNodes.includes(node.id)) {
+      return 'completed';
+    }
+    
+    if (node.requires) {
+      const allRequirementsMet = node.requires.every(req => 
+        progress.completedNodes.includes(req)
+      );
+      return allRequirementsMet ? 'available' : 'locked';
+    }
+    
+    // Węzły połączone z ukończonymi
+    const connectedCompleted = CAREER_MAP.connections.some(conn => 
+      conn.to === node.id && progress.completedNodes.includes(conn.from)
+    );
+    
+    return connectedCompleted ? 'available' : node.status;
+  };
+
+  // Obsługa kliknięcia w węzeł
+  const handleNodeClick = (node) => {
+    if (node.status === 'locked') {
+      alert(`🔒 "${node.title}" jest zablokowane! Ukończ wymagane kursy.`);
+      return;
+    }
+    
+    setSelectedNode(node);
+    
+    if (node.status === 'available') {
+      // Generuj spersonalizowane ćwiczenie
+      const exercise = learningSystem.generateExercise(node.id, 'practice');
+      console.log('Generated exercise:', exercise);
+    }
+  };
+
+  // Ukończ węzeł
+  const completeNode = (nodeId) => {
+    const node = mapNodes.find(n => n.id === nodeId);
+    if (node) {
+      setUserProgress(prev => ({
+        ...prev,
+        completedNodes: [...prev.completedNodes, nodeId],
+        totalXP: prev.totalXP + node.xp,
+        currentNode: nodeId
+      }));
+      
+      // Zapisz metryki czasu ukończenia
+      learningSystem.userMetrics.completionTimes[nodeId] = Date.now();
+    }
+    setSelectedNode(null);
+  };
+
+  // Przewijanie mapy (dla mobile)
+  const scrollMap = (direction) => {
+    if (direction === 'up' && currentRow > 0) {
+      setCurrentRow(currentRow - 1);
+    } else if (direction === 'down' && currentRow < CAREER_MAP.rows.length - maxVisibleRows) {
+      setCurrentRow(currentRow + 1);
+    }
+  };
+
+  // Renderuj połączenie między węzłami
+  const renderConnection = (from, to) => {
+    const fromNode = mapNodes.find(n => n.id === from);
+    const toNode = mapNodes.find(n => n.id === to);
+    
+    if (!fromNode || !toNode) return null;
+    
+    const isActive = userProgress.completedNodes.includes(from) || 
+                    (fromNode.status === 'available' && toNode.status === 'available');
+    
+    const x1 = 16.66 + (fromNode.col * 33.33);
+    const y1 = 10 + (fromNode.row * 15);
+    const x2 = 16.66 + (toNode.col * 33.33);
+    const y2 = 10 + (toNode.row * 15);
+    
+    return (
+      <line
+        key={`${from}-${to}`}
+        x1={`${x1}%`}
+        y1={`${y1}%`}
+        x2={`${x2}%`}
+        y2={`${y2}%`}
+        stroke={isActive ? '#10b981' : '#cbd5e1'}
+        strokeWidth={isActive ? '3' : '2'}
+        strokeDasharray={toNode.status === 'locked' ? '5,5' : '0'}
+        className="transition-all duration-300"
+      />
+    );
+  };
+
+  // Renderuj węzeł
+  const renderNode = (node) => {
+    const x = 16.66 + (node.col * 33.33);
+    const y = 10 + (node.row * 15);
+    
+    let bgColor = '';
+    let ringColor = '';
+    let textColor = '';
+    
+    switch(node.status) {
+      case 'completed':
+        bgColor = '#10b981';
+        ringColor = '#22c55e';
+        textColor = 'white';
+        break;
+      case 'available':
+        bgColor = node.isBoss ? '#fbbf24' : '#3b82f6';
+        ringColor = node.isBoss ? '#f59e0b' : '#60a5fa';
+        textColor = 'white';
+        break;
+      case 'locked':
+        bgColor = '#9ca3af';
+        ringColor = '#d1d5db';
+        textColor = '#4b5563';
+        break;
+      default:
+        bgColor = '#e5e7eb';
+        ringColor = '#f3f4f6';
+        textColor = '#6b7280';
+    }
+    
+    return (
+      <g
+        key={node.id}
+        transform={`translate(${x * 6}, ${y * 6.67})`}
+        onClick={() => handleNodeClick(node)}
+        className="cursor-pointer"
+      >
+        {/* Efekt pulsowania dla dostępnych */}
+        {node.status === 'available' && (
+          <circle
+            cx="0"
+            cy="0"
+            r="35"
+            fill={ringColor}
+            opacity="0.3"
+            className="animate-pulse"
+          />
+        )}
+        
+        {/* Zewnętrzny pierścień */}
+        <circle
+          cx="0"
+          cy="0"
+          r="28"
+          fill={ringColor}
+          className="transition-all duration-300"
+        />
+        
+        {/* Główny węzeł */}
+        <circle
+          cx="0"
+          cy="0"
+          r="24"
+          fill={bgColor}
+          className="transition-all duration-300"
+        />
+        
+        {/* Ikona */}
+        <text
+          x="0"
+          y="5"
+          textAnchor="middle"
+          fontSize="20"
+          className="select-none"
+        >
+          {node.status === 'locked' ? '🔒' : node.icon}
+        </text>
+        
+        {/* XP Badge */}
+        {node.xp > 0 && node.status !== 'locked' && (
+          <g transform="translate(20, -20)">
+            <circle cx="0" cy="0" r="10" fill="#fbbf24" />
+            <text
+              x="0"
+              y="4"
+              textAnchor="middle"
+              fontSize="10"
+              fill="#92400e"
+              fontWeight="bold"
+            >
+              {node.xp}
+            </text>
+          </g>
+        )}
+        
+        {/* Tytuł */}
+        <text
+          x="0"
+          y="45"
+          textAnchor="middle"
+          fontSize="11"
+          fill="#374151"
+          fontWeight="600"
+        >
+          {node.title}
+        </text>
+      </g>
+    );
+  };
+
+  // Widok mobilny z ograniczoną liczbą widocznych rzędów
+  const visibleRows = CAREER_MAP.rows.slice(currentRow, currentRow + maxVisibleRows);
+  const visibleNodes = mapNodes.filter(node => 
+    node.row >= currentRow && node.row < currentRow + maxVisibleRows
+  );
+
+  return (
+    <div className="w-full h-screen bg-gradient-to-br from-amber-50 via-emerald-50 to-blue-50 flex flex-col">
+      {/* Header */}
+      <div className="bg-white shadow-lg p-4 z-10">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-xl font-bold text-gray-800">Ścieżka Kariery</h1>
+            <p className="text-sm text-gray-600">Wybierz swoją drogę</p>
+          </div>
+          <div className="flex items-center space-x-3">
+            <div className="bg-yellow-100 px-3 py-1 rounded-lg">
+              <span className="text-sm font-bold text-yellow-700">⚡ {userProgress.totalXP} XP</span>
+            </div>
+            <div className="bg-green-100 px-3 py-1 rounded-lg">
+              <span className="text-sm font-bold text-green-700">✅ {userProgress.completedNodes.length - 1}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Mapa */}
+      <div className="flex-1 relative overflow-hidden">
+        {/* Przyciski przewijania dla mobile */}
+        {currentRow > 0 && (
+          <button
+            onClick={() => scrollMap('up')}
+            className="absolute top-2 left-1/2 transform -translate-x-1/2 z-20 bg-white/80 backdrop-blur rounded-full p-2 shadow-lg"
+          >
+            <ChevronLeft className="w-5 h-5 rotate-90" />
+          </button>
+        )}
+        
+        {currentRow < CAREER_MAP.rows.length - maxVisibleRows && (
+          <button
+            onClick={() => scrollMap('down')}
+            className="absolute bottom-2 left-1/2 transform -translate-x-1/2 z-20 bg-white/80 backdrop-blur rounded-full p-2 shadow-lg"
+          >
+            <ChevronRight className="w-5 h-5 rotate-90" />
+          </button>
+        )}
+
+        <svg
+          className="w-full h-full"
+          viewBox="0 0 600 600"
+          preserveAspectRatio="xMidYMid meet"
+        >
+          {/* Tło */}
+          <rect width="100%" height="100%" fill="transparent" />
+          
+          {/* Połączenia */}
+          <g className="connections">
+            {CAREER_MAP.connections.map(conn => renderConnection(conn.from, conn.to))}
+          </g>
+          
+          {/* Węzły */}
+          <g className="nodes">
+            {visibleNodes.map(node => renderNode(node))}
+          </g>
+        </svg>
+      </div>
+
+      {/* Panel szczegółów */}
+      {selectedNode && (
+        <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-2xl p-6 z-30 animate-slideUp">
+          <div className="flex justify-between items-start mb-4">
+            <div>
+              <div className="flex items-center space-x-3 mb-2">
+                <span className="text-3xl">{selectedNode.icon}</span>
+                <h2 className="text-2xl font-bold text-gray-800">{selectedNode.title}</h2>
+              </div>
+              <div className="flex items-center space-x-4 text-sm">
+                <span className="flex items-center">
+                  <Zap className="w-4 h-4 text-yellow-500 mr-1" />
+                  {selectedNode.xp} XP
+                </span>
+                <span className="flex items-center">
+                  <Star className="w-4 h-4 text-blue-500 mr-1" />
+                  Poziom {selectedNode.row}
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={() => setSelectedNode(null)}
+              className="text-gray-400 text-2xl"
+            >
+              ×
+            </button>
+          </div>
+          
+          {/* Adaptacyjny system uczenia - info */}
+          <div className="bg-blue-50 rounded-lg p-3 mb-4">
+            <p className="text-sm text-blue-700">
+              🧠 System dostosuje poziom trudności do Twoich umiejętności
+            </p>
+          </div>
+          
+          {selectedNode.status === 'available' ? (
+            <button
+              onClick={() => completeNode(selectedNode.id)}
+              className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white font-bold py-3 rounded-xl hover:from-blue-600 hover:to-purple-700 transition-all"
+            >
+              Rozpocznij naukę →
+            </button>
+          ) : selectedNode.status === 'completed' ? (
+            <button className="w-full bg-green-500 text-white font-bold py-3 rounded-xl">
+              ✅ Ukończone - Powtórz lekcję
+            </button>
+          ) : (
+            <button disabled className="w-full bg-gray-300 text-gray-500 font-bold py-3 rounded-xl">
+              🔒 Najpierw ukończ wymagane kursy
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default CompactCareerMap;
