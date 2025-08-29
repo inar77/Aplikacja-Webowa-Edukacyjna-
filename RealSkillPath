@@ -1,0 +1,623 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  BookOpen, MessageCircle, Users, Lightbulb, Target, 
+  PlayCircle, Mic, Video, Phone, ChevronRight, Info,
+  AlertCircle, CheckCircle, HelpCircle, Settings, 
+  Zap, Brain, Heart, Star, Trophy, TrendingUp,
+  Clock, Calendar, Map, Navigation, Compass, 
+  Menu, X, Volume2, Headphones, Eye, Hand,
+  ArrowRight, ArrowLeft, RotateCcw, Flag,
+  ThumbsUp, ThumbsDown, MessageSquare, Send,
+  Sparkles, Award, Shield, Gauge, Filter
+} from 'lucide-react';
+
+// ==========================================
+// GŁÓWNY SYSTEM EDUKACYJNY
+// ==========================================
+
+const RealSkillPath = () => {
+  const [activeMode, setActiveMode] = useState('learn');
+  const [currentLesson, setCurrentLesson] = useState(null);
+  const [showExplanation, setShowExplanation] = useState(false);
+  const [userPath, setUserPath] = useState('flexible'); // flexible | structured | mixed
+
+  // ==========================================
+  // 1. ROZWIĄZANIE: WYJAŚNIENIA I KONTEKST
+  // ==========================================
+
+  const ContextualLearning = ({ skill, level }) => {
+    const [activeTab, setActiveTab] = useState('context');
+    
+    // Przykład dla elektryka - wyjaśnienie prawa Ohma
+    const electricalConcept = {
+      title: "Prawo Ohma w praktyce",
+      why: "Musisz to znać, bo pozwala obliczyć bezpieczne parametry instalacji",
+      realWorld: "Dzięki temu wiesz, czy przewód wytrzyma obciążenie i nie spowoduje pożaru",
+      theory: {
+        simple: "Napięcie = Prąd × Opór (U = I × R)",
+        detailed: "Im większy opór przewodu, tym więcej napięcia 'tracisz' po drodze. Dlatego używamy grubszych przewodów do większych obciążeń.",
+        visual: "🔋→[Opór]→💡 Im większy opór, tym słabiej świeci żarówka"
+      },
+      examples: [
+        {
+          situation: "Instalacja gniazdka do pralki (2000W)",
+          calculation: "I = P/U = 2000W/230V = 8.7A",
+          conclusion: "Potrzebujesz przewodu 2.5mm² i bezpiecznika 16A"
+        },
+        {
+          situation: "Przedłużacz się grzeje",
+          problem: "Za cienki przewód = duży opór = ciepło",
+          solution: "Użyj grubszego przedłużacza lub zmniejsz obciążenie"
+        }
+      ],
+      commonMistakes: [
+        "Używanie za cienkich przewodów 'bo taniej'",
+        "Łączenie wielu przedłużaczy w szereg",
+        "Ignorowanie nagrzewania się kabli"
+      ]
+    };
+
+    return (
+      <div className="bg-white rounded-xl shadow-lg p-6">
+        {/* Header z przyciskiem "Dlaczego?" */}
+        <div className="flex items-start justify-between mb-6">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">{electricalConcept.title}</h2>
+            <p className="text-gray-600 mt-1">{electricalConcept.why}</p>
+          </div>
+          <button className="p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors">
+            <HelpCircle className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Tabs dla różnych stylów nauki */}
+        <div className="flex space-x-2 mb-6 border-b border-gray-200">
+          {[
+            { id: 'context', label: 'Kontekst', icon: Map },
+            { id: 'theory', label: 'Teoria', icon: BookOpen },
+            { id: 'practice', label: 'Praktyka', icon: Hand },
+            { id: 'examples', label: 'Przykłady', icon: Lightbulb }
+          ].map(tab => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center space-x-2 px-4 py-2 border-b-2 transition-colors ${
+                  activeTab === tab.id
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Content based on tab */}
+        {activeTab === 'context' && (
+          <div className="space-y-4">
+            <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+              <h3 className="font-semibold text-green-900 mb-2">🌍 Gdzie to wykorzystasz?</h3>
+              <p className="text-green-800">{electricalConcept.realWorld}</p>
+            </div>
+            
+            <div className="p-4 bg-blue-50 rounded-lg">
+              <h3 className="font-semibold text-blue-900 mb-2">💡 Wizualizacja</h3>
+              <p className="text-blue-800 font-mono text-lg">{electricalConcept.theory.visual}</p>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'theory' && (
+          <div className="space-y-4">
+            <div className="p-4 bg-gray-50 rounded-lg">
+              <h3 className="font-semibold mb-2">Proste wyjaśnienie</h3>
+              <p className="text-2xl font-mono text-center py-4 text-blue-600">
+                {electricalConcept.theory.simple}
+              </p>
+              <p className="text-gray-600">{electricalConcept.theory.detailed}</p>
+            </div>
+            
+            <button className="w-full p-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+              <PlayCircle className="w-5 h-5 inline mr-2" />
+              Zobacz animację wyjaśniającą
+            </button>
+          </div>
+        )}
+
+        {activeTab === 'practice' && (
+          <div className="space-y-4">
+            <h3 className="font-semibold mb-3">🔧 Zadanie praktyczne</h3>
+            {electricalConcept.examples.map((example, idx) => (
+              <div key={idx} className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                <h4 className="font-semibold text-yellow-900">{example.situation}</h4>
+                {example.calculation && (
+                  <p className="font-mono text-sm mt-2 text-yellow-800">{example.calculation}</p>
+                )}
+                <p className="text-yellow-700 mt-2">
+                  ✅ {example.conclusion || example.solution}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {activeTab === 'examples' && (
+          <div className="space-y-4">
+            <h3 className="font-semibold mb-3">⚠️ Częste błędy</h3>
+            {electricalConcept.commonMistakes.map((mistake, idx) => (
+              <div key={idx} className="flex items-start space-x-3 p-3 bg-red-50 rounded-lg">
+                <AlertCircle className="w-5 h-5 text-red-500 mt-0.5" />
+                <p className="text-red-800">{mistake}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Always visible "Why this matters" box */}
+        <div className="mt-6 p-3 bg-purple-50 rounded-lg border border-purple-200">
+          <p className="text-sm text-purple-800">
+            <Sparkles className="w-4 h-4 inline mr-1" />
+            <strong>Pamiętaj:</strong> Zrozumienie tego zagadnienia może uratować życie - 
+            niewłaściwa instalacja to ryzyko porażenia lub pożaru!
+          </p>
+        </div>
+      </div>
+    );
+  };
+
+  // ==========================================
+  // 2. ROZWIĄZANIE: REALISTYCZNE SCENARIUSZE
+  // ==========================================
+
+  const RealWorldScenarios = () => {
+    const [selectedScenario, setSelectedScenario] = useState(null);
+    
+    const scenarios = [
+      {
+        id: 'customer_complaint',
+        title: 'Klient: "Wyskakują mi korki"',
+        context: 'Przychodzisz do klienta, który skarży się na wyskakujące bezpieczniki',
+        difficulty: 'medium',
+        skills: ['diagnostyka', 'komunikacja', 'rozwiązywanie problemów'],
+        steps: [
+          {
+            type: 'dialogue',
+            speaker: 'Klient',
+            text: 'Dzień dobry, ciągle wyskakują mi korki, szczególnie wieczorem.',
+            options: [
+              { text: 'Kiedy dokładnie to się zdarza?', correct: true, points: 10 },
+              { text: 'Na pewno za słabe bezpieczniki', correct: false, points: 0 },
+              { text: 'Wymienię panu na mocniejsze', correct: false, points: -5 }
+            ]
+          },
+          {
+            type: 'investigation',
+            task: 'Co sprawdzisz najpierw?',
+            options: [
+              { text: 'Obciążenie sieci w godzinach szczytu', correct: true },
+              { text: 'Stan bezpieczników', correct: false },
+              { text: 'Wilgotność w rozdzielnicy', correct: false }
+            ]
+          },
+          {
+            type: 'diagnosis',
+            finding: 'Odkrywasz, że klient używa 3 grzejników na jednym obwodzie',
+            solution: 'Musisz wyjaśnić problem i zaproponować rozwiązanie',
+            correctApproach: 'Wytłumacz przeciążenie i zaproponuj dodatkowy obwód'
+          }
+        ]
+      },
+      {
+        id: 'emergency_call',
+        title: 'Awaria w restauracji',
+        context: 'Pilne wezwanie - w kuchni restauracji nie działa połowa urządzeń',
+        difficulty: 'hard',
+        skills: ['praca pod presją', 'priorytetyzacja', 'bezpieczeństwo'],
+        timeLimit: '2 godziny do otwarcia',
+        steps: [
+          {
+            type: 'assessment',
+            task: 'Oceń sytuację',
+            critical: ['lodówki', 'oświetlenie awaryjne'],
+            important: ['piekarnik', 'zmywarka'],
+            optional: ['oświetlenie dekoracyjne', 'muzyka']
+          }
+        ]
+      }
+    ];
+
+    const ScenarioCard = ({ scenario }) => (
+      <div 
+        className="p-6 bg-white rounded-xl border-2 border-gray-200 hover:border-blue-400 cursor-pointer transition-all"
+        onClick={() => setSelectedScenario(scenario)}
+      >
+        <div className="flex items-start justify-between mb-3">
+          <h3 className="text-lg font-bold text-gray-900">{scenario.title}</h3>
+          <span className={`px-2 py-1 text-xs rounded-full ${
+            scenario.difficulty === 'easy' ? 'bg-green-100 text-green-700' :
+            scenario.difficulty === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+            'bg-red-100 text-red-700'
+          }`}>
+            {scenario.difficulty === 'easy' ? 'Łatwy' :
+             scenario.difficulty === 'medium' ? 'Średni' : 'Trudny'}
+          </span>
+        </div>
+        
+        <p className="text-gray-600 mb-3">{scenario.context}</p>
+        
+        {scenario.timeLimit && (
+          <div className="flex items-center text-red-600 text-sm mb-3">
+            <Clock className="w-4 h-4 mr-1" />
+            <span>{scenario.timeLimit}</span>
+          </div>
+        )}
+        
+        <div className="flex flex-wrap gap-2">
+          {scenario.skills.map(skill => (
+            <span key={skill} className="px-2 py-1 bg-blue-50 text-blue-700 text-xs rounded">
+              {skill}
+            </span>
+          ))}
+        </div>
+      </div>
+    );
+
+    return (
+      <div className="space-y-6">
+        <div className="text-center mb-8">
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">
+            Realne sytuacje z pracy
+          </h2>
+          <p className="text-gray-600">
+            Naucz się przez symulacje prawdziwych wyzwań zawodowych
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {scenarios.map(scenario => (
+            <ScenarioCard key={scenario.id} scenario={scenario} />
+          ))}
+        </div>
+
+        {/* Interactive Scenario Player */}
+        {selectedScenario && (
+          <ScenarioPlayer 
+            scenario={selectedScenario} 
+            onClose={() => setSelectedScenario(null)}
+          />
+        )}
+      </div>
+    );
+  };
+
+  // ==========================================
+  // 3. ROZWIĄZANIE: ELASTYCZNE ŚCIEŻKI
+  // ==========================================
+
+  const FlexiblePathSelector = () => {
+    const [selectedPath, setSelectedPath] = useState('custom');
+    
+    return (
+      <div className="bg-white rounded-xl shadow-lg p-6">
+        <h2 className="text-2xl font-bold mb-6">Wybierz swój styl nauki</h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Structured Path */}
+          <button
+            onClick={() => setSelectedPath('structured')}
+            className={`p-6 rounded-xl border-2 transition-all text-left ${
+              selectedPath === 'structured'
+                ? 'border-blue-500 bg-blue-50'
+                : 'border-gray-200 hover:border-gray-300'
+            }`}
+          >
+            <Navigation className="w-8 h-8 text-blue-600 mb-3" />
+            <h3 className="font-bold text-lg mb-2">Prowadzona ścieżka</h3>
+            <p className="text-sm text-gray-600 mb-3">
+              Krok po kroku, od podstaw do mistrzostwa
+            </p>
+            <ul className="text-xs text-gray-500 space-y-1">
+              <li>✓ Jasna struktura</li>
+              <li>✓ Stopniowy progres</li>
+              <li>✓ Dla początkujących</li>
+            </ul>
+          </button>
+
+          {/* Custom Path */}
+          <button
+            onClick={() => setSelectedPath('custom')}
+            className={`p-6 rounded-xl border-2 transition-all text-left ${
+              selectedPath === 'custom'
+                ? 'border-purple-500 bg-purple-50'
+                : 'border-gray-200 hover:border-gray-300'
+            }`}
+          >
+            <Compass className="w-8 h-8 text-purple-600 mb-3" />
+            <h3 className="font-bold text-lg mb-2">Własna ścieżka</h3>
+            <p className="text-sm text-gray-600 mb-3">
+              Wybierz co chcesz się uczyć i kiedy
+            </p>
+            <ul className="text-xs text-gray-500 space-y-1">
+              <li>✓ Pełna kontrola</li>
+              <li>✓ Pomijaj znane tematy</li>
+              <li>✓ Dla doświadczonych</li>
+            </ul>
+          </button>
+
+          {/* Adaptive Path */}
+          <button
+            onClick={() => setSelectedPath('adaptive')}
+            className={`p-6 rounded-xl border-2 transition-all text-left ${
+              selectedPath === 'adaptive'
+                ? 'border-green-500 bg-green-50'
+                : 'border-gray-200 hover:border-gray-300'
+            }`}
+          >
+            <Brain className="w-8 h-8 text-green-600 mb-3" />
+            <h3 className="font-bold text-lg mb-2">Inteligentna ścieżka</h3>
+            <p className="text-sm text-gray-600 mb-3">
+              AI dostosowuje program do Ciebie
+            </p>
+            <ul className="text-xs text-gray-500 space-y-1">
+              <li>✓ Personalizacja</li>
+              <li>✓ Optymalne tempo</li>
+              <li>✓ Najlepsza efektywność</li>
+            </ul>
+          </button>
+        </div>
+
+        {/* Path Customization Options */}
+        {selectedPath === 'custom' && (
+          <div className="mt-6 p-6 bg-purple-50 rounded-lg">
+            <h3 className="font-bold mb-4">Co chcesz pominąć?</h3>
+            <div className="space-y-2">
+              {['Podstawy elektryczności', 'Narzędzia', 'Bezpieczeństwo', 'Przepisy'].map(topic => (
+                <label key={topic} className="flex items-center space-x-3">
+                  <input type="checkbox" className="rounded" />
+                  <span>{topic}</span>
+                  <span className="text-xs text-gray-500">(znam to już)</span>
+                </label>
+              ))}
+            </div>
+            <button className="mt-4 px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+              Stwórz moją ścieżkę
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // ==========================================
+  // 4. ROZWIĄZANIE: PRAKTYKA MÓWIENIA/DZIAŁANIA
+  // ==========================================
+
+  const InteractivePractice = () => {
+    const [practiceMode, setPracticeMode] = useState('simulation');
+    
+    return (
+      <div className="space-y-6">
+        <div className="bg-white rounded-xl shadow-lg p-6">
+          <h2 className="text-2xl font-bold mb-6">Praktyka interaktywna</h2>
+          
+          {/* Practice Mode Selector */}
+          <div className="flex space-x-2 mb-6">
+            <button
+              onClick={() => setPracticeMode('simulation')}
+              className={`flex-1 p-3 rounded-lg font-medium transition-colors ${
+                practiceMode === 'simulation'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              <Video className="w-5 h-5 inline mr-2" />
+              Symulacja AR
+            </button>
+            
+            <button
+              onClick={() => setPracticeMode('voice')}
+              className={`flex-1 p-3 rounded-lg font-medium transition-colors ${
+                practiceMode === 'voice'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              <Mic className="w-5 h-5 inline mr-2" />
+              Rozmowa głosowa
+            </button>
+            
+            <button
+              onClick={() => setPracticeMode('mentor')}
+              className={`flex-1 p-3 rounded-lg font-medium transition-colors ${
+                practiceMode === 'mentor'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              <Users className="w-5 h-5 inline mr-2" />
+              Sesja z mentorem
+            </button>
+          </div>
+
+          {/* Simulation Mode */}
+          {practiceMode === 'simulation' && (
+            <div className="space-y-4">
+              <div className="p-6 bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg">
+                <h3 className="font-bold mb-3">🥽 Wirtualna rzeczywistość</h3>
+                <p className="text-gray-600 mb-4">
+                  Ćwicz w bezpiecznym środowisku VR - popełniaj błędy bez konsekwencji
+                </p>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 bg-white rounded-lg">
+                    <Eye className="w-6 h-6 text-blue-600 mb-2" />
+                    <p className="font-medium">Wizualizacja 3D</p>
+                    <p className="text-xs text-gray-500">Zobacz jak wygląda instalacja</p>
+                  </div>
+                  <div className="p-3 bg-white rounded-lg">
+                    <Hand className="w-6 h-6 text-purple-600 mb-2" />
+                    <p className="font-medium">Interakcja gestami</p>
+                    <p className="text-xs text-gray-500">Używaj wirtualnych narzędzi</p>
+                  </div>
+                </div>
+                
+                <button className="mt-4 w-full p-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:shadow-lg transition-all">
+                  Rozpocznij symulację
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Voice Practice */}
+          {practiceMode === 'voice' && (
+            <div className="space-y-4">
+              <div className="p-6 bg-green-50 rounded-lg">
+                <h3 className="font-bold mb-3">🎙️ Ćwicz komunikację z klientem</h3>
+                <p className="text-gray-600 mb-4">
+                  AI symuluje różnych klientów - naucz się profesjonalnej komunikacji
+                </p>
+                
+                <div className="space-y-3">
+                  <button className="w-full p-4 bg-white rounded-lg text-left hover:shadow-md transition-shadow">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">Zdenerwowany klient</p>
+                        <p className="text-sm text-gray-500">Naucz się radzić z trudnymi sytuacjami</p>
+                      </div>
+                      <Phone className="w-6 h-6 text-green-600" />
+                    </div>
+                  </button>
+                  
+                  <button className="w-full p-4 bg-white rounded-lg text-left hover:shadow-md transition-shadow">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">Techniczne wyjaśnienia</p>
+                        <p className="text-sm text-gray-500">Tłumacz skomplikowane rzeczy prosto</p>
+                      </div>
+                      <MessageCircle className="w-6 h-6 text-blue-600" />
+                    </div>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Mentor Sessions */}
+          {practiceMode === 'mentor' && (
+            <div className="space-y-4">
+              <div className="p-6 bg-orange-50 rounded-lg">
+                <h3 className="font-bold mb-3">👨‍🏫 Sesje z ekspertem</h3>
+                <p className="text-gray-600 mb-4">
+                  Połącz się z doświadczonym elektrykiem na żywo
+                </p>
+                
+                <div className="grid grid-cols-1 gap-3">
+                  <div className="p-4 bg-white rounded-lg flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-12 h-12 bg-orange-200 rounded-full"></div>
+                      <div>
+                        <p className="font-medium">Marek K.</p>
+                        <p className="text-sm text-gray-500">15 lat doświadczenia</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-green-600 text-sm">Dostępny teraz</p>
+                      <button className="mt-1 px-4 py-1 bg-orange-500 text-white text-sm rounded-lg hover:bg-orange-600">
+                        Połącz
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // ==========================================
+  // 5. ROZWIĄZANIE: SPOŁECZNOŚĆ I FEEDBACK
+  // ==========================================
+
+  const CommunitySupport = () => {
+    return (
+      <div className="bg-white rounded-xl shadow-lg p-6">
+        <h2 className="text-2xl font-bold mb-6">Wsparcie społeczności</h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Quick Help */}
+          <div className="p-4 bg-blue-50 rounded-lg">
+            <h3 className="font-bold text-blue-900 mb-3">⚡ Szybka pomoc</h3>
+            <p className="text-sm text-blue-700 mb-3">
+              Odpowiedź w ciągu 5 minut od społeczności
+            </p>
+            <button className="w-full p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
+              Zadaj pytanie
+            </button>
+          </div>
+          
+          {/* Study Groups */}
+          <div className="p-4 bg-green-50 rounded-lg">
+            <h3 className="font-bold text-green-900 mb-3">👥 Grupy nauki</h3>
+            <p className="text-sm text-green-700 mb-3">
+              Ucz się z innymi na tym samym poziomie
+            </p>
+            <button className="w-full p-2 bg-green-500 text-white rounded-lg hover:bg-green-600">
+              Dołącz do grupy
+            </button>
+          </div>
+          
+          {/* Expert Reviews */}
+          <div className="p-4 bg-purple-50 rounded-lg">
+            <h3 className="font-bold text-purple-900 mb-3">✅ Ocena eksperta</h3>
+            <p className="text-sm text-purple-700 mb-3">
+              Prześlij swoją pracę do sprawdzenia
+            </p>
+            <button className="w-full p-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600">
+              Wyślij do oceny
+            </button>
+          </div>
+          
+          {/* Live Support */}
+          <div className="p-4 bg-orange-50 rounded-lg">
+            <h3 className="font-bold text-orange-900 mb-3">🆘 Wsparcie 24/7</h3>
+            <p className="text-sm text-orange-700 mb-3">
+              Zawsze ktoś pomoże - ludzie lub AI
+            </p>
+            <button className="w-full p-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600">
+              Czat wsparcia
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ==========================================
+  // SCENARIO PLAYER COMPONENT
+  // ==========================================
+
+  const ScenarioPlayer = ({ scenario, onClose }) => {
+    const [currentStep, setCurrentStep] = useState(0);
+    const [score, setScore] = useState(0);
+    const [feedback, setFeedback] = useState('');
+
+    const handleOption = (option) => {
+      if (option.correct) {
+        setScore(score + (option.points || 10));
+        setFeedback('Dobra decyzja! ' + (option.explanation || ''));
+      } else {
+        setScore(score + (option.points || 0));
+        setFeedback('Nie najlepszy wybór. ' + (option.explanation || 'Spróbuj przemyśleć to inaczej.'));
+      }
+      
+      setTimeout(() => {
+        if (currentStep < scenario.steps.length - 1) {
+          setCurrentStep(currentStep + 1);
+          setFeedback('');
+        }
