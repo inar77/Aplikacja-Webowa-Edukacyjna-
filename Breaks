@@ -1,0 +1,493 @@
+// components/Streak/StreakBreakSystem.jsx
+import React, { useState, useEffect } from 'react';
+import { 
+  Shield, Calendar, Clock, Heart, Coffee, Umbrella, 
+  AlertCircle, CheckCircle, X, ChevronRight, Star,
+  Zap, Gift, TrendingUp, Pause, Play, Info, 
+  Home, Briefcase, Users, Baby, HeartHandshake, Activity
+} from 'lucide-react';
+
+const StreakBreakSystem = ({ user, onUseBreak, onPurchaseBreak }) => {
+  const [showBreakModal, setShowBreakModal] = useState(false);
+  const [selectedBreakType, setSelectedBreakType] = useState(null);
+  const [breakHistory, setBreakHistory] = useState([]);
+  const [activeBreak, setActiveBreak] = useState(null);
+  
+  // Typy przerw dostępne w systemie
+  const breakTypes = {
+    vacation: {
+      id: 'vacation',
+      name: 'Urlop',
+      icon: '✈️',
+      duration: [3, 7, 14],
+      description: 'Planowany wypoczynek, wakacje',
+      color: 'from-blue-400 to-blue-600',
+      cost: { 3: 0, 7: 50, 14: 100 } // dni: koszt w monetach
+    },
+    health: {
+      id: 'health',
+      name: 'Zdrowie',
+      icon: '🏥',
+      duration: [1, 3, 7, 14],
+      description: 'Choroba, rekonwalescencja, wizyta lekarska',
+      color: 'from-red-400 to-red-600',
+      cost: { 1: 0, 3: 0, 7: 0, 14: 0 } // darmowe dla zdrowia
+    },
+    family: {
+      id: 'family',
+      name: 'Rodzina',
+      icon: '👨‍👩‍👧‍👦',
+      duration: [1, 3, 7],
+      description: 'Ważne wydarzenia rodzinne, opieka',
+      color: 'from-purple-400 to-purple-600',
+      cost: { 1: 0, 3: 25, 7: 50 }
+    },
+    work: {
+      id: 'work',
+      name: 'Praca/Nauka',
+      icon: '💼',
+      duration: [1, 3, 5],
+      description: 'Deadline, sesja, nadgodziny',
+      color: 'from-orange-400 to-orange-600',
+      cost: { 1: 0, 3: 20, 5: 40 }
+    },
+    mental: {
+      id: 'mental',
+      name: 'Zdrowie psychiczne',
+      icon: '🧘',
+      duration: [1, 3, 7],
+      description: 'Potrzebujesz przerwy na reset',
+      color: 'from-green-400 to-green-600',
+      cost: { 1: 0, 3: 0, 7: 0 } // darmowe dla zdrowia psychicznego
+    },
+    emergency: {
+      id: 'emergency',
+      name: 'Nagły wypadek',
+      icon: '🚨',
+      duration: [1, 2, 3],
+      description: 'Nieprzewidziane sytuacje',
+      color: 'from-red-500 to-red-700',
+      cost: { 1: 0, 2: 0, 3: 0 } // darmowe dla emergencies
+    }
+  };
+
+  // Stan użytkownika - przerwy
+  const [userBreaks, setUserBreaks] = useState({
+    freeBreaksLeft: 3, // Darmowe przerwy na miesiąc
+    purchasedBreaks: 5, // Kupione za monety
+    weekendMode: true, // Weekendy nie przerywają serii
+    protectedDays: ['saturday', 'sunday'], // Dni chronione
+    totalBreaksUsed: 12,
+    longestStreakSaved: 47,
+    breaksThisMonth: 1,
+    lastBreakDate: '2024-01-10'
+  });
+
+  // Oblicz dostępne przerwy
+  const totalBreaksAvailable = userBreaks.freeBreaksLeft + userBreaks.purchasedBreaks;
+
+  // Sprawdź czy dzisiaj jest dzień chroniony
+  const isProtectedDay = () => {
+    const today = new Date().toLocaleDateString('en-US', { weekday: 'lowercase' });
+    return userBreaks.protectedDays.includes(today);
+  };
+
+  // Historia przerw użytkownika
+  useEffect(() => {
+    // Załaduj historię z localStorage lub API
+    const mockHistory = [
+      {
+        id: 1,
+        type: 'vacation',
+        startDate: '2024-01-05',
+        endDate: '2024-01-08',
+        duration: 3,
+        reason: 'Wyjazd rodzinny',
+        streakSaved: 23
+      },
+      {
+        id: 2,
+        type: 'health',
+        startDate: '2023-12-20',
+        endDate: '2023-12-21',
+        duration: 1,
+        reason: 'Wizyta u lekarza',
+        streakSaved: 15
+      }
+    ];
+    setBreakHistory(mockHistory);
+  }, []);
+
+  const handleActivateBreak = (type, duration) => {
+    const break_ = breakTypes[type];
+    const cost = break_.cost[duration];
+    
+    // Sprawdź czy użytkownik może aktywować przerwę
+    if (cost === 0 && userBreaks.freeBreaksLeft > 0) {
+      // Użyj darmowej przerwy
+      setUserBreaks(prev => ({ ...prev, freeBreaksLeft: prev.freeBreaksLeft - 1 }));
+    } else if (cost > 0 && user.coins >= cost) {
+      // Kup przerwę za monety
+      onPurchaseBreak(cost);
+      setUserBreaks(prev => ({ ...prev, purchasedBreaks: prev.purchasedBreaks + 1 }));
+    } else if (cost === 0 && userBreaks.purchasedBreaks > 0) {
+      // Użyj kupionej przerwy
+      setUserBreaks(prev => ({ ...prev, purchasedBreaks: prev.purchasedBreaks - 1 }));
+    } else {
+      alert('Nie masz wystarczająco przerw lub monet!');
+      return;
+    }
+
+    // Aktywuj przerwę
+    const startDate = new Date();
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() + duration);
+
+    const newBreak = {
+      type,
+      duration,
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      active: true
+    };
+
+    setActiveBreak(newBreak);
+    onUseBreak(newBreak);
+    setShowBreakModal(false);
+    
+    // Dodaj do historii
+    setBreakHistory(prev => [...prev, {
+      id: Date.now(),
+      type,
+      startDate: startDate.toLocaleDateString(),
+      endDate: endDate.toLocaleDateString(),
+      duration,
+      streakSaved: user.streak
+    }]);
+  };
+
+  const BreakCard = ({ type, breakData }) => {
+    const [selectedDuration, setSelectedDuration] = useState(breakData.duration[0]);
+    const cost = breakData.cost[selectedDuration];
+    const canAfford = cost === 0 || user.coins >= cost;
+    const hasFreeBreak = userBreaks.freeBreaksLeft > 0;
+    
+    return (
+      <div className="border rounded-lg p-4 hover:shadow-lg transition-all">
+        <div className={`h-2 rounded-full bg-gradient-to-r ${breakData.color} mb-4`} />
+        
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex items-center">
+            <span className="text-3xl mr-3">{breakData.icon}</span>
+            <div>
+              <h3 className="font-semibold text-lg">{breakData.name}</h3>
+              <p className="text-sm text-gray-600">{breakData.description}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Wybór długości */}
+        <div className="mb-4">
+          <p className="text-sm font-medium mb-2">Wybierz długość przerwy:</p>
+          <div className="flex gap-2">
+            {breakData.duration.map(days => (
+              <button
+                key={days}
+                onClick={() => setSelectedDuration(days)}
+                className={`px-3 py-1 rounded-lg text-sm font-medium transition-all ${
+                  selectedDuration === days
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 hover:bg-gray-200'
+                }`}
+              >
+                {days} {days === 1 ? 'dzień' : 'dni'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Koszt */}
+        <div className="bg-gray-50 rounded-lg p-3 mb-4">
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-600">Koszt:</span>
+            <div className="flex items-center">
+              {cost === 0 ? (
+                <span className="text-green-600 font-bold">DARMOWE</span>
+              ) : (
+                <>
+                  <span className="font-bold text-lg">{cost}</span>
+                  <span className="text-yellow-500 ml-1">💰</span>
+                </>
+              )}
+            </div>
+          </div>
+          {cost === 0 && hasFreeBreak && (
+            <p className="text-xs text-green-600 mt-1">
+              Wykorzystasz 1 z {userBreaks.freeBreaksLeft} darmowych przerw
+            </p>
+          )}
+          {!canAfford && cost > 0 && (
+            <p className="text-xs text-red-600 mt-1">
+              Brak wystarczającej ilości monet
+            </p>
+          )}
+        </div>
+
+        {/* Przycisk aktywacji */}
+        <button
+          onClick={() => handleActivateBreak(type, selectedDuration)}
+          disabled={!canAfford && cost > 0}
+          className={`w-full py-2 rounded-lg font-medium transition-all ${
+            canAfford || (cost === 0 && hasFreeBreak)
+              ? 'bg-blue-600 text-white hover:bg-blue-700'
+              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+          }`}
+        >
+          {cost === 0 && hasFreeBreak ? 'Aktywuj darmową przerwę' :
+           cost === 0 && !hasFreeBreak && userBreaks.purchasedBreaks > 0 ? 'Użyj kupionej przerwy' :
+           cost > 0 && canAfford ? `Kup i aktywuj za ${cost} monet` :
+           'Brak środków'}
+        </button>
+      </div>
+    );
+  };
+
+  return (
+    <>
+      {/* Main Streak Display */}
+      <div className="bg-white rounded-lg border p-6 mb-6">
+        <div className="flex justify-between items-start">
+          <div>
+            <h2 className="text-2xl font-bold mb-2 flex items-center">
+              <Shield className="w-7 h-7 text-blue-600 mr-2" />
+              Ochrona Twojej Serii
+            </h2>
+            <p className="text-gray-600">Życie się zdarza - chroń swoją serię dni!</p>
+          </div>
+          
+          <div className="text-center">
+            <div className="text-4xl font-bold text-orange-500 flex items-center">
+              <Zap className="w-8 h-8 mr-2" />
+              {user?.streak || 0}
+            </div>
+            <p className="text-sm text-gray-600">dni serii</p>
+          </div>
+        </div>
+
+        {/* Active Break Banner */}
+        {activeBreak && (
+          <div className="mt-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-4 border border-green-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <Shield className="w-6 h-6 text-green-600 mr-3" />
+                <div>
+                  <p className="font-semibold text-green-800">Przerwa aktywna!</p>
+                  <p className="text-sm text-green-700">
+                    Twoja seria jest chroniona do {new Date(activeBreak.endDate).toLocaleDateString('pl-PL')}
+                  </p>
+                </div>
+              </div>
+              <button 
+                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                onClick={() => setActiveBreak(null)}
+              >
+                Anuluj przerwę
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Protected Days */}
+        {isProtectedDay() && (
+          <div className="mt-4 bg-blue-50 rounded-lg p-3 border border-blue-200">
+            <p className="text-sm text-blue-800 flex items-center">
+              <Info className="w-4 h-4 mr-2" />
+              Dzisiaj jest dzień chroniony (weekend) - seria nie zostanie przerwana!
+            </p>
+          </div>
+        )}
+
+        {/* Break Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+          <div className="bg-gray-50 rounded-lg p-3 text-center">
+            <p className="text-2xl font-bold text-blue-600">{userBreaks.freeBreaksLeft}</p>
+            <p className="text-xs text-gray-600">Darmowe przerwy</p>
+          </div>
+          <div className="bg-gray-50 rounded-lg p-3 text-center">
+            <p className="text-2xl font-bold text-green-600">{userBreaks.purchasedBreaks}</p>
+            <p className="text-xs text-gray-600">Kupione przerwy</p>
+          </div>
+          <div className="bg-gray-50 rounded-lg p-3 text-center">
+            <p className="text-2xl font-bold text-purple-600">{userBreaks.totalBreaksUsed}</p>
+            <p className="text-xs text-gray-600">Użyte łącznie</p>
+          </div>
+          <div className="bg-gray-50 rounded-lg p-3 text-center">
+            <p className="text-2xl font-bold text-orange-600">{userBreaks.longestStreakSaved}</p>
+            <p className="text-xs text-gray-600">Najdłuższa uratowana</p>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-3 mt-6">
+          <button
+            onClick={() => setShowBreakModal(true)}
+            className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 font-medium flex items-center justify-center"
+          >
+            <Pause className="w-5 h-5 mr-2" />
+            Weź przerwę
+          </button>
+          <button className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-lg hover:bg-gray-200 font-medium flex items-center justify-center">
+            <Gift className="w-5 h-5 mr-2" />
+            Kup więcej przerw
+          </button>
+        </div>
+      </div>
+
+      {/* Weekend Mode Settings */}
+      <div className="bg-white rounded-lg border p-6 mb-6">
+        <h3 className="font-semibold mb-4 flex items-center">
+          <Calendar className="w-5 h-5 text-blue-600 mr-2" />
+          Ustawienia ochrony
+        </h3>
+        
+        <div className="space-y-4">
+          {/* Weekend Mode */}
+          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+            <div>
+              <p className="font-medium">Tryb weekendowy</p>
+              <p className="text-sm text-gray-600">Weekendy nie przerywają serii</p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input 
+                type="checkbox" 
+                checked={userBreaks.weekendMode}
+                onChange={(e) => setUserBreaks(prev => ({ ...prev, weekendMode: e.target.checked }))}
+                className="sr-only peer" 
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+            </label>
+          </div>
+
+          {/* Protected Days */}
+          <div className="p-3 bg-gray-50 rounded-lg">
+            <p className="font-medium mb-2">Dni chronione</p>
+            <div className="flex gap-2 flex-wrap">
+              {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(day => (
+                <button
+                  key={day}
+                  onClick={() => {
+                    setUserBreaks(prev => ({
+                      ...prev,
+                      protectedDays: prev.protectedDays.includes(day)
+                        ? prev.protectedDays.filter(d => d !== day)
+                        : [...prev.protectedDays, day]
+                    }));
+                  }}
+                  className={`px-3 py-1 rounded text-sm font-medium transition-all ${
+                    userBreaks.protectedDays.includes(day)
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  {day === 'monday' ? 'Pon' :
+                   day === 'tuesday' ? 'Wt' :
+                   day === 'wednesday' ? 'Śr' :
+                   day === 'thursday' ? 'Czw' :
+                   day === 'friday' ? 'Pt' :
+                   day === 'saturday' ? 'Sob' : 'Nd'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Auto-break */}
+          <div className="p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+            <p className="font-medium text-yellow-800 mb-1">💡 Wskazówka</p>
+            <p className="text-sm text-yellow-700">
+              Możesz kupić "Streak Insurance" za 200 monet miesięcznie - automatyczna ochrona na 5 dni awaryjnych!
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Break History */}
+      <div className="bg-white rounded-lg border p-6">
+        <h3 className="font-semibold mb-4 flex items-center">
+          <Clock className="w-5 h-5 text-blue-600 mr-2" />
+          Historia przerw
+        </h3>
+        
+        {breakHistory.length > 0 ? (
+          <div className="space-y-3">
+            {breakHistory.map(break_ => (
+              <div key={break_.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center">
+                  <span className="text-2xl mr-3">
+                    {breakTypes[break_.type]?.icon || '📅'}
+                  </span>
+                  <div>
+                    <p className="font-medium">{breakTypes[break_.type]?.name}</p>
+                    <p className="text-sm text-gray-600">
+                      {break_.startDate} - {break_.endDate} ({break_.duration} dni)
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-medium text-green-600">
+                    Uratowano {break_.streakSaved} dni
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-gray-500 text-center py-4">Brak historii przerw</p>
+        )}
+      </div>
+
+      {/* Break Modal */}
+      {showBreakModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b sticky top-0 bg-white">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold">Wybierz typ przerwy</h2>
+                <button
+                  onClick={() => setShowBreakModal(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              <p className="text-gray-600 mt-2">
+                Masz {totalBreaksAvailable} {totalBreaksAvailable === 1 ? 'przerwę' : 'przerw'} do wykorzystania
+              </p>
+            </div>
+            
+            <div className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {Object.entries(breakTypes).map(([type, data]) => (
+                  <BreakCard key={type} type={type} breakData={data} />
+                ))}
+              </div>
+              
+              {/* Info */}
+              <div className="mt-6 bg-blue-50 rounded-lg p-4">
+                <h4 className="font-semibold text-blue-800 mb-2">ℹ️ Jak działają przerwy?</h4>
+                <ul className="text-sm text-blue-700 space-y-1">
+                  <li>• Przerwy chronią Twoją serię dni podczas nieobecności</li>
+                  <li>• Otrzymujesz 3 darmowe przerwy miesięcznie</li>
+                  <li>• Możesz kupić dodatkowe przerwy za monety</li>
+                  <li>• Przerwy zdrowotne i awaryjne są zawsze darmowe</li>
+                  <li>• Weekendy mogą być automatycznie chronione</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
+export default StreakBreakSystem;
