@@ -1,0 +1,707 @@
+// components/Testing/KnowledgeTestingSystem.jsx
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Code, CheckCircle, XCircle, AlertCircle, Play, 
+  Terminal, Copy, RotateCcw, Send, Bot, User,
+  Award, FileCode, Lightbulb, Target, Zap,
+  ChevronRight, Download, Share2, Star, Brain
+} from 'lucide-react';
+
+// Import CodeMirror (npm install @uiw/react-codemirror @codemirror/lang-javascript @codemirror/lang-python)
+// import CodeMirror from '@uiw/react-codemirror';
+// import { javascript } from '@codemirror/lang-javascript';
+// import { python } from '@codemirror/lang-python';
+
+const KnowledgeTestingSystem = ({ lesson, user, onComplete }) => {
+  const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [answers, setAnswers] = useState({});
+  const [code, setCode] = useState('');
+  const [testResults, setTestResults] = useState(null);
+  const [aiMentorOpen, setAiMentorOpen] = useState(false);
+  const [aiMessages, setAiMessages] = useState([]);
+  const [userMessage, setUserMessage] = useState('');
+  const [isEvaluating, setIsEvaluating] = useState(false);
+  const [showCertificate, setShowCertificate] = useState(false);
+  const [draggedItem, setDraggedItem] = useState(null);
+
+  // Przykładowy test z różnymi typami zadań
+  const testData = {
+    title: "JavaScript Podstawy - Test końcowy",
+    passingScore: 70,
+    timeLimit: 30, // minuty
+    questions: [
+      {
+        id: 1,
+        type: 'code',
+        title: 'Napisz funkcję',
+        description: 'Napisz funkcję która zwraca sumę dwóch liczb',
+        points: 20,
+        initialCode: `function sum(a, b) {\n  // Twój kod tutaj\n  \n}`,
+        testCases: [
+          { input: [2, 3], expected: 5 },
+          { input: [10, -5], expected: 5 },
+          { input: [0, 0], expected: 0 }
+        ],
+        hints: [
+          'Użyj operatora +',
+          'Pamiętaj o return',
+          'Funkcja powinna zwrócić wynik, nie console.log'
+        ]
+      },
+      {
+        id: 2,
+        type: 'multiple-choice',
+        title: 'Typy danych',
+        description: 'Które z poniższych są typami danych w JavaScript?',
+        points: 10,
+        options: [
+          { id: 'a', text: 'string', correct: true },
+          { id: 'b', text: 'number', correct: true },
+          { id: 'c', text: 'integer', correct: false },
+          { id: 'd', text: 'boolean', correct: true },
+          { id: 'e', text: 'float', correct: false }
+        ]
+      },
+      {
+        id: 3,
+        type: 'drag-drop',
+        title: 'Kolejność wykonania',
+        description: 'Ułóż kod w prawidłowej kolejności',
+        points: 15,
+        items: [
+          { id: '1', content: 'const arr = []', order: 1 },
+          { id: '2', content: 'arr.push(1)', order: 2 },
+          { id: '3', content: 'arr.push(2)', order: 3 },
+          { id: '4', content: 'console.log(arr)', order: 4 }
+        ]
+      },
+      {
+        id: 4,
+        type: 'code-completion',
+        title: 'Uzupełnij kod',
+        description: 'Uzupełnij brakujące części kodu',
+        points: 15,
+        template: `function reverseString(str) {
+  return str._____._____.____();
+}`,
+        blanks: ['split', 'reverse', 'join'],
+        correctAnswer: `function reverseString(str) {
+  return str.split('').reverse().join('');
+}`
+      },
+      {
+        id: 5,
+        type: 'debugging',
+        title: 'Znajdź błąd',
+        description: 'Znajdź i napraw błąd w kodzie',
+        points: 20,
+        buggyCode: `function factorial(n) {
+  if (n = 0) {
+    return 1;
+  }
+  return n * factorial(n - 1);
+}`,
+        correctCode: `function factorial(n) {
+  if (n === 0) {
+    return 1;
+  }
+  return n * factorial(n - 1);
+}`,
+        bugs: [
+          { line: 2, issue: 'Użyto = zamiast ===' }
+        ]
+      },
+      {
+        id: 6,
+        type: 'output-prediction',
+        title: 'Przewidź wynik',
+        description: 'Co wypisze poniższy kod?',
+        points: 10,
+        code: `let x = 5;
+x += 3;
+x *= 2;
+console.log(x);`,
+        options: [
+          { id: 'a', text: '8', correct: false },
+          { id: 'b', text: '16', correct: true },
+          { id: 'c', text: '13', correct: false },
+          { id: 'd', text: '10', correct: false }
+        ]
+      },
+      {
+        id: 7,
+        type: 'live-coding',
+        title: 'FizzBuzz Challenge',
+        description: 'Klasyczne zadanie programistyczne',
+        points: 10,
+        task: 'Napisz funkcję która dla liczb od 1 do n:\n- Dla liczb podzielnych przez 3 zwraca "Fizz"\n- Dla liczb podzielnych przez 5 zwraca "Buzz"\n- Dla liczb podzielnych przez 3 i 5 zwraca "FizzBuzz"\n- W pozostałych przypadkach zwraca liczbę',
+        initialCode: `function fizzBuzz(n) {\n  // Twój kod tutaj\n  \n}`,
+        testCases: [
+          { input: 3, expected: ['1', '2', 'Fizz'] },
+          { input: 5, expected: ['1', '2', 'Fizz', '4', 'Buzz'] },
+          { input: 15, expected: ['1', '2', 'Fizz', '4', 'Buzz', 'Fizz', '7', '8', 'Fizz', 'Buzz', '11', 'Fizz', '13', '14', 'FizzBuzz'] }
+        ]
+      }
+    ]
+  };
+
+  const question = testData.questions[currentQuestion];
+
+  // Symulacja AI Mentora
+  const askAIMentor = async (message) => {
+    setIsEvaluating(true);
+    
+    // Symulacja odpowiedzi AI (w prawdziwej aplikacji - API call do OpenAI)
+    setTimeout(() => {
+      const aiResponse = generateAIResponse(message, question);
+      setAiMessages(prev => [...prev, 
+        { role: 'user', content: message },
+        { role: 'assistant', content: aiResponse }
+      ]);
+      setIsEvaluating(false);
+    }, 1500);
+  };
+
+  // Generowanie odpowiedzi AI (symulacja)
+  const generateAIResponse = (message, currentQ) => {
+    const responses = {
+      hint: `Dla tego zadania sugeruję:\n\n1. Przeanalizuj dokładnie wymagania\n2. ${currentQ.hints?.[0] || 'Zacznij od prostego rozwiązania'}\n3. Przetestuj edge cases\n\nCzy chcesz, żebym wyjaśnił konkretny koncept?`,
+      
+      explain: `To zadanie testuje Twoją umiejętność ${currentQ.type === 'code' ? 'pisania funkcji' : 'rozumienia konceptów'}.\n\nKluczowe elementy:\n- Zrozumienie problemu\n- Implementacja logiki\n- Obsługa przypadków brzegowych\n\nSpróbuj najpierw rozwiązać to samodzielnie, a ja pomogę gdy utkniesz.`,
+      
+      debug: `Widzę, że masz problem z kodem. Sprawdźmy:\n\n1. Czy Twoja funkcja ma poprawną składnię?\n2. Czy zwracasz wynik (return)?\n3. Czy obsługujesz wszystkie przypadki testowe?\n\nPokaż mi swój kod, a pomogę znaleźć błąd.`,
+      
+      default: `Jestem tutaj, aby Ci pomóc! 🤖\n\nMogę:\n- Wyjaśnić koncepty\n- Dać wskazówki\n- Pomóc w debugowaniu\n- Sprawdzić Twoje rozumowanie\n\nO co dokładnie chcesz zapytać?`
+    };
+
+    if (message.toLowerCase().includes('hint') || message.toLowerCase().includes('wskazówk')) {
+      return responses.hint;
+    } else if (message.toLowerCase().includes('wyjaśn') || message.toLowerCase().includes('explain')) {
+      return responses.explain;
+    } else if (message.toLowerCase().includes('błąd') || message.toLowerCase().includes('debug')) {
+      return responses.debug;
+    }
+    
+    return responses.default;
+  };
+
+  // Wykonanie testów kodu
+  const runCodeTests = () => {
+    setIsEvaluating(true);
+    
+    try {
+      // Symulacja wykonania testów (w prawdziwej app - sandbox execution)
+      const results = question.testCases.map(testCase => {
+        // Tu byłoby prawdziwe wykonanie kodu
+        // Dla demo - losowa symulacja
+        const passed = Math.random() > 0.3;
+        return {
+          input: testCase.input,
+          expected: testCase.expected,
+          actual: passed ? testCase.expected : 'undefined',
+          passed
+        };
+      });
+      
+      setTestResults(results);
+      
+      // Zapisz odpowiedź
+      const allPassed = results.every(r => r.passed);
+      setAnswers(prev => ({
+        ...prev,
+        [question.id]: {
+          code,
+          passed: allPassed,
+          score: allPassed ? question.points : question.points * 0.5
+        }
+      }));
+    } catch (error) {
+      setTestResults([{ error: error.message, passed: false }]);
+    }
+    
+    setIsEvaluating(false);
+  };
+
+  // Drag & Drop handlers
+  const handleDragStart = (e, item) => {
+    setDraggedItem(item);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (e, targetItem) => {
+    e.preventDefault();
+    if (!draggedItem) return;
+    
+    // Swap items logic here
+    console.log('Dropped', draggedItem, 'on', targetItem);
+    setDraggedItem(null);
+  };
+
+  // Calculate final score
+  const calculateScore = () => {
+    const totalPoints = testData.questions.reduce((sum, q) => sum + q.points, 0);
+    const earnedPoints = Object.values(answers).reduce((sum, a) => sum + (a.score || 0), 0);
+    return Math.round((earnedPoints / totalPoints) * 100);
+  };
+
+  // Generate Certificate
+  const generateCertificate = () => {
+    const score = calculateScore();
+    if (score >= testData.passingScore) {
+      setShowCertificate(true);
+    }
+  };
+
+  // Render different question types
+  const renderQuestion = () => {
+    switch (question.type) {
+      case 'code':
+      case 'live-coding':
+        return (
+          <div className="space-y-4">
+            <div className="bg-gray-900 rounded-lg p-4">
+              <div className="flex justify-between items-center mb-3">
+                <span className="text-white font-mono text-sm">script.js</span>
+                <button 
+                  onClick={() => setCode(question.initialCode)}
+                  className="text-gray-400 hover:text-white text-sm"
+                >
+                  <RotateCcw className="w-4 h-4 inline mr-1" />
+                  Reset
+                </button>
+              </div>
+              <textarea
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                className="w-full h-64 bg-gray-800 text-green-400 font-mono p-3 rounded resize-none"
+                placeholder="// Napisz swój kod tutaj..."
+              />
+            </div>
+            
+            <button
+              onClick={runCodeTests}
+              disabled={isEvaluating}
+              className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50"
+            >
+              <Play className="w-4 h-4 inline mr-2" />
+              {isEvaluating ? 'Testowanie...' : 'Uruchom testy'}
+            </button>
+            
+            {testResults && (
+              <div className="space-y-2">
+                <h4 className="font-semibold">Wyniki testów:</h4>
+                {testResults.map((result, idx) => (
+                  <div key={idx} className={`p-3 rounded-lg ${result.passed ? 'bg-green-50' : 'bg-red-50'}`}>
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-sm">
+                        Test {idx + 1}: {JSON.stringify(result.input)} → {JSON.stringify(result.expected)}
+                      </span>
+                      {result.passed ? (
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                      ) : (
+                        <XCircle className="w-5 h-5 text-red-600" />
+                      )}
+                    </div>
+                    {!result.passed && (
+                      <p className="text-sm text-red-600 mt-1">
+                        Otrzymano: {JSON.stringify(result.actual)}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+
+      case 'multiple-choice':
+        return (
+          <div className="space-y-3">
+            {question.options.map(option => (
+              <label key={option.id} className="flex items-center p-4 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={answers[question.id]?.includes(option.id) || false}
+                  onChange={(e) => {
+                    const current = answers[question.id] || [];
+                    if (e.target.checked) {
+                      setAnswers(prev => ({
+                        ...prev,
+                        [question.id]: [...current, option.id]
+                      }));
+                    } else {
+                      setAnswers(prev => ({
+                        ...prev,
+                        [question.id]: current.filter(id => id !== option.id)
+                      }));
+                    }
+                  }}
+                  className="mr-3 w-5 h-5"
+                />
+                <span>{option.text}</span>
+              </label>
+            ))}
+          </div>
+        );
+
+      case 'drag-drop':
+        return (
+          <div className="space-y-3">
+            <div className="bg-gray-50 rounded-lg p-4 min-h-[200px]">
+              <p className="text-sm text-gray-600 mb-3">Przeciągnij elementy w prawidłowej kolejności:</p>
+              {question.items.map((item, idx) => (
+                <div
+                  key={item.id}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, item)}
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleDrop(e, item)}
+                  className="bg-white p-3 mb-2 rounded cursor-move hover:shadow-md transition-shadow flex items-center"
+                >
+                  <span className="text-gray-400 mr-3">{idx + 1}.</span>
+                  <code className="font-mono text-sm">{item.content}</code>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+
+      case 'code-completion':
+        return (
+          <div className="space-y-4">
+            <div className="bg-gray-900 rounded-lg p-4">
+              <pre className="text-green-400 font-mono">
+                <code>{question.template}</code>
+              </pre>
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm text-gray-600">Wypełnij luki używając:</p>
+              <div className="flex gap-2 flex-wrap">
+                {question.blanks.map(blank => (
+                  <span key={blank} className="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg font-mono text-sm">
+                    {blank}()
+                  </span>
+                ))}
+              </div>
+            </div>
+            <textarea
+              className="w-full h-32 p-3 border rounded-lg font-mono"
+              placeholder="Wpisz kompletny kod..."
+              onChange={(e) => setAnswers(prev => ({
+                ...prev,
+                [question.id]: e.target.value
+              }))}
+            />
+          </div>
+        );
+
+      case 'debugging':
+        return (
+          <div className="space-y-4">
+            <div className="bg-gray-900 rounded-lg p-4">
+              <div className="text-green-400 font-mono whitespace-pre">
+                {question.buggyCode.split('\n').map((line, idx) => (
+                  <div key={idx} className="hover:bg-gray-800">
+                    <span className="text-gray-500 mr-3">{idx + 1}</span>
+                    {line}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="bg-red-50 rounded-lg p-3">
+              <p className="text-sm text-red-800">
+                <AlertCircle className="w-4 h-4 inline mr-1" />
+                Ten kod zawiera {question.bugs.length} błąd(y). Znajdź i popraw!
+              </p>
+            </div>
+            <textarea
+              className="w-full h-32 p-3 border rounded-lg font-mono"
+              placeholder="Wpisz poprawiony kod..."
+              onChange={(e) => setAnswers(prev => ({
+                ...prev,
+                [question.id]: e.target.value
+              }))}
+            />
+          </div>
+        );
+
+      case 'output-prediction':
+        return (
+          <div className="space-y-4">
+            <div className="bg-gray-900 rounded-lg p-4">
+              <pre className="text-green-400 font-mono">
+                <code>{question.code}</code>
+              </pre>
+            </div>
+            <div className="space-y-2">
+              {question.options.map(option => (
+                <label key={option.id} className="flex items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer">
+                  <input
+                    type="radio"
+                    name={`q-${question.id}`}
+                    value={option.id}
+                    onChange={(e) => setAnswers(prev => ({
+                      ...prev,
+                      [question.id]: e.target.value
+                    }))}
+                    className="mr-3"
+                  />
+                  <span className="font-mono">{option.text}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        );
+
+      default:
+        return <p>Nieznany typ pytania</p>;
+    }
+  };
+
+  return (
+    <div className="max-w-7xl mx-auto p-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Main Test Area */}
+        <div className="lg:col-span-2">
+          <div className="bg-white rounded-lg shadow-lg p-6">
+            {/* Header */}
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h2 className="text-2xl font-bold">{testData.title}</h2>
+                <p className="text-gray-600">
+                  Pytanie {currentQuestion + 1} z {testData.questions.length}
+                </p>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-blue-600">
+                  {question.points}
+                </div>
+                <p className="text-xs text-gray-600">punktów</p>
+              </div>
+            </div>
+
+            {/* Progress */}
+            <div className="w-full bg-gray-200 rounded-full h-2 mb-6">
+              <div 
+                className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 rounded-full transition-all"
+                style={{ width: `${((currentQuestion + 1) / testData.questions.length) * 100}%` }}
+              />
+            </div>
+
+            {/* Question */}
+            <div className="mb-6">
+              <h3 className="text-xl font-semibold mb-2">{question.title}</h3>
+              <p className="text-gray-700 mb-4">{question.description}</p>
+              
+              {question.task && (
+                <div className="bg-blue-50 rounded-lg p-4 mb-4">
+                  <p className="text-sm whitespace-pre-line">{question.task}</p>
+                </div>
+              )}
+              
+              {renderQuestion()}
+            </div>
+
+            {/* Navigation */}
+            <div className="flex justify-between">
+              <button
+                onClick={() => setCurrentQuestion(Math.max(0, currentQuestion - 1))}
+                disabled={currentQuestion === 0}
+                className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 disabled:opacity-50"
+              >
+                Poprzednie
+              </button>
+              
+              {currentQuestion === testData.questions.length - 1 ? (
+                <button
+                  onClick={generateCertificate}
+                  className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                >
+                  Zakończ test
+                </button>
+              ) : (
+                <button
+                  onClick={() => setCurrentQuestion(currentQuestion + 1)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  Następne
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* AI Mentor Sidebar */}
+        <div className="space-y-6">
+          {/* AI Mentor Chat */}
+          <div className="bg-white rounded-lg shadow-lg p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold flex items-center">
+                <Bot className="w-5 h-5 text-blue-600 mr-2" />
+                AI Mentor
+              </h3>
+              <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
+                Online
+              </span>
+            </div>
+            
+            <div className="h-64 overflow-y-auto mb-4 space-y-3">
+              {aiMessages.length === 0 ? (
+                <div className="text-center text-gray-500 py-8">
+                  <Brain className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                  <p className="text-sm">Cześć! Jestem Twoim AI Mentorem 🤖</p>
+                  <p className="text-xs mt-2">Zapytaj mnie o wskazówkę lub wyjaśnienie</p>
+                </div>
+              ) : (
+                aiMessages.map((msg, idx) => (
+                  <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[80%] p-3 rounded-lg ${
+                      msg.role === 'user' 
+                        ? 'bg-blue-600 text-white' 
+                        : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      <p className="text-sm whitespace-pre-line">{msg.content}</p>
+                    </div>
+                  </div>
+                ))
+              )}
+              {isEvaluating && (
+                <div className="flex justify-start">
+                  <div className="bg-gray-100 p-3 rounded-lg">
+                    <p className="text-sm text-gray-600">AI myśli...</p>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={userMessage}
+                onChange={(e) => setUserMessage(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && userMessage.trim()) {
+                    askAIMentor(userMessage);
+                    setUserMessage('');
+                  }
+                }}
+                placeholder="Zadaj pytanie..."
+                className="flex-1 px-3 py-2 border rounded-lg text-sm"
+              />
+              <button
+                onClick={() => {
+                  if (userMessage.trim()) {
+                    askAIMentor(userMessage);
+                    setUserMessage('');
+                  }
+                }}
+                className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            </div>
+            
+            {/* Quick prompts */}
+            <div className="flex gap-2 mt-3 flex-wrap">
+              <button
+                onClick={() => askAIMentor('Daj mi wskazówkę')}
+                className="text-xs bg-gray-100 px-3 py-1 rounded-full hover:bg-gray-200"
+              >
+                💡 Wskazówka
+              </button>
+              <button
+                onClick={() => askAIMentor('Wyjaśnij to zadanie')}
+                className="text-xs bg-gray-100 px-3 py-1 rounded-full hover:bg-gray-200"
+              >
+                🤔 Wyjaśnij
+              </button>
+              <button
+                onClick={() => askAIMentor('Sprawdź mój kod')}
+                className="text-xs bg-gray-100 px-3 py-1 rounded-full hover:bg-gray-200"
+              >
+                🔍 Debug
+              </button>
+            </div>
+          </div>
+
+          {/* Hints */}
+          {question.hints && (
+            <div className="bg-yellow-50 rounded-lg p-4">
+              <h4 className="font-semibold text-yellow-800 mb-2 flex items-center">
+                <Lightbulb className="w-4 h-4 mr-2" />
+                Wskazówki
+              </h4>
+              <ul className="space-y-1">
+                {question.hints.map((hint, idx) => (
+                  <li key={idx} className="text-sm text-yellow-700">
+                    • {hint}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Timer */}
+          <div className="bg-white rounded-lg shadow p-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-600">Pozostały czas:</span>
+              <span className="text-xl font-bold">25:34</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Certificate Modal */}
+      {showCertificate && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-2xl w-full p-8">
+            <div className="text-center mb-6">
+              <Award className="w-20 h-20 text-yellow-500 mx-auto mb-4" />
+              <h2 className="text-3xl font-bold mb-2">Gratulacje! 🎉</h2>
+              <p className="text-gray-600">Zdałeś test z wynikiem {calculateScore()}%</p>
+            </div>
+            
+            {/* Certificate Preview */}
+            <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg p-8 mb-6 border-2 border-blue-200">
+              <div className="text-center">
+                <h3 className="text-xl font-serif mb-2">Certyfikat Ukończenia</h3>
+                <p className="text-lg mb-4">To zaświadcza, że</p>
+                <p className="text-2xl font-bold mb-4">{user?.name || 'Student'}</p>
+                <p className="text-lg mb-4">pomyślnie ukończył</p>
+                <p className="text-xl font-semibold mb-4">{testData.title}</p>
+                <p className="text-sm text-gray-600">Data: {new Date().toLocaleDateString('pl-PL')}</p>
+                <div className="flex justify-center mt-6">
+                  {[...Array(5)].map((_, i) => (
+                    <Star key={i} className="w-6 h-6 text-yellow-500 fill-current" />
+                  ))}
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex gap-3 justify-center">
+              <button className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center">
+                <Download className="w-5 h-5 mr-2" />
+                Pobierz PDF
+              </button>
+              <button className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center">
+                <Share2 className="w-5 h-5 mr-2" />
+                Udostępnij
+              </button>
+              <button 
+                onClick={() => setShowCertificate(false)}
+                className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+              >
+                Zamknij
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default KnowledgeTestingSystem;
