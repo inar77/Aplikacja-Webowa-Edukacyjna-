@@ -1,0 +1,529 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  Clock, Zap, CheckCircle, XCircle, ChevronRight,
+  TrendingUp, Award, Target, Sparkles
+} from 'lucide-react';
+
+// ============================================
+// WIZUALNE WYJAŚNIENIA - KRÓTKIE I OBRAZOWE
+// ============================================
+const VisualExplanations = {
+  'const': {
+    visual: '🔒',
+    text: 'const = ZAMKNIĘTE NA KLUCZ',
+    memory: 'const = beton - raz wylany, nie zmienisz'
+  },
+  'let': {
+    visual: '🔄',
+    text: 'let = MOŻNA ZMIENIAĆ',
+    memory: 'let it be... different'
+  },
+  'var': {
+    visual: '👴',
+    text: 'var = STARY SPOSÓB',
+    memory: 'var = vintage JavaScript'
+  },
+  'map': {
+    visual: '🔄➡️',
+    text: 'map = PRZEKSZTAŁĆ KAŻDY',
+    memory: '[🍎,🍎,🍎].map() = [🥧,🥧,🥧]'
+  },
+  'filter': {
+    visual: '☕',
+    text: 'filter = ZOSTAW DOBRE',
+    memory: '[🍎,🥝,🍎].filter(🍎) = [🍎,🍎]'
+  },
+  'object': {
+    visual: '🐛',
+    text: 'typeof null = object (BUG!)',
+    memory: 'To błąd z 1995 roku!'
+  }
+};
+
+// ============================================
+// PROSTY TIMER WIZUALNY
+// ============================================
+const VisualTimer = ({ timeLeft, maxTime }) => {
+  const dots = 10;
+  const activeDots = Math.ceil((timeLeft / maxTime) * dots);
+  
+  return (
+    <div className="flex items-center space-x-2">
+      <Clock className={`w-5 h-5 ${timeLeft <= 5 ? 'text-red-500 animate-pulse' : 'text-gray-600'}`} />
+      <div className="flex space-x-1">
+        {[...Array(dots)].map((_, i) => (
+          <div
+            key={i}
+            className={`
+              h-2 rounded-full transition-all duration-300
+              ${i < activeDots 
+                ? timeLeft <= 5 
+                  ? 'w-2 bg-red-500' 
+                  : 'w-2 bg-green-500'
+                : 'w-1 bg-gray-300'
+              }
+            `}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// WIZUALNY PROGRESS
+// ============================================
+const VisualProgress = ({ current, total }) => {
+  return (
+    <div className="flex items-center space-x-2">
+      {[...Array(total)].map((_, i) => (
+        <div
+          key={i}
+          className={`
+            transition-all duration-300
+            ${i < current 
+              ? 'w-8 h-8 bg-green-500 rounded-full flex items-center justify-center'
+              : i === current
+                ? 'w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center animate-pulse'
+                : 'w-6 h-6 bg-gray-300 rounded-full'
+            }
+          `}
+        >
+          {i < current && <CheckCircle className="w-4 h-4 text-white" />}
+          {i === current && <div className="w-2 h-2 bg-white rounded-full" />}
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// ============================================
+// GŁÓWNY KOMPONENT QUIZU
+// ============================================
+const CleanVisualQuiz = ({ careerPath = 'frontend', onComplete }) => {
+  const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [selectedAnswer, setSelectedAnswer] = useState(null);
+  const [showResult, setShowResult] = useState(false);
+  const [earnedXP, setEarnedXP] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(20);
+  const [isTimerRunning, setIsTimerRunning] = useState(true);
+
+  // Przykładowe pytania - normalnie z Firebase
+  const questions = [
+    {
+      id: 1,
+      text: "Jak deklarujesz STAŁĄ w JavaScript?",
+      visual: "🔒 = ?",
+      options: [
+        { text: 'let', visual: '🔄', key: 'let' },
+        { text: 'const', visual: '🔒', key: 'const' },
+        { text: 'var', visual: '👴', key: 'var' },
+        { text: 'define', visual: '❓', key: 'define' }
+      ],
+      correct: 1,
+      xp: 10,
+      timeLimit: 20
+    },
+    {
+      id: 2,
+      text: "Która metoda NIE zmienia tablicy?",
+      visual: "[🍎,🍎,🍎] → [?,?,?]",
+      options: [
+        { text: 'push()', visual: '➕', key: 'push' },
+        { text: 'pop()', visual: '➖', key: 'pop' },
+        { text: 'map()', visual: '🔄➡️', key: 'map' },
+        { text: 'sort()', visual: '🔀', key: 'sort' }
+      ],
+      correct: 2,
+      xp: 15,
+      timeLimit: 20
+    },
+    {
+      id: 3,
+      text: "typeof null zwraca?",
+      visual: "typeof null = ?",
+      options: [
+        { text: "'null'", visual: '0️⃣', key: 'null' },
+        { text: "'undefined'", visual: '❔', key: 'undefined' },
+        { text: "'object'", visual: '📦', key: 'object' },
+        { text: "'boolean'", visual: '✅❌', key: 'boolean' }
+      ],
+      correct: 2,
+      xp: 20,
+      timeLimit: 15
+    }
+  ];
+
+  const currentQ = questions[currentQuestion];
+
+  // Timer
+  useEffect(() => {
+    if (!isTimerRunning || showResult) return;
+    
+    if (timeLeft <= 0) {
+      handleTimeUp();
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setTimeLeft(timeLeft - 0.5);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [timeLeft, isTimerRunning, showResult]);
+
+  // Reset timer dla nowego pytania
+  useEffect(() => {
+    setTimeLeft(currentQ.timeLimit);
+    setIsTimerRunning(true);
+  }, [currentQuestion]);
+
+  const handleAnswer = (index) => {
+    if (showResult) return;
+    
+    setSelectedAnswer(index);
+    setIsTimerRunning(false);
+    setShowResult(true);
+    
+    if (index === currentQ.correct) {
+      // Bonus za szybkość
+      const speedBonus = timeLeft > 10 ? 5 : timeLeft > 5 ? 3 : 0;
+      const totalXP = currentQ.xp + speedBonus;
+      setEarnedXP(earnedXP + totalXP);
+    }
+  };
+
+  const handleTimeUp = () => {
+    setIsTimerRunning(false);
+    setShowResult(true);
+    setSelectedAnswer(null);
+  };
+
+  const nextQuestion = () => {
+    if (currentQuestion < questions.length - 1) {
+      setCurrentQuestion(currentQuestion + 1);
+      setSelectedAnswer(null);
+      setShowResult(false);
+    } else {
+      // Quiz ukończony
+      if (onComplete) {
+        onComplete(earnedXP);
+      }
+    }
+  };
+
+  return (
+    <div className="max-w-2xl mx-auto p-4">
+      {/* Header z XP i Timer */}
+      <div className="bg-white rounded-t-2xl shadow-lg p-4">
+        <div className="flex items-center justify-between mb-4">
+          {/* XP Counter */}
+          <div className="flex items-center space-x-2 bg-yellow-50 px-4 py-2 rounded-full">
+            <Zap className="w-5 h-5 text-yellow-600" />
+            <span className="font-bold text-yellow-700">{earnedXP} XP</span>
+          </div>
+
+          {/* Timer */}
+          <VisualTimer 
+            timeLeft={timeLeft} 
+            maxTime={currentQ.timeLimit}
+          />
+        </div>
+
+        {/* Progress */}
+        <div className="flex justify-center">
+          <VisualProgress 
+            current={currentQuestion} 
+            total={questions.length}
+          />
+        </div>
+      </div>
+
+      {/* Question Card */}
+      <div className="bg-white shadow-lg p-6">
+        {/* Question */}
+        <div className="text-center mb-6">
+          <div className="text-6xl mb-4">{currentQ.visual}</div>
+          <h2 className="text-2xl font-bold text-gray-900">
+            {currentQ.text}
+          </h2>
+        </div>
+
+        {/* Options - 2x2 Grid */}
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          {currentQ.options.map((option, index) => {
+            const isSelected = selectedAnswer === index;
+            const isCorrect = index === currentQ.correct;
+            const showCorrect = showResult && isCorrect;
+            const showWrong = showResult && isSelected && !isCorrect;
+            
+            return (
+              <button
+                key={index}
+                onClick={() => handleAnswer(index)}
+                disabled={showResult}
+                className={`
+                  relative p-6 rounded-2xl border-3 transition-all transform
+                  ${showCorrect 
+                    ? 'bg-green-50 border-green-500 scale-105 ring-4 ring-green-300' 
+                    : showWrong 
+                      ? 'bg-red-50 border-red-500 shake' 
+                      : isSelected 
+                        ? 'bg-blue-50 border-blue-500' 
+                        : 'bg-gray-50 border-gray-300 hover:bg-gray-100 hover:scale-105'
+                  }
+                  ${showResult ? 'cursor-default' : 'cursor-pointer'}
+                `}
+              >
+                {/* Visual Icon */}
+                <div className="text-4xl mb-2">{option.visual}</div>
+                
+                {/* Text */}
+                <div className="font-bold text-lg text-gray-800">
+                  {option.text}
+                </div>
+
+                {/* Result Indicator */}
+                {showResult && (
+                  <div className="absolute top-2 right-2">
+                    {showCorrect && (
+                      <div className="bg-green-500 text-white rounded-full p-1">
+                        <CheckCircle className="w-6 h-6" />
+                      </div>
+                    )}
+                    {showWrong && (
+                      <div className="bg-red-500 text-white rounded-full p-1">
+                        <XCircle className="w-6 h-6" />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Explanation - Super Simple */}
+        {showResult && (
+          <div className={`
+            p-6 rounded-xl mb-6
+            ${selectedAnswer === currentQ.correct 
+              ? 'bg-gradient-to-r from-green-50 to-emerald-50' 
+              : 'bg-gradient-to-r from-yellow-50 to-orange-50'}
+          `}>
+            {/* Visual Explanation */}
+            <div className="text-center mb-4">
+              <div className="text-5xl mb-2">
+                {VisualExplanations[currentQ.options[currentQ.correct].key]?.visual}
+              </div>
+              <p className="text-2xl font-bold text-gray-900">
+                {VisualExplanations[currentQ.options[currentQ.correct].key]?.text}
+              </p>
+            </div>
+
+            {/* Memory Trick */}
+            <div className="bg-white/60 rounded-lg p-4 text-center">
+              <p className="text-lg text-gray-700">
+                💡 {VisualExplanations[currentQ.options[currentQ.correct].key]?.memory}
+              </p>
+            </div>
+
+            {/* XP Earned */}
+            {selectedAnswer === currentQ.correct && (
+              <div className="mt-4 text-center">
+                <div className="inline-flex items-center space-x-2 bg-yellow-100 px-4 py-2 rounded-full">
+                  <Sparkles className="w-5 h-5 text-yellow-600" />
+                  <span className="font-bold text-yellow-700">
+                    +{currentQ.xp} XP
+                    {timeLeft > 10 && ' +5 bonus za szybkość!'}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Next Button */}
+        {showResult && (
+          <button
+            onClick={nextQuestion}
+            className="w-full py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl font-bold text-lg hover:from-blue-600 hover:to-purple-700 transition-all transform hover:scale-105 flex items-center justify-center"
+          >
+            {currentQuestion < questions.length - 1 ? (
+              <>
+                Dalej
+                <ChevronRight className="w-6 h-6 ml-2" />
+              </>
+            ) : (
+              <>
+                Zakończ Quiz
+                <Award className="w-6 h-6 ml-2" />
+              </>
+            )}
+          </button>
+        )}
+      </div>
+
+      {/* Visual Summary */}
+      {currentQuestion === questions.length - 1 && showResult && (
+        <div className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-b-2xl p-6 text-white text-center">
+          <div className="text-5xl mb-2">🏆</div>
+          <p className="text-2xl font-bold mb-2">Quiz ukończony!</p>
+          <div className="flex justify-center items-center space-x-2">
+            <Zap className="w-8 h-8" />
+            <span className="text-3xl font-bold">{earnedXP} XP</span>
+          </div>
+        </div>
+      )}
+
+      {/* Simple Animation Styles */}
+      <style jsx>{`
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-10px); }
+          75% { transform: translateX(10px); }
+        }
+        
+        .shake {
+          animation: shake 0.5s ease-in-out;
+        }
+      `}</style>
+    </div>
+  );
+};
+
+// ============================================
+// FIREBASE INTEGRATION (przykład)
+// ============================================
+const FirebaseQuizLoader = ({ careerPath, level }) => {
+  const [questions, setQuestions] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Symulacja ładowania z Firebase
+    // W prawdziwej aplikacji:
+    // const questionsRef = collection(db, 'quizzes', careerPath, level);
+    // const snapshot = await getDocs(questionsRef);
+    // setQuestions(snapshot.docs.map(doc => doc.data()));
+    
+    setTimeout(() => {
+      setQuestions([
+        // Pytania załadowane z Firebase
+      ]);
+      setLoading(false);
+    }, 1000);
+  }, [careerPath, level]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Ładowanie quizu...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return <CleanVisualQuiz careerPath={careerPath} questions={questions} />;
+};
+
+// ============================================
+// INTEGRACJA Z CAREER PATH
+// ============================================
+const CareerQuizIntegration = ({ userProgress, careerPath }) => {
+  const [totalXP, setTotalXP] = useState(userProgress.totalXP || 0);
+  const [currentLevel, setCurrentLevel] = useState(userProgress.level || 1);
+
+  const handleQuizComplete = (earnedXP) => {
+    // Aktualizuj globalny XP
+    const newTotalXP = totalXP + earnedXP;
+    setTotalXP(newTotalXP);
+    
+    // Sprawdź level up (każde 100 XP = nowy poziom)
+    const newLevel = Math.floor(newTotalXP / 100) + 1;
+    if (newLevel > currentLevel) {
+      setCurrentLevel(newLevel);
+      // Pokaż animację level up
+      showLevelUpAnimation();
+    }
+    
+    // Zapisz do Firebase
+    // updateDoc(doc(db, 'users', userId), {
+    //   totalXP: newTotalXP,
+    //   level: newLevel,
+    //   [`careerPaths.${careerPath}.xp`]: increment(earnedXP)
+    // });
+  };
+
+  const showLevelUpAnimation = () => {
+    // Animacja level up
+    console.log('🎉 LEVEL UP!');
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 py-8">
+      {/* User Stats Bar */}
+      <div className="max-w-2xl mx-auto mb-6 px-4">
+        <div className="bg-white rounded-xl shadow-lg p-4">
+          <div className="flex items-center justify-between">
+            {/* Level */}
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-bold text-xl">
+                {currentLevel}
+              </div>
+              <div>
+                <p className="text-xs text-gray-600">Poziom</p>
+                <p className="font-bold text-gray-900">Level {currentLevel}</p>
+              </div>
+            </div>
+
+            {/* Total XP */}
+            <div className="text-center">
+              <p className="text-xs text-gray-600">Całkowite XP</p>
+              <div className="flex items-center space-x-1">
+                <Zap className="w-5 h-5 text-yellow-500" />
+                <span className="font-bold text-xl text-gray-900">{totalXP}</span>
+              </div>
+            </div>
+
+            {/* Career Path */}
+            <div className="text-right">
+              <p className="text-xs text-gray-600">Ścieżka</p>
+              <p className="font-bold text-gray-900 capitalize">{careerPath}</p>
+            </div>
+          </div>
+
+          {/* XP to next level - VISUAL */}
+          <div className="mt-4">
+            <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+              <span>Do następnego poziomu</span>
+              <span className="font-bold">{totalXP % 100}/100 XP</span>
+            </div>
+            <div className="flex space-x-1">
+              {[...Array(10)].map((_, i) => (
+                <div
+                  key={i}
+                  className={`
+                    flex-1 h-2 rounded-full
+                    ${i < Math.floor((totalXP % 100) / 10) 
+                      ? 'bg-gradient-to-r from-purple-500 to-pink-500' 
+                      : 'bg-gray-200'}
+                  `}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Quiz Component */}
+      <CleanVisualQuiz 
+        careerPath={careerPath}
+        onComplete={handleQuizComplete}
+      />
+    </div>
+  );
+};
+
+export default CareerQuizIntegration;
