@@ -1,0 +1,838 @@
+import React, { useState, useEffect } from 'react';
+import {
+  Compass, Map, Navigation, User, Settings, Lock, Unlock,
+  ChevronRight, ChevronLeft, Play, Pause, SkipForward,
+  BookOpen, Trophy, Target, Sparkles, Info, HelpCircle,
+  Zap, Shield, Star, Award, CheckCircle, AlertCircle,
+  BarChart3, Grid, List, ArrowRight, Home, Lightbulb,
+  Rocket, Brain, Heart, Coffee, Sun, Moon, X
+} from 'lucide-react';
+
+// ============================================
+// SYSTEM PREFERENCJI UŻYTKOWNIKA
+// ============================================
+
+class UserPreferenceSystem {
+  constructor() {
+    this.profiles = {
+      guided: {
+        name: 'Prowadzony',
+        icon: '🤝',
+        description: 'Aplikacja prowadzi Cię krok po kroku',
+        features: {
+          autoProgress: true,
+          suggestedPath: true,
+          limitedChoices: true,
+          dailyGoals: true,
+          reminders: true
+        }
+      },
+      balanced: {
+        name: 'Zbalansowany',
+        icon: '⚖️',
+        description: 'Masz sugestie, ale możesz wybierać',
+        features: {
+          autoProgress: false,
+          suggestedPath: true,
+          limitedChoices: false,
+          dailyGoals: true,
+          reminders: false
+        }
+      },
+      explorer: {
+        name: 'Odkrywca',
+        icon: '🗺️',
+        description: 'Pełna swoboda wyboru i eksploracji',
+        features: {
+          autoProgress: false,
+          suggestedPath: false,
+          limitedChoices: false,
+          dailyGoals: false,
+          reminders: false
+        }
+      }
+    };
+
+    this.experienceLevels = {
+      beginner: { unlockedFeatures: ['basic'], maxChoices: 3 },
+      intermediate: { unlockedFeatures: ['basic', 'advanced'], maxChoices: 5 },
+      expert: { unlockedFeatures: ['basic', 'advanced', 'expert'], maxChoices: 'unlimited' }
+    };
+  }
+
+  calculateUserLevel(completedLessons, daysActive) {
+    if (completedLessons < 10 || daysActive < 7) return 'beginner';
+    if (completedLessons < 50 || daysActive < 30) return 'intermediate';
+    return 'expert';
+  }
+
+  suggestProfile(userAnswers) {
+    let score = 0;
+    
+    if (userAnswers.techComfort === 'low') score -= 2;
+    if (userAnswers.techComfort === 'high') score += 2;
+    
+    if (userAnswers.learningStyle === 'structured') score -= 2;
+    if (userAnswers.learningStyle === 'flexible') score += 2;
+    
+    if (userAnswers.timeAvailable === 'limited') score -= 1;
+    if (userAnswers.timeAvailable === 'plenty') score += 1;
+    
+    if (userAnswers.decisionPreference === 'guided') score -= 2;
+    if (userAnswers.decisionPreference === 'independent') score += 2;
+
+    if (score <= -3) return 'guided';
+    if (score >= 3) return 'explorer';
+    return 'balanced';
+  }
+}
+
+// ============================================
+// ONBOARDING - WYBÓR STYLU NAUKI
+// ============================================
+
+const AdaptiveOnboarding = ({ onComplete }) => {
+  const [step, setStep] = useState(0);
+  const [answers, setAnswers] = useState({});
+  const preferenceSystem = new UserPreferenceSystem();
+
+  const questions = [
+    {
+      id: 'intro',
+      type: 'welcome',
+      title: 'Cześć! Dostosujmy aplikację do Ciebie',
+      subtitle: 'Odpowiedz na 3 krótkie pytania, żeby wybrać najlepszy tryb nauki'
+    },
+    {
+      id: 'techComfort',
+      type: 'question',
+      title: 'Jak oceniasz swoją sprawność z technologią?',
+      options: [
+        { value: 'low', label: 'Podstawowa', icon: '🌱', desc: 'Wolę proste rozwiązania' },
+        { value: 'medium', label: 'Średnia', icon: '🌿', desc: 'Radzę sobie nieźle' },
+        { value: 'high', label: 'Zaawansowana', icon: '🌳', desc: 'Technologia to moja druga natura' }
+      ]
+    },
+    {
+      id: 'learningStyle',
+      type: 'question',
+      title: 'Jak lubisz się uczyć?',
+      options: [
+        { value: 'structured', label: 'Krok po kroku', icon: '📚', desc: 'Według planu i harmonogramu' },
+        { value: 'mixed', label: 'Elastycznie', icon: '🎯', desc: 'Plan, ale z możliwością zmian' },
+        { value: 'flexible', label: 'Swobodnie', icon: '🦋', desc: 'Sam decyduję co i kiedy' }
+      ]
+    },
+    {
+      id: 'decisionPreference',
+      type: 'question',
+      title: 'Jak podejmujesz decyzje?',
+      options: [
+        { value: 'guided', label: 'Z przewodnikiem', icon: '🧭', desc: 'Lubię mieć jasne wskazówki' },
+        { value: 'balanced', label: 'Z sugestiami', icon: '💡', desc: 'Cenię rady, ale decyduję sam' },
+        { value: 'independent', label: 'Samodzielnie', icon: '🚀', desc: 'Wolę pełną kontrolę' }
+      ]
+    },
+    {
+      id: 'result',
+      type: 'result'
+    }
+  ];
+
+  const currentQuestion = questions[step];
+
+  const handleAnswer = (value) => {
+    const newAnswers = { ...answers, [currentQuestion.id]: value };
+    setAnswers(newAnswers);
+    
+    if (step < questions.length - 2) {
+      setStep(step + 1);
+    } else {
+      // Calculate recommended profile
+      const profile = preferenceSystem.suggestProfile(newAnswers);
+      setAnswers({ ...newAnswers, recommendedProfile: profile });
+      setStep(step + 1);
+    }
+  };
+
+  const selectProfile = (profile) => {
+    onComplete({
+      profile,
+      answers,
+      features: preferenceSystem.profiles[profile].features
+    });
+  };
+
+  if (currentQuestion.type === 'welcome') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center p-6">
+        <div className="max-w-2xl w-full bg-white rounded-3xl shadow-2xl p-8 md:p-12">
+          <div className="text-center">
+            <div className="text-6xl mb-6">👋</div>
+            <h1 className="text-3xl font-bold mb-4">{currentQuestion.title}</h1>
+            <p className="text-gray-600 mb-8">{currentQuestion.subtitle}</p>
+            
+            <button
+              onClick={() => setStep(step + 1)}
+              className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all"
+            >
+              Zaczynamy →
+            </button>
+            
+            <button
+              onClick={() => selectProfile('balanced')}
+              className="block mx-auto mt-4 text-gray-500 hover:text-gray-700"
+            >
+              Pomiń i użyj ustawień domyślnych
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (currentQuestion.type === 'question') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center p-6">
+        <div className="max-w-3xl w-full bg-white rounded-3xl shadow-2xl p-8 md:p-12">
+          {/* Progress */}
+          <div className="flex justify-between items-center mb-8">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className={`flex-1 h-2 mx-1 rounded-full ${
+                  i <= step ? 'bg-blue-600' : 'bg-gray-200'
+                }`}
+              />
+            ))}
+          </div>
+
+          <h2 className="text-2xl font-bold text-center mb-8">{currentQuestion.title}</h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {currentQuestion.options.map((option) => (
+              <button
+                key={option.value}
+                onClick={() => handleAnswer(option.value)}
+                className="p-6 bg-gray-50 rounded-2xl hover:bg-blue-50 hover:border-blue-500 border-2 border-transparent transition-all group"
+              >
+                <div className="text-4xl mb-3">{option.icon}</div>
+                <h3 className="font-bold text-lg mb-2">{option.label}</h3>
+                <p className="text-sm text-gray-600">{option.desc}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (currentQuestion.type === 'result') {
+    const recommendedProfile = preferenceSystem.profiles[answers.recommendedProfile];
+    
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center p-6">
+        <div className="max-w-4xl w-full bg-white rounded-3xl shadow-2xl p-8 md:p-12">
+          <div className="text-center mb-8">
+            <div className="text-6xl mb-4">🎯</div>
+            <h2 className="text-3xl font-bold mb-2">Idealny tryb dla Ciebie to:</h2>
+          </div>
+
+          {/* Recommended Profile */}
+          <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-8 mb-8 border-2 border-blue-500">
+            <div className="text-center">
+              <div className="text-5xl mb-4">{recommendedProfile.icon}</div>
+              <h3 className="text-2xl font-bold mb-2">Tryb {recommendedProfile.name}</h3>
+              <p className="text-gray-600 mb-6">{recommendedProfile.description}</p>
+              
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
+                {Object.entries(recommendedProfile.features).map(([key, value]) => (
+                  <div key={key} className="bg-white rounded-lg p-3">
+                    {value ? (
+                      <CheckCircle className="w-5 h-5 text-green-500 inline mr-2" />
+                    ) : (
+                      <X className="w-5 h-5 text-gray-400 inline mr-2" />
+                    )}
+                    <span className="text-sm">
+                      {key === 'autoProgress' && 'Auto-postęp'}
+                      {key === 'suggestedPath' && 'Sugerowana ścieżka'}
+                      {key === 'limitedChoices' && 'Ograniczone opcje'}
+                      {key === 'dailyGoals' && 'Dzienne cele'}
+                      {key === 'reminders' && 'Przypomnienia'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              
+              <button
+                onClick={() => selectProfile(answers.recommendedProfile)}
+                className="px-8 py-4 bg-gradient-to-r from-green-600 to-blue-600 text-white font-bold rounded-xl hover:from-green-700 hover:to-blue-700 transition-all"
+              >
+                Wybierz tryb {recommendedProfile.name}
+              </button>
+            </div>
+          </div>
+
+          {/* Other Options */}
+          <div className="text-center">
+            <p className="text-gray-600 mb-4">Możesz też wybrać inny tryb:</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {Object.entries(preferenceSystem.profiles).map(([key, profile]) => {
+                if (key === answers.recommendedProfile) return null;
+                
+                return (
+                  <button
+                    key={key}
+                    onClick={() => selectProfile(key)}
+                    className="p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-all"
+                  >
+                    <div className="text-3xl mb-2">{profile.icon}</div>
+                    <h4 className="font-bold">{profile.name}</h4>
+                    <p className="text-xs text-gray-600 mt-1">{profile.description}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+};
+
+// ============================================
+// GŁÓWNY INTERFEJS - ADAPTACYJNY
+// ============================================
+
+const AdaptiveLearningInterface = ({ userProfile }) => {
+  const [currentMode, setCurrentMode] = useState(userProfile.profile);
+  const [userLevel, setUserLevel] = useState('beginner');
+  const [unlockedFeatures, setUnlockedFeatures] = useState(['basic']);
+  const [showModeSwitch, setShowModeSwitch] = useState(false);
+  const [dailyProgress, setDailyProgress] = useState(0);
+  
+  const preferenceSystem = new UserPreferenceSystem();
+  const profile = preferenceSystem.profiles[currentMode];
+
+  // Simulate user progression
+  useEffect(() => {
+    const completedLessons = 15; // From user data
+    const daysActive = 10; // From user data
+    const level = preferenceSystem.calculateUserLevel(completedLessons, daysActive);
+    setUserLevel(level);
+    setUnlockedFeatures(preferenceSystem.experienceLevels[level].unlockedFeatures);
+  }, []);
+
+  // GUIDED MODE INTERFACE
+  if (currentMode === 'guided') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50">
+        {/* Simple Header */}
+        <header className="bg-white shadow-sm p-4">
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Home className="w-6 h-6 text-gray-600" />
+              <h1 className="text-xl font-bold">Twoja nauka na dziś</h1>
+            </div>
+            
+            <button
+              onClick={() => setShowModeSwitch(true)}
+              className="p-2 hover:bg-gray-100 rounded-lg"
+              title="Zmień tryb nauki"
+            >
+              <Settings className="w-5 h-5 text-gray-600" />
+            </button>
+          </div>
+        </header>
+
+        {/* Daily Goal - Big and Clear */}
+        <div className="max-w-4xl mx-auto p-6">
+          <div className="bg-white rounded-3xl shadow-lg p-8 mb-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-bold mb-2">Cel na dziś</h2>
+                <p className="text-gray-600">Ukończ 3 lekcje, żeby utrzymać serię</p>
+              </div>
+              <div className="text-center">
+                <div className="text-4xl font-bold text-blue-600">{dailyProgress}/3</div>
+                <p className="text-sm text-gray-500">lekcje</p>
+              </div>
+            </div>
+            
+            <div className="h-4 bg-gray-200 rounded-full overflow-hidden mb-6">
+              <div 
+                className="h-full bg-gradient-to-r from-green-500 to-blue-500 transition-all"
+                style={{ width: `${(dailyProgress / 3) * 100}%` }}
+              />
+            </div>
+
+            {/* Next Lesson - Only One Choice */}
+            <div className="bg-gradient-to-r from-blue-50 to-green-50 rounded-2xl p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Następna lekcja:</p>
+                  <h3 className="text-xl font-bold mb-2">Podstawy bezpieczeństwa</h3>
+                  <p className="text-gray-600">15 minut • Łatwy poziom</p>
+                </div>
+                <button className="px-8 py-4 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all text-lg">
+                  Rozpocznij →
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Simple Progress Overview */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-white rounded-2xl p-6 text-center">
+              <div className="text-3xl mb-2">🔥</div>
+              <p className="text-2xl font-bold">7 dni</p>
+              <p className="text-gray-600">Twoja seria</p>
+            </div>
+            <div className="bg-white rounded-2xl p-6 text-center">
+              <div className="text-3xl mb-2">⭐</div>
+              <p className="text-2xl font-bold">Poziom 3</p>
+              <p className="text-gray-600">250 XP do następnego</p>
+            </div>
+          </div>
+
+          {/* Help Always Visible */}
+          <div className="mt-6 bg-yellow-50 border-2 border-yellow-200 rounded-2xl p-6">
+            <div className="flex items-start gap-4">
+              <Lightbulb className="w-6 h-6 text-yellow-600 mt-1" />
+              <div>
+                <h4 className="font-bold text-yellow-900 mb-1">Wskazówka dnia</h4>
+                <p className="text-yellow-800">
+                  Najlepiej uczyć się codziennie po 15-20 minut niż raz w tygodniu przez 2 godziny.
+                  Regularność to klucz do sukcesu!
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // BALANCED MODE INTERFACE
+  if (currentMode === 'balanced') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50">
+        <header className="bg-white shadow-sm p-4">
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-6">
+              <Home className="w-6 h-6 text-gray-600" />
+              <nav className="flex gap-4">
+                <button className="font-semibold text-blue-600 border-b-2 border-blue-600 pb-1">
+                  Nauka
+                </button>
+                <button className="text-gray-600 hover:text-gray-900">
+                  Postępy
+                </button>
+                <button className="text-gray-600 hover:text-gray-900">
+                  Społeczność
+                </button>
+              </nav>
+            </div>
+            
+            <button
+              onClick={() => setShowModeSwitch(true)}
+              className="p-2 hover:bg-gray-100 rounded-lg"
+            >
+              <Settings className="w-5 h-5 text-gray-600" />
+            </button>
+          </div>
+        </header>
+
+        <div className="max-w-7xl mx-auto p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Main Content */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Suggested Path */}
+            <div className="bg-white rounded-2xl shadow-lg p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <Compass className="w-6 h-6 text-blue-600" />
+                  Sugerowana ścieżka
+                </h2>
+                <span className="text-sm text-gray-500">Możesz też wybrać własną</span>
+              </div>
+              
+              <div className="space-y-3">
+                {[
+                  { title: 'Bezpieczeństwo podstawowe', time: '15 min', difficulty: 'Łatwy', recommended: true },
+                  { title: 'Narzędzia elektryka', time: '20 min', difficulty: 'Średni', recommended: true },
+                  { title: 'Pierwsza instalacja', time: '30 min', difficulty: 'Średni', locked: false }
+                ].map((lesson, idx) => (
+                  <div key={idx} className={`flex items-center justify-between p-4 rounded-xl border-2 ${
+                    lesson.recommended ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+                  }`}>
+                    <div className="flex items-center gap-4">
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                        lesson.recommended ? 'bg-blue-600 text-white' : 'bg-gray-200'
+                      }`}>
+                        {idx + 1}
+                      </div>
+                      <div>
+                        <h3 className="font-bold">{lesson.title}</h3>
+                        <p className="text-sm text-gray-600">{lesson.time} • {lesson.difficulty}</p>
+                      </div>
+                    </div>
+                    <button className={`px-6 py-2 rounded-lg font-semibold ${
+                      lesson.recommended 
+                        ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    } transition-all`}>
+                      {lesson.recommended && '⭐ '}Rozpocznij
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Alternative Paths */}
+            <div className="bg-white rounded-2xl shadow-lg p-6">
+              <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                <Grid className="w-5 h-5 text-purple-600" />
+                Inne dostępne moduły
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                {['Teoria prądu', 'Schematy', 'Praktyka', 'Projekty'].map(module => (
+                  <button key={module} className="p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-all text-left">
+                    <h4 className="font-semibold">{module}</h4>
+                    <p className="text-sm text-gray-600">12 lekcji</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Sidebar */}
+          <div className="space-y-6">
+            {/* Daily Goals */}
+            <div className="bg-white rounded-2xl shadow-lg p-6">
+              <h3 className="font-bold mb-4">Cele dzienne (opcjonalne)</h3>
+              <div className="space-y-3">
+                <label className="flex items-center gap-3">
+                  <input type="checkbox" className="w-5 h-5" />
+                  <span>Ukończ 2 lekcje</span>
+                </label>
+                <label className="flex items-center gap-3">
+                  <input type="checkbox" className="w-5 h-5" />
+                  <span>Zdobądź 100 XP</span>
+                </label>
+                <label className="flex items-center gap-3">
+                  <input type="checkbox" className="w-5 h-5" />
+                  <span>Utrzymaj serię</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Quick Stats */}
+            <div className="bg-gradient-to-br from-purple-100 to-blue-100 rounded-2xl p-6">
+              <h3 className="font-bold mb-4">Twoje postępy</h3>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span>Poziom</span>
+                  <span className="font-bold">5</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>XP dziś</span>
+                  <span className="font-bold">150/200</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Seria</span>
+                  <span className="font-bold">🔥 12 dni</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // EXPLORER MODE INTERFACE
+  if (currentMode === 'explorer') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-50">
+        <header className="bg-white shadow-sm p-4">
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-6">
+              <Map className="w-6 h-6 text-indigo-600" />
+              <h1 className="text-xl font-bold">Eksploruj wiedzę</h1>
+            </div>
+            
+            <div className="flex items-center gap-4">
+              <button className="p-2 hover:bg-gray-100 rounded-lg">
+                <BarChart3 className="w-5 h-5" />
+              </button>
+              <button className="p-2 hover:bg-gray-100 rounded-lg">
+                <User className="w-5 h-5" />
+              </button>
+              <button
+                onClick={() => setShowModeSwitch(true)}
+                className="p-2 hover:bg-gray-100 rounded-lg"
+              >
+                <Settings className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <div className="max-w-7xl mx-auto p-6">
+          {/* Knowledge Map */}
+          <div className="bg-white rounded-3xl shadow-lg p-8 mb-6">
+            <h2 className="text-2xl font-bold mb-6">Mapa wiedzy - wybierz swoją drogę</h2>
+            
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              {[
+                { name: 'Podstawy', icon: '🌱', progress: 100, unlocked: true },
+                { name: 'Bezpieczeństwo', icon: '🛡️', progress: 60, unlocked: true },
+                { name: 'Narzędzia', icon: '🔧', progress: 30, unlocked: true },
+                { name: 'Instalacje', icon: '⚡', progress: 0, unlocked: true },
+                { name: 'Schematy', icon: '📐', progress: 0, unlocked: true },
+                { name: 'Projekty', icon: '🏗️', progress: 0, unlocked: true },
+                { name: 'Specjalizacja', icon: '🎯', progress: 0, unlocked: userLevel !== 'beginner' },
+                { name: 'Masterclass', icon: '👑', progress: 0, unlocked: userLevel === 'expert' }
+              ].map(area => (
+                <button
+                  key={area.name}
+                  disabled={!area.unlocked}
+                  className={`relative p-6 rounded-2xl transition-all ${
+                    area.unlocked 
+                      ? 'bg-gradient-to-br from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100 cursor-pointer' 
+                      : 'bg-gray-100 cursor-not-allowed opacity-50'
+                  }`}
+                >
+                  {!area.unlocked && (
+                    <Lock className="absolute top-2 right-2 w-4 h-4 text-gray-400" />
+                  )}
+                  <div className="text-4xl mb-3">{area.icon}</div>
+                  <h3 className="font-bold mb-2">{area.name}</h3>
+                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-indigo-500 to-purple-500"
+                      style={{ width: `${area.progress}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-600 mt-2">{area.progress}% ukończone</p>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Free Choice Areas */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white rounded-2xl shadow-lg p-6">
+              <h3 className="font-bold mb-4 flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-indigo-600" />
+                Biblioteka lekcji
+              </h3>
+              <p className="text-gray-600 text-sm mb-4">237 dostępnych lekcji</p>
+              <button className="w-full py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all">
+                Przeglądaj wszystkie
+              </button>
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-lg p-6">
+              <h3 className="font-bold mb-4 flex items-center gap-2">
+                <Trophy className="w-5 h-5 text-purple-600" />
+                Wyzwania
+              </h3>
+              <p className="text-gray-600 text-sm mb-4">12 aktywnych wyzwań</p>
+              <button className="w-full py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-all">
+                Zobacz wyzwania
+              </button>
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-lg p-6">
+              <h3 className="font-bold mb-4 flex items-center gap-2">
+                <Users className="w-5 h-5 text-green-600" />
+                Projekty grupowe
+              </h3>
+              <p className="text-gray-600 text-sm mb-4">3 nowe projekty</p>
+              <button className="w-full py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all">
+                Dołącz do projektu
+              </button>
+            </div>
+          </div>
+
+          {/* No restrictions message */}
+          <div className="mt-6 bg-gradient-to-r from-indigo-100 to-purple-100 rounded-2xl p-6 text-center">
+            <Unlock className="w-8 h-8 text-indigo-600 mx-auto mb-3" />
+            <p className="text-indigo-900 font-semibold">
+              Tryb Odkrywcy - pełna swoboda wyboru
+            </p>
+            <p className="text-indigo-700 text-sm mt-2">
+              Nie ma sugerowanej ścieżki ani dziennych celów. Ucz się w swoim tempie!
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Mode Switch Modal
+  if (showModeSwitch) {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-3xl max-w-3xl w-full p-8">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold">Zmień tryb nauki</h2>
+            <button
+              onClick={() => setShowModeSwitch(false)}
+              className="p-2 hover:bg-gray-100 rounded-lg"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+
+          <p className="text-gray-600 mb-6">
+            Aktualny tryb: <strong>{profile.name}</strong>
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            {Object.entries(preferenceSystem.profiles).map(([key, p]) => (
+              <button
+                key={key}
+                onClick={() => {
+                  setCurrentMode(key);
+                  setShowModeSwitch(false);
+                }}
+                className={`p-6 rounded-2xl border-2 transition-all ${
+                  key === currentMode 
+                    ? 'border-blue-500 bg-blue-50' 
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <div className="text-4xl mb-3">{p.icon}</div>
+                <h3 className="font-bold mb-2">{p.name}</h3>
+                <p className="text-sm text-gray-600">{p.description}</p>
+              </button>
+            ))}
+          </div>
+
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+            <p className="text-sm text-yellow-800">
+              <Info className="w-4 h-4 inline mr-2" />
+              Możesz zmienić tryb w każdej chwili. Twoje postępy zostaną zachowane.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+};
+
+// ============================================
+// GŁÓWNY KOMPONENT SYSTEMU
+// ============================================
+
+const AdaptiveLearningSystem = () => {
+  const [userPreferences, setUserPreferences] = useState(null);
+  const [showOnboarding, setShowOnboarding] = useState(true);
+
+  const handleOnboardingComplete = (preferences) => {
+    setUserPreferences(preferences);
+    setShowOnboarding(false);
+    
+    // Save to localStorage
+    localStorage.setItem('userLearningPreferences', JSON.stringify(preferences));
+  };
+
+  // Check for saved preferences
+  useEffect(() => {
+    const saved = localStorage.getItem('userLearningPreferences');
+    if (saved) {
+      setUserPreferences(JSON.parse(saved));
+      setShowOnboarding(false);
+    }
+  }, []);
+
+  if (showOnboarding) {
+    return <AdaptiveOnboarding onComplete={handleOnboardingComplete} />;
+  }
+
+  if (userPreferences) {
+    return <AdaptiveLearningInterface userProfile={userPreferences} />;
+  }
+
+  return null;
+};
+
+// ============================================
+// FEATURES UNLOCK NOTIFICATION
+// ============================================
+
+const FeatureUnlockNotification = ({ feature, onClose }) => {
+  return (
+    <div className="fixed bottom-4 right-4 bg-white rounded-2xl shadow-2xl p-6 max-w-sm animate-slide-up">
+      <div className="flex items-start gap-4">
+        <div className="text-3xl">🎉</div>
+        <div>
+          <h3 className="font-bold text-lg mb-1">Nowa funkcja odblokowana!</h3>
+          <p className="text-gray-600 text-sm mb-3">{feature.description}</p>
+          <button
+            onClick={onClose}
+            className="text-blue-600 font-semibold text-sm hover:text-blue-700"
+          >
+            Świetnie! →
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// PROGRESS TRACKING WIDGET
+// ============================================
+
+const ProgressWidget = ({ mode, stats }) => {
+  if (mode === 'guided') {
+    // Simple, single metric
+    return (
+      <div className="fixed bottom-4 left-4 bg-white rounded-2xl shadow-lg p-4">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center text-white font-bold">
+            {stats.dailyProgress}
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">Lekcje dzisiaj</p>
+            <p className="font-bold">{stats.dailyProgress}/3</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (mode === 'balanced') {
+    // Multiple metrics, compact
+    return (
+      <div className="fixed bottom-4 left-4 bg-white rounded-2xl shadow-lg p-4">
+        <div className="flex items-center gap-6">
+          <div className="text-center">
+            <p className="text-2xl font-bold">{stats.streak}</p>
+            <p className="text-xs text-gray-600">Seria 🔥</p>
+          </div>
+          <div className="text-center">
+            <p className="text-2xl font-bold">{stats.xp}</p>
+            <p className="text-xs text-gray-600">XP dziś</p>
+          </div>
+          <div className="text-center">
+            <p className="text-2xl font-bold">{stats.level}</p>
+            <p className="text-xs text-gray-600">Poziom</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Explorer mode - minimal or hidden
+  return null;
+};
+
+export default AdaptiveLearningSystem;
