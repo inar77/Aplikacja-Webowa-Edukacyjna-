@@ -1,0 +1,1231 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Users, Clock, MessageCircle, FileText, CheckSquare,
+  Video, Mic, MicOff, VideoOff, Send, Plus, Camera,
+  Trophy, Star, Shield, AlertTriangle, CheckCircle,
+  Timer, Zap, Heart, HandshakeIcon, LogOut, Upload,
+  Sparkles, Loader, ArrowRight, X, Gift, ThumbsUp,
+  ThumbsDown, Award, Flag, Coffee, Lightbulb, Target,
+  BookOpen, Briefcase, Home, User, Settings, ChevronLeft
+} from 'lucide-react';
+
+// ============================================
+// CYTATY MOTYWACYJNE DLA ZAWODÓW
+// ============================================
+
+const ProfessionalQuotes = {
+  electrician: [
+    "⚡ Elektryczność to język, którym mówi przyszłość.",
+    "💡 Każde połączenie, które tworzysz, niesie energię życia.",
+    "🔌 W Twoich rękach płynie moc, która napędza świat.",
+    "⚡ Bezpieczeństwo elektryczne = życie. Jesteś jego strażnikiem."
+  ],
+  chef: [
+    "🍳 Gotowanie to miłość, którą można posmakować.",
+    "👨‍🍳 Każde danie to opowieść napisana smakiem.",
+    "🥘 W kuchni nie ma błędów, są tylko nowe przepisy.",
+    "🍽️ Karmisz nie tylko ciała, ale i dusze."
+  ],
+  developer: [
+    "💻 Kod to poezja, która zmienia świat.",
+    "🚀 Każdy bug to lekcja, każde rozwiązanie to zwycięstwo.",
+    "⌨️ Programiści nie tworzą aplikacji, tworzą przyszłość.",
+    "🌐 Twój kod może dotknąć milionów żyć."
+  ],
+  mechanic: [
+    "🔧 Silnik to serce, a Ty jesteś kardiochirurgiem.",
+    "🚗 Każda naprawa to przywrócona wolność.",
+    "⚙️ W oleju i smarze znajdujesz piękno precyzji.",
+    "🛠️ Mechanik nie naprawia, on wskrzesza."
+  ],
+  plumber: [
+    "💧 Woda to życie, a Ty jesteś jego architektem.",
+    "🔧 Rurociągi to żyły miasta - dbasz o jego krążenie.",
+    "🚿 Każdy szczelny system to Twoje dzieło sztuki.",
+    "💦 Hydraulik: bohater, którego świat potrzebuje."
+  ],
+  mixed: [
+    "🤝 Razem możemy więcej niż osobno.",
+    "💪 Współpraca to supermocy zwykłych ludzi.",
+    "🌟 Każdy projekt to szansa na nową przyjaźń.",
+    "🎯 Cel wspólny jednoczy różnice."
+  ]
+};
+
+// ============================================
+// SYSTEM REPUTACJI I NAGRÓD
+// ============================================
+
+class ReputationSystem {
+  calculateProjectRewards(baseRewards, performance) {
+    const multipliers = {
+      timeBonus: performance.completedEarly ? 1.2 : 1.0,
+      qualityBonus: performance.tasksQuality > 0.8 ? 1.3 : 1.0,
+      cooperationBonus: performance.partnerRating >= 4 ? 1.15 : 1.0,
+      firstTimeBonus: performance.firstCollaboration ? 1.5 : 1.0
+    };
+
+    const totalMultiplier = Object.values(multipliers).reduce((a, b) => a * b, 1);
+    
+    return {
+      xp: Math.round(baseRewards.xp * totalMultiplier),
+      coins: Math.round(baseRewards.coins * totalMultiplier),
+      reputation: this.calculateReputationGain(performance),
+      badges: this.checkForBadges(performance),
+      multipliers
+    };
+  }
+
+  calculateReputationGain(performance) {
+    let rep = 0;
+    
+    if (performance.partnerRating >= 5) rep += 20;
+    else if (performance.partnerRating >= 4) rep += 10;
+    else if (performance.partnerRating >= 3) rep += 5;
+    else if (performance.partnerRating < 2) rep -= 10;
+    
+    if (performance.completedAllTasks) rep += 15;
+    if (performance.helpedPartner) rep += 10;
+    if (performance.goodCommunication) rep += 10;
+    
+    return rep;
+  }
+
+  checkForBadges(performance) {
+    const badges = [];
+    
+    if (performance.completedEarly) badges.push({ id: 'speedster', name: 'Speedster', icon: '⚡' });
+    if (performance.perfectExecution) badges.push({ id: 'perfectionist', name: 'Perfekcjonista', icon: '💎' });
+    if (performance.greatTeamwork) badges.push({ id: 'team_player', name: 'Team Player', icon: '🤝' });
+    
+    return badges;
+  }
+
+  calculatePenalty(reason, userStats) {
+    const penalties = {
+      abandon: {
+        xp: Math.min(userStats.level * 20, 500), // Kara rośnie z poziomem
+        reputation: -30,
+        streak: true // Resetuje streak
+      },
+      timeout: {
+        xp: Math.min(userStats.level * 10, 200),
+        reputation: -15,
+        streak: false
+      },
+      poor_rating: {
+        xp: 0,
+        reputation: -20,
+        streak: false
+      }
+    };
+    
+    return penalties[reason] || penalties.abandon;
+  }
+}
+
+// ============================================
+// POKÓJ PROJEKTOWY - WERSJA TAB
+// ============================================
+
+const ProjectRoomTabbed = ({ match, user, onLeave, onComplete }) => {
+  const [activeTab, setActiveTab] = useState('chat');
+  const [messages, setMessages] = useState([
+    { id: 1, sender: 'system', text: '🎉 Witajcie w pokoju projektowym!', time: new Date() }
+  ]);
+  const [newMessage, setNewMessage] = useState('');
+  const [tasks, setTasks] = useState(match.project.tasks);
+  const [sharedFiles, setSharedFiles] = useState([]);
+  const [timeLeft, setTimeLeft] = useState(match.project.duration * 24 * 60 * 60);
+  const [partnerRating, setPartnerRating] = useState(0);
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [motivationalQuote] = useState(() => {
+    const quotes = ProfessionalQuotes[user.career] || ProfessionalQuotes.mixed;
+    return quotes[Math.floor(Math.random() * quotes.length)];
+  });
+  
+  const messagesEndRef = useRef(null);
+  const reputationSystem = new ReputationSystem();
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTimeLeft(prev => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const sendMessage = () => {
+    if (!newMessage.trim()) return;
+    
+    setMessages([...messages, {
+      id: messages.length + 1,
+      sender: user.name,
+      text: newMessage,
+      time: new Date()
+    }]);
+    setNewMessage('');
+
+    // Partner auto-response
+    setTimeout(() => {
+      const responses = [
+        'Świetny pomysł! 💡',
+        'Pracuję nad tym... ⚡',
+        'Co myślisz o tym rozwiązaniu? 🤔',
+        'Super, to załatwione! ✅',
+        'Może spróbujmy inaczej? 🔄'
+      ];
+      
+      setMessages(prev => [...prev, {
+        id: prev.length + 1,
+        sender: match.partner.name,
+        text: responses[Math.floor(Math.random() * responses.length)],
+        time: new Date()
+      }]);
+    }, 2000 + Math.random() * 3000);
+  };
+
+  const toggleTask = (taskId) => {
+    setTasks(tasks.map(task => 
+      task.id === taskId ? { ...task, completed: !task.completed } : task
+    ));
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const fileData = {
+        id: sharedFiles.length + 1,
+        name: file.name,
+        size: (file.size / 1024).toFixed(2) + ' KB',
+        uploadedBy: user.name,
+        time: new Date(),
+        type: file.type.startsWith('image/') ? 'image' : 'document'
+      };
+      
+      setSharedFiles([...sharedFiles, fileData]);
+      
+      setMessages([...messages, {
+        id: messages.length + 1,
+        sender: user.name,
+        text: `📎 Dodał(a) ${fileData.type === 'image' ? 'zdjęcie' : 'plik'}: ${file.name}`,
+        time: new Date(),
+        isFile: true,
+        fileData
+      }]);
+    }
+  };
+
+  const formatTime = (seconds) => {
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    
+    if (days > 0) return `${days}d ${hours}h`;
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    return `${minutes}m`;
+  };
+
+  const progress = (tasks.filter(t => t.completed).length / tasks.length) * 100;
+
+  const handleProjectComplete = () => {
+    if (progress === 100) {
+      setShowRatingModal(true);
+    }
+  };
+
+  const submitRating = () => {
+    const performance = {
+      completedEarly: timeLeft > 86400,
+      tasksQuality: 0.9,
+      partnerRating,
+      firstCollaboration: user.completedDuos === 0,
+      completedAllTasks: true,
+      helpedPartner: true,
+      goodCommunication: partnerRating >= 4
+    };
+
+    const rewards = reputationSystem.calculateProjectRewards(
+      match.project.rewards,
+      performance
+    );
+
+    alert(`
+      🎉 Projekt ukończony!
+      
+      Nagrody:
+      • ${rewards.xp} XP (${rewards.multipliers.timeBonus > 1 ? '+ bonus czasowy!' : ''})
+      • ${rewards.coins} monet
+      • +${rewards.reputation} reputacji
+      ${rewards.badges.length > 0 ? `• Nowe odznaki: ${rewards.badges.map(b => b.icon).join(' ')}` : ''}
+      
+      Dziękujemy za współpracę!
+    `);
+    
+    onComplete(rewards);
+  };
+
+  const tabs = [
+    { id: 'chat', label: 'Czat', icon: MessageCircle, badge: messages.length - 1 },
+    { id: 'tasks', label: 'Zadania', icon: CheckSquare, badge: `${tasks.filter(t => t.completed).length}/${tasks.length}` },
+    { id: 'files', label: 'Pliki', icon: FileText, badge: sharedFiles.length },
+    { id: 'partner', label: 'Partner', icon: User, badge: null }
+  ];
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+      {/* Header - Slim Version */}
+      <div className="bg-black/30 backdrop-blur-md border-b border-white/10">
+        <div className="max-w-7xl mx-auto px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={onLeave}
+                className="p-2 hover:bg-white/10 rounded-lg transition-all"
+              >
+                <ChevronLeft className="w-5 h-5 text-white" />
+              </button>
+              <div>
+                <h1 className="text-lg font-bold text-white">{match.project.title}</h1>
+                <p className="text-sm text-gray-400">{match.project.difficulty === 'hard' ? '🔥 Trudny' : '⭐ Średni'}</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-6">
+              {/* Progress */}
+              <div className="hidden md:flex items-center gap-3">
+                <div className="text-right">
+                  <p className="text-xs text-gray-400">Postęp</p>
+                  <p className="text-white font-bold">{Math.round(progress)}%</p>
+                </div>
+                <div className="w-32 h-2 bg-black/30 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-green-400 to-blue-400 transition-all"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Timer */}
+              <div className={`flex items-center gap-2 px-3 py-1 rounded-lg ${
+                timeLeft < 86400 ? 'bg-red-500/20 text-red-300' : 'bg-white/10 text-white'
+              }`}>
+                <Timer className="w-4 h-4" />
+                <span className="font-mono font-bold">{formatTime(timeLeft)}</span>
+              </div>
+
+              {/* Complete Button */}
+              <button
+                onClick={handleProjectComplete}
+                disabled={progress < 100}
+                className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                  progress === 100
+                    ? 'bg-green-500 text-white hover:bg-green-600'
+                    : 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                }`}
+              >
+                <CheckCircle className="inline w-4 h-4 mr-2" />
+                Zakończ
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Motivational Quote */}
+      <div className="bg-gradient-to-r from-purple-600/20 to-blue-600/20 backdrop-blur-sm">
+        <div className="max-w-7xl mx-auto px-4 py-3">
+          <p className="text-center text-white/80 italic">
+            <Sparkles className="inline w-4 h-4 mr-2 text-yellow-400" />
+            {motivationalQuote}
+            <Sparkles className="inline w-4 h-4 ml-2 text-yellow-400" />
+          </p>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Column - Project Info */}
+          <div className="lg:col-span-1 space-y-4">
+            {/* Project Overview Card */}
+            <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/10">
+              <h3 className="text-white font-bold mb-4 flex items-center">
+                <Briefcase className="w-5 h-5 mr-2" />
+                O projekcie
+              </h3>
+              <p className="text-gray-300 text-sm mb-4">{match.project.description}</p>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-black/20 rounded-lg p-3 text-center">
+                  <div className="text-2xl mb-1">⚡</div>
+                  <p className="text-yellow-300 font-bold">{match.project.rewards.xp}</p>
+                  <p className="text-xs text-gray-400">XP</p>
+                </div>
+                <div className="bg-black/20 rounded-lg p-3 text-center">
+                  <div className="text-2xl mb-1">💰</div>
+                  <p className="text-yellow-300 font-bold">{match.project.rewards.coins}</p>
+                  <p className="text-xs text-gray-400">Monet</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-4 border border-white/10">
+              <div className="grid grid-cols-2 gap-2">
+                <button className="p-3 bg-blue-500/20 text-blue-300 rounded-lg hover:bg-blue-500/30 transition-all">
+                  <Video className="w-5 h-5 mx-auto mb-1" />
+                  <span className="text-xs">Video</span>
+                </button>
+                <button className="p-3 bg-green-500/20 text-green-300 rounded-lg hover:bg-green-500/30 transition-all">
+                  <Mic className="w-5 h-5 mx-auto mb-1" />
+                  <span className="text-xs">Audio</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column - Tabbed Content */}
+          <div className="lg:col-span-2">
+            <div className="bg-white/10 backdrop-blur-lg rounded-2xl border border-white/10 overflow-hidden">
+              {/* Tab Navigation */}
+              <div className="flex border-b border-white/10">
+                {tabs.map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`flex-1 px-4 py-3 flex items-center justify-center gap-2 transition-all ${
+                      activeTab === tab.id
+                        ? 'bg-white/10 text-white border-b-2 border-blue-400'
+                        : 'text-gray-400 hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    <tab.icon className="w-4 h-4" />
+                    <span className="hidden sm:inline">{tab.label}</span>
+                    {tab.badge && (
+                      <span className="ml-2 px-2 py-0.5 bg-blue-500/30 text-blue-300 text-xs rounded-full">
+                        {tab.badge}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              {/* Tab Content */}
+              <div className="h-[600px] overflow-hidden">
+                {/* Chat Tab */}
+                {activeTab === 'chat' && (
+                  <div className="h-full flex flex-col">
+                    <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                      {messages.map(msg => (
+                        <div 
+                          key={msg.id}
+                          className={`${msg.sender === user.name ? 'text-right' : ''}`}
+                        >
+                          <div className={`inline-block max-w-[80%] ${
+                            msg.sender === 'system' 
+                              ? 'w-full'
+                              : msg.sender === user.name 
+                                ? 'bg-blue-500/20 text-blue-100' 
+                                : 'bg-purple-500/20 text-purple-100'
+                          } rounded-lg p-3`}>
+                            {msg.sender !== 'system' && (
+                              <p className="text-xs opacity-70 mb-1">{msg.sender}</p>
+                            )}
+                            <p className={`text-sm ${msg.sender === 'system' ? 'text-yellow-300 text-center' : ''}`}>
+                              {msg.text}
+                            </p>
+                            {msg.fileData?.type === 'image' && (
+                              <div className="mt-2 p-2 bg-black/20 rounded">
+                                <Camera className="w-4 h-4 inline mr-2" />
+                                <span className="text-xs">Zdjęcie</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                      <div ref={messagesEndRef} />
+                    </div>
+                    
+                    <div className="p-4 border-t border-white/10">
+                      <div className="flex gap-2">
+                        <label className="p-3 bg-black/20 rounded-lg hover:bg-black/30 cursor-pointer transition-all">
+                          <Camera className="w-5 h-5 text-gray-400" />
+                          <input type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
+                        </label>
+                        <input
+                          type="text"
+                          value={newMessage}
+                          onChange={(e) => setNewMessage(e.target.value)}
+                          onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                          placeholder="Napisz wiadomość..."
+                          className="flex-1 bg-black/20 text-white rounded-lg px-4 py-3 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                        />
+                        <button
+                          onClick={sendMessage}
+                          className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all"
+                        >
+                          <Send className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Tasks Tab */}
+                {activeTab === 'tasks' && (
+                  <div className="p-6 space-y-4">
+                    <h3 className="text-white font-bold mb-4">Lista zadań projektu</h3>
+                    {tasks.map(task => (
+                      <label 
+                        key={task.id}
+                        className={`flex items-center gap-4 p-4 rounded-xl cursor-pointer transition-all ${
+                          task.completed 
+                            ? 'bg-green-500/20 border border-green-500/30' 
+                            : 'bg-black/20 hover:bg-black/30 border border-white/10'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={task.completed}
+                          onChange={() => toggleTask(task.id)}
+                          className="w-5 h-5"
+                        />
+                        <div className="flex-1">
+                          <span className={`text-white ${task.completed ? 'line-through opacity-60' : ''}`}>
+                            {task.text}
+                          </span>
+                          {task.completed && (
+                            <p className="text-xs text-green-400 mt-1">
+                              ✅ Ukończone przez {Math.random() > 0.5 ? user.name : match.partner.name}
+                            </p>
+                          )}
+                        </div>
+                      </label>
+                    ))}
+                    
+                    {progress === 100 && (
+                      <div className="mt-6 p-4 bg-green-500/20 border border-green-500/30 rounded-xl text-center">
+                        <Trophy className="w-12 h-12 text-yellow-400 mx-auto mb-2" />
+                        <p className="text-white font-bold">Wszystkie zadania ukończone!</p>
+                        <p className="text-green-300 text-sm">Możecie zakończyć projekt</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Files Tab */}
+                {activeTab === 'files' && (
+                  <div className="p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-white font-bold">Pliki projektu</h3>
+                      <label className="px-4 py-2 bg-blue-500/20 text-blue-300 rounded-lg cursor-pointer hover:bg-blue-500/30 transition-all">
+                        <Upload className="inline w-4 h-4 mr-2" />
+                        Dodaj plik
+                        <input type="file" className="hidden" onChange={handleFileUpload} />
+                      </label>
+                    </div>
+                    
+                    {sharedFiles.length === 0 ? (
+                      <div className="text-center py-12">
+                        <FileText className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+                        <p className="text-gray-400">Brak plików</p>
+                        <p className="text-gray-500 text-sm">Dodajcie dokumenty, zdjęcia lub schematy</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {sharedFiles.map(file => (
+                          <div key={file.id} className="bg-black/20 rounded-xl p-4 border border-white/10">
+                            <div className="flex items-start gap-3">
+                              <div className="text-3xl">
+                                {file.type === 'image' ? '🖼️' : '📄'}
+                              </div>
+                              <div className="flex-1">
+                                <p className="text-white font-medium text-sm">{file.name}</p>
+                                <p className="text-gray-400 text-xs mt-1">
+                                  {file.size} • {file.uploadedBy}
+                                </p>
+                                <p className="text-gray-500 text-xs">
+                                  {new Date(file.time).toLocaleTimeString()}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Partner Tab */}
+                {activeTab === 'partner' && (
+                  <div className="p-6">
+                    <div className="text-center mb-6">
+                      <div className="text-6xl mb-4">{match.partner.avatar}</div>
+                      <h3 className="text-2xl font-bold text-white">{match.partner.name}</h3>
+                      <p className="text-gray-400">Poziom {match.partner.level} • {match.partner.career}</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 mb-6">
+                      <div className="bg-black/20 rounded-xl p-4 text-center">
+                        <Trophy className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
+                        <p className="text-2xl font-bold text-white">{match.partner.completedProjects}</p>
+                        <p className="text-gray-400 text-sm">Ukończone projekty</p>
+                      </div>
+                      <div className="bg-black/20 rounded-xl p-4 text-center">
+                        <Star className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
+                        <p className="text-2xl font-bold text-white">{match.partner.rating.toFixed(1)}</p>
+                        <p className="text-gray-400 text-sm">Średnia ocena</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="bg-gradient-to-r from-green-500/20 to-blue-500/20 rounded-xl p-4">
+                        <p className="text-white font-semibold mb-2">💪 Mocne strony</p>
+                        <div className="flex flex-wrap gap-2">
+                          {['Komunikatywny', 'Punktualny', 'Kreatywny'].map(skill => (
+                            <span key={skill} className="px-3 py-1 bg-white/10 rounded-full text-sm text-gray-300">
+                              {skill}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="bg-black/20 rounded-xl p-4">
+                        <p className="text-white font-semibold mb-2">📊 Statystyki współpracy</p>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">Odpowiedzi w czacie</span>
+                            <span className="text-white">~5 min</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">Preferowane godziny</span>
+                            <span className="text-white">18:00-22:00</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">Streak projektów</span>
+                            <span className="text-white">🔥 7 dni</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Rating Modal */}
+      {showRatingModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-3xl p-8 max-w-md w-full border border-white/10">
+            <h3 className="text-2xl font-bold text-white mb-6 text-center">
+              🏆 Oceń współpracę
+            </h3>
+            
+            <div className="text-center mb-6">
+              <p className="text-gray-400 mb-4">Jak oceniasz współpracę z</p>
+              <p className="text-xl font-bold text-white">{match.partner.name}?</p>
+            </div>
+
+            <div className="flex justify-center gap-2 mb-6">
+              {[1, 2, 3, 4, 5].map(rating => (
+                <button
+                  key={rating}
+                  onClick={() => setPartnerRating(rating)}
+                  className="transition-all transform hover:scale-110"
+                >
+                  <Star 
+                    className={`w-10 h-10 ${
+                      rating <= partnerRating 
+                        ? 'text-yellow-400 fill-yellow-400' 
+                        : 'text-gray-600'
+                    }`}
+                  />
+                </button>
+              ))}
+            </div>
+
+            <div className="space-y-3 mb-6">
+              <button className="w-full p-3 bg-green-500/20 text-green-300 rounded-lg hover:bg-green-500/30 transition-all text-left">
+                <ThumbsUp className="inline w-4 h-4 mr-2" />
+                Świetna komunikacja
+              </button>
+              <button className="w-full p-3 bg-blue-500/20 text-blue-300 rounded-lg hover:bg-blue-500/30 transition-all text-left">
+                <Zap className="inline w-4 h-4 mr-2" />
+                Szybkie tempo pracy
+              </button>
+              <button className="w-full p-3 bg-purple-500/20 text-purple-300 rounded-lg hover:bg-purple-500/30 transition-all text-left">
+                <Lightbulb className="inline w-4 h-4 mr-2" />
+                Kreatywne podejście
+              </button>
+            </div>
+
+            <button
+              onClick={submitRating}
+              disabled={partnerRating === 0}
+              className={`w-full py-3 rounded-lg font-bold transition-all ${
+                partnerRating > 0
+                  ? 'bg-gradient-to-r from-green-500 to-blue-500 text-white hover:from-green-600 hover:to-blue-600'
+                  : 'bg-gray-700 text-gray-400 cursor-not-allowed'
+              }`}
+            >
+              Zakończ i odbierz nagrody
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ============================================
+// EKRAN MATCHOWANIA - ULEPSZONA WERSJA
+// ============================================
+
+const DuoMatchingScreen = ({ user, onMatchFound, onCancel }) => {
+  const [searchTime, setSearchTime] = useState(0);
+  const [status, setStatus] = useState('searching');
+  const [matchDetails, setMatchDetails] = useState(null);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setSearchTime(prev => prev + 1);
+    }, 1000);
+
+    const matchTimeout = setTimeout(() => {
+      const engine = new DuoMatchingEngine();
+      const match = engine.findMatch(user);
+      setMatchDetails(match);
+      setStatus('found');
+      
+      setTimeout(() => {
+        onMatchFound(match);
+      }, 3000);
+    }, 3000 + Math.random() * 5000);
+
+    return () => {
+      clearInterval(timer);
+      clearTimeout(matchTimeout);
+    };
+  }, [user, onMatchFound]);
+
+  return (
+    <div className="fixed inset-0 bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center z-50">
+      <div className="text-center max-w-md">
+        {status === 'searching' && (
+          <>
+            <div className="relative w-32 h-32 mx-auto mb-8">
+              <div className="absolute inset-0 bg-blue-500 rounded-full animate-ping opacity-20"></div>
+              <div className="absolute inset-0 bg-purple-500 rounded-full animate-ping animation-delay-200 opacity-20"></div>
+              <div className="relative w-32 h-32 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
+                <Users className="w-16 h-16 text-white animate-pulse" />
+              </div>
+            </div>
+            
+            <h2 className="text-3xl font-bold text-white mb-2">Szukamy partnera...</h2>
+            <p className="text-gray-300 mb-2">Analizujemy {1247 + searchTime * 73} profili</p>
+            
+            <div className="mt-6 space-y-2">
+              <div className="flex items-center justify-center gap-2 text-gray-400">
+                <CheckCircle className="w-5 h-5 text-green-400" />
+                <span>Podobny poziom: {user.level} ±2</span>
+              </div>
+              <div className="flex items-center justify-center gap-2 text-gray-400">
+                <CheckCircle className="w-5 h-5 text-green-400" />
+                <span>Kompatybilne umiejętności</span>
+              </div>
+              <div className="flex items-center justify-center gap-2 text-gray-400">
+                {searchTime > 3 ? (
+                  <CheckCircle className="w-5 h-5 text-green-400" />
+                ) : (
+                  <Loader className="w-5 h-5 animate-spin" />
+                )}
+                <span>Dostępność czasowa</span>
+              </div>
+            </div>
+            
+            <p className="text-gray-500 mt-6">{searchTime}s</p>
+            
+            <button
+              onClick={onCancel}
+              className="mt-8 px-6 py-3 bg-red-500/20 text-red-300 rounded-lg hover:bg-red-500/30 transition-all"
+            >
+              <X className="inline w-4 h-4 mr-2" />
+              Anuluj
+            </button>
+          </>
+        )}
+
+        {status === 'found' && matchDetails && (
+          <div className="animate-fade-in">
+            <div className="text-8xl mb-6 animate-bounce">🎉</div>
+            <h2 className="text-3xl font-bold text-white mb-4">Partner znaleziony!</h2>
+            
+            <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 mb-6">
+              <div className="flex items-center justify-center gap-4 mb-4">
+                <div className="text-5xl">{user.avatar || '👤'}</div>
+                <div className="text-3xl animate-pulse">🤝</div>
+                <div className="text-5xl">{matchDetails.partner.avatar}</div>
+              </div>
+              
+              <p className="text-white font-bold text-lg">{matchDetails.partner.name}</p>
+              <p className="text-gray-300">Poziom {matchDetails.partner.level} • {matchDetails.partner.career}</p>
+              
+              <div className="mt-4 flex items-center justify-center gap-1">
+                {[...Array(5)].map((_, i) => (
+                  <Star 
+                    key={i}
+                    className={`w-4 h-4 ${
+                      i < Math.floor(matchDetails.partner.rating) 
+                        ? 'text-yellow-400 fill-yellow-400' 
+                        : 'text-gray-600'
+                    }`}
+                  />
+                ))}
+                <span className="text-gray-300 text-sm ml-2">
+                  ({matchDetails.partner.completedProjects} projektów)
+                </span>
+              </div>
+            </div>
+            
+            <p className="text-gray-300">Przygotowujemy projekt...</p>
+            <div className="mt-4">
+              <Loader className="w-8 h-8 text-white animate-spin mx-auto" />
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// GŁÓWNY KOMPONENT DUO SYSTEM
+// ============================================
+
+const DuoProjectSystem = () => {
+  const [currentUser] = useState({
+    id: 'user_1',
+    name: 'Jan Kowalski',
+    level: 12,
+    career: 'electrician',
+    xp: 3400,
+    completedDuos: 5,
+    reputation: 85,
+    avatar: '👨‍🔧'
+  });
+
+  const [screen, setScreen] = useState('menu');
+  const [currentMatch, setCurrentMatch] = useState(null);
+  const [userStats, setUserStats] = useState({
+    completedProjects: currentUser.completedDuos,
+    averageRating: 4.8,
+    projectStreak: 3,
+    totalXpEarned: 12500,
+    reputation: currentUser.reputation
+  });
+
+  const handleStartMatching = () => {
+    setScreen('matching');
+  };
+
+  const handleMatchFound = (match) => {
+    setCurrentMatch(match);
+    setScreen('project');
+  };
+
+  const handleLeaveProject = () => {
+    const reputationSystem = new ReputationSystem();
+    const penalty = reputationSystem.calculatePenalty('abandon', currentUser);
+    
+    if (window.confirm(`
+      ⚠️ Opuszczenie projektu spowoduje:
+      • -${penalty.xp} XP (kara zależna od poziomu)
+      • -${penalty.reputation} reputacji
+      ${penalty.streak ? '• Reset streak projektów' : ''}
+      
+      Czy na pewno chcesz opuścić projekt?
+    `)) {
+      setScreen('menu');
+      setCurrentMatch(null);
+      setUserStats(prev => ({
+        ...prev,
+        reputation: Math.max(0, prev.reputation + penalty.reputation),
+        projectStreak: penalty.streak ? 0 : prev.projectStreak
+      }));
+    }
+  };
+
+  const handleCompleteProject = (rewards) => {
+    setScreen('menu');
+    setCurrentMatch(null);
+    setUserStats(prev => ({
+      ...prev,
+      completedProjects: prev.completedProjects + 1,
+      totalXpEarned: prev.totalXpEarned + rewards.xp,
+      reputation: Math.min(100, prev.reputation + rewards.reputation),
+      projectStreak: prev.projectStreak + 1
+    }));
+  };
+
+  if (screen === 'matching') {
+    return (
+      <DuoMatchingScreen
+        user={currentUser}
+        onMatchFound={handleMatchFound}
+        onCancel={() => setScreen('menu')}
+      />
+    );
+  }
+
+  if (screen === 'project' && currentMatch) {
+    return (
+      <ProjectRoomTabbed
+        match={currentMatch}
+        user={currentUser}
+        onLeave={handleLeaveProject}
+        onComplete={handleCompleteProject}
+      />
+    );
+  }
+
+  // Menu Screen - Enhanced
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+      {/* Animated Background */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
+      </div>
+
+      <div className="relative z-10 max-w-5xl mx-auto p-6">
+        {/* Header */}
+        <div className="text-center mb-12">
+          <h1 className="text-6xl font-black text-white mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400">
+            🤝 Projekty DUO
+          </h1>
+          <p className="text-xl text-gray-300">Znajdź partnera, realizuj projekty, zdobywaj doświadczenie</p>
+          
+          {/* Motivational Quote */}
+          <div className="mt-6 inline-flex items-center gap-2 px-4 py-2 bg-white/10 rounded-full">
+            <Sparkles className="w-4 h-4 text-yellow-400" />
+            <p className="text-sm text-gray-300 italic">
+              {ProfessionalQuotes[currentUser.career]?.[0] || ProfessionalQuotes.mixed[0]}
+            </p>
+          </div>
+        </div>
+
+        {/* User Stats Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+          <div className="bg-gradient-to-br from-green-600/20 to-green-600/10 backdrop-blur-lg rounded-2xl p-4 border border-green-500/20">
+            <Trophy className="w-8 h-8 text-yellow-400 mb-2" />
+            <p className="text-2xl font-bold text-white">{userStats.completedProjects}</p>
+            <p className="text-xs text-gray-400">Projekty</p>
+          </div>
+          
+          <div className="bg-gradient-to-br from-blue-600/20 to-blue-600/10 backdrop-blur-lg rounded-2xl p-4 border border-blue-500/20">
+            <Star className="w-8 h-8 text-yellow-400 mb-2" />
+            <p className="text-2xl font-bold text-white">{userStats.averageRating.toFixed(1)}</p>
+            <p className="text-xs text-gray-400">Ocena</p>
+          </div>
+          
+          <div className="bg-gradient-to-br from-orange-600/20 to-orange-600/10 backdrop-blur-lg rounded-2xl p-4 border border-orange-500/20">
+            <Zap className="w-8 h-8 text-orange-400 mb-2" />
+            <p className="text-2xl font-bold text-white">{userStats.projectStreak}</p>
+            <p className="text-xs text-gray-400">Streak 🔥</p>
+          </div>
+          
+          <div className="bg-gradient-to-br from-purple-600/20 to-purple-600/10 backdrop-blur-lg rounded-2xl p-4 border border-purple-500/20">
+            <Award className="w-8 h-8 text-purple-400 mb-2" />
+            <p className="text-2xl font-bold text-white">{userStats.totalXpEarned}</p>
+            <p className="text-xs text-gray-400">Total XP</p>
+          </div>
+          
+          <div className="bg-gradient-to-br from-pink-600/20 to-pink-600/10 backdrop-blur-lg rounded-2xl p-4 border border-pink-500/20">
+            <Shield className="w-8 h-8 text-pink-400 mb-2" />
+            <p className="text-2xl font-bold text-white">{userStats.reputation}%</p>
+            <p className="text-xs text-gray-400">Reputacja</p>
+          </div>
+        </div>
+
+        {/* Main CTA */}
+        <div className="bg-gradient-to-br from-purple-600/20 to-blue-600/20 backdrop-blur-lg rounded-3xl p-8 mb-8 border border-white/10">
+          <div className="text-center">
+            <h2 className="text-3xl font-bold text-white mb-4">Gotowy na nowe wyzwanie?</h2>
+            <p className="text-gray-300 mb-8 max-w-2xl mx-auto">
+              System automatycznie dobierze partnera o podobnym poziomie i kompatybilnych umiejętnościach.
+              Będziecie mieli <strong>3-5 dni</strong> na wspólną realizację projektu.
+            </p>
+            
+            <button
+              onClick={handleStartMatching}
+              className="group relative px-12 py-5 bg-gradient-to-r from-green-500 to-blue-500 text-white text-xl font-bold rounded-2xl hover:from-green-600 hover:to-blue-600 transform hover:scale-105 transition-all shadow-lg"
+            >
+              <span className="flex items-center gap-3">
+                <UserPlus className="w-6 h-6" />
+                Znajdź partnera do projektu
+                <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
+              </span>
+            </button>
+
+            <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-black/20 rounded-xl p-4">
+                <Lock className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
+                <p className="text-white font-semibold">3-dniowy commitment</p>
+                <p className="text-gray-400 text-sm">Nie możesz zmienić partnera przez czas projektu</p>
+              </div>
+              
+              <div className="bg-black/20 rounded-xl p-4">
+                <Target className="w-8 h-8 text-green-400 mx-auto mb-2" />
+                <p className="text-white font-semibold">Realne projekty</p>
+                <p className="text-gray-400 text-sm">Zadania praktyczne z Twojej branży</p>
+              </div>
+              
+              <div className="bg-black/20 rounded-xl p-4">
+                <Gift className="w-8 h-8 text-purple-400 mx-auto mb-2" />
+                <p className="text-white font-semibold">Dynamiczne nagrody</p>
+                <p className="text-gray-400 text-sm">Bonusy za szybkość i jakość</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Recent Projects */}
+        <div className="bg-white/5 backdrop-blur-lg rounded-2xl p-6 border border-white/10">
+          <h3 className="text-2xl font-bold text-white mb-6 flex items-center">
+            <Clock className="w-6 h-6 mr-3 text-blue-400" />
+            Aktywne projekty społeczności
+          </h3>
+          
+          <div className="space-y-3">
+            {[
+              { 
+                users: 'Anna K. & Michał P.', 
+                project: 'Smart Home dla Seniora',
+                career: 'electrician',
+                time: '2h temu', 
+                status: 'completed',
+                rating: 5
+              },
+              { 
+                users: 'Kasia W. & Tomek R.', 
+                project: 'Food Truck Menu',
+                career: 'chef',
+                time: '5h temu', 
+                status: 'in-progress',
+                progress: 67
+              },
+              { 
+                users: 'Piotr L. & Magda S.', 
+                project: 'Aplikacja NGO',
+                career: 'developer',
+                time: '1d temu', 
+                status: 'completed',
+                rating: 4
+              }
+            ].map((project, idx) => (
+              <div key={idx} className="flex items-center justify-between p-4 bg-black/20 rounded-xl hover:bg-black/30 transition-all">
+                <div className="flex items-center gap-4">
+                  <div className="text-3xl">
+                    {project.career === 'electrician' ? '⚡' : 
+                     project.career === 'chef' ? '👨‍🍳' : '💻'}
+                  </div>
+                  <div>
+                    <p className="text-white font-semibold">{project.users}</p>
+                    <p className="text-gray-400 text-sm">{project.project}</p>
+                  </div>
+                </div>
+                
+                <div className="text-right">
+                  <p className="text-gray-500 text-xs mb-1">{project.time}</p>
+                  {project.status === 'completed' ? (
+                    <div className="flex items-center gap-1">
+                      {[...Array(5)].map((_, i) => (
+                        <Star 
+                          key={i}
+                          className={`w-3 h-3 ${
+                            i < project.rating 
+                              ? 'text-yellow-400 fill-yellow-400' 
+                              : 'text-gray-600'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <div className="w-20 h-2 bg-gray-700 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-gradient-to-r from-green-400 to-blue-400"
+                          style={{ width: `${project.progress}%` }}
+                        />
+                      </div>
+                      <span className="text-green-400 text-xs">{project.progress}%</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* CSS for animations */}
+      <style jsx>{`
+        @keyframes blob {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          33% { transform: translate(30px, -50px) scale(1.1); }
+          66% { transform: translate(-20px, 20px) scale(0.9); }
+        }
+        
+        @keyframes fade-in {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .animate-blob {
+          animation: blob 7s infinite;
+        }
+        
+        .animation-delay-2000 {
+          animation-delay: 2s;
+        }
+        
+        .animate-fade-in {
+          animation: fade-in 0.5s ease-out;
+        }
+        
+        .animation-delay-200 {
+          animation-delay: 200ms;
+        }
+      `}</style>
+    </div>
+  );
+};
+
+// ============================================
+// MATCHING ENGINE CLASS
+// ============================================
+
+class DuoMatchingEngine {
+  constructor() {
+    this.projectTemplates = {
+      electrician: [
+        {
+          id: 'smart_home',
+          title: 'Smart Home dla Seniora',
+          description: 'Zaprojektujcie i zaplanujcie instalację smart home dla osoby starszej',
+          duration: 3,
+          difficulty: 'medium',
+          rewards: { xp: 500, coins: 200 },
+          tasks: [
+            { id: 1, text: 'Analiza potrzeb seniora', completed: false },
+            { id: 2, text: 'Dobór urządzeń smart', completed: false },
+            { id: 3, text: 'Schemat instalacji', completed: false },
+            { id: 4, text: 'Kosztorys projektu', completed: false },
+            { id: 5, text: 'Plan wdrożenia', completed: false }
+          ]
+        }
+      ],
+      chef: [
+        {
+          id: 'food_truck',
+          title: 'Food Truck Menu',
+          description: 'Stwórzcie menu i plan biznesowy dla food trucka',
+          duration: 3,
+          difficulty: 'medium',
+          rewards: { xp: 500, coins: 200 },
+          tasks: [
+            { id: 1, text: 'Koncepcja food trucka', completed: false },
+            { id: 2, text: 'Menu z cenami', completed: false },
+            { id: 3, text: 'Analiza konkurencji', completed: false },
+            { id: 4, text: 'Plan marketingowy', completed: false },
+            { id: 5, text: 'Symulacja kosztów', completed: false }
+          ]
+        }
+      ],
+      developer: [
+        {
+          id: 'app_duo',
+          title: 'Aplikacja dla NGO',
+          description: 'Zaprojektujcie aplikację pomagającą lokalnej organizacji charytatywnej',
+          duration: 5,
+          difficulty: 'hard',
+          rewards: { xp: 1000, coins: 400 },
+          tasks: [
+            { id: 1, text: 'Research potrzeb NGO', completed: false },
+            { id: 2, text: 'Wireframes aplikacji', completed: false },
+            { id: 3, text: 'Stack technologiczny', completed: false },
+            { id: 4, text: 'MVP features', completed: false },
+            { id: 5, text: 'Plan rozwoju', completed: false }
+          ]
+        }
+      ],
+      mixed: [
+        {
+          id: 'community_center',
+          title: 'Centrum Społeczne',
+          description: 'Zaprojektujcie wielofunkcyjne centrum dla lokalnej społeczności',
+          duration: 4,
+          difficulty: 'medium',
+          rewards: { xp: 700, coins: 300 },
+          tasks: [
+            { id: 1, text: 'Analiza potrzeb społeczności', completed: false },
+            { id: 2, text: 'Plan przestrzenny', completed: false },
+            { id: 3, text: 'Program zajęć', completed: false },
+            { id: 4, text: 'Budżet operacyjny', completed: false },
+            { id: 5, text: 'Strategia finansowania', completed: false }
+          ]
+        }
+      ]
+    };
+  }
+
+  findMatch(user) {
+    const mockPartner = {
+      id: 'partner_' + Date.now(),
+      name: ['Anna K.', 'Michał P.', 'Kasia W.', 'Tomek R.'][Math.floor(Math.random() * 4)],
+      level: user.level + Math.floor(Math.random() * 3) - 1,
+      career: Math.random() > 0.5 ? user.career : 'developer',
+      avatar: '👤',
+      completedProjects: Math.floor(Math.random() * 10),
+      rating: 3.5 + Math.random() * 1.5
+    };
+
+    const project = this.selectProject(user, mockPartner);
+    
+    return {
+      partner: mockPartner,
+      project,
+      roomId: 'room_' + Date.now(),
+      matchQuality: this.calculateMatchQuality(user, mockPartner)
+    };
+  }
+
+  selectProject(user1, user2) {
+    const sameCareer = user1.career === user2.career;
+    const templates = sameCareer 
+      ? this.projectTemplates[user1.career] || this.projectTemplates.mixed
+      : this.projectTemplates.mixed;
+    
+    return templates[Math.floor(Math.random() * templates.length)];
+  }
+
+  calculateMatchQuality(user1, user2) {
+    let score = 0;
+    
+    if (user1.career === user2.career) score += 40;
+    
+    const levelDiff = Math.abs(user1.level - user2.level);
+    if (levelDiff <= 2) score += 30;
+    
+    return Math.min(score, 100);
+  }
+}
+
+export default DuoProjectSystem;
