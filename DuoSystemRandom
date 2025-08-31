@@ -1229,3 +1229,844 @@ class DuoMatchingEngine {
 }
 
 export default DuoProjectSystem;
+
+
+
+
+
+
+
+
+////////////DZIAŁA///////////////
+
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Users, Lock, Clock, Target, MessageCircle, 
+  Video, Mic, MicOff, VideoOff, Send, Plus,
+  Trophy, Star, Shield, AlertTriangle, CheckCircle,
+  Timer, Zap, Heart, HandshakeIcon, LogOut,
+  Sparkles, Loader, ArrowRight, X, Gift,
+  Camera, FileText, CheckSquare, AlertCircle,
+  UserPlus, Calendar, Award, Briefcase
+} from 'lucide-react';
+
+// ============================================
+// SYSTEM MATCHOWANIA DUO
+// ============================================
+
+class DuoMatchingEngine {
+  constructor() {
+    this.activeRooms = new Map();
+    this.waitingQueue = [];
+    this.userHistory = new Map();
+    
+    this.matchingCriteria = {
+      sameCareer: 40,
+      similarLevel: 30,
+      complementarySkills: 20,
+      timeZone: 10
+    };
+
+    this.projectTemplates = {
+      electrician: [
+        {
+          id: 'smart_home',
+          title: 'Smart Home dla Seniora',
+          description: 'Zaprojektujcie i zaplanujcie instalację smart home dla osoby starszej',
+          duration: 3,
+          difficulty: 'medium',
+          rewards: { xp: 500, coins: 200 },
+          tasks: [
+            { id: 1, text: 'Analiza potrzeb seniora', completed: false },
+            { id: 2, text: 'Dobór urządzeń smart', completed: false },
+            { id: 3, text: 'Schemat instalacji', completed: false },
+            { id: 4, text: 'Kosztorys projektu', completed: false },
+            { id: 5, text: 'Plan wdrożenia', completed: false }
+          ]
+        }
+      ],
+      chef: [
+        {
+          id: 'food_truck',
+          title: 'Food Truck Menu',
+          description: 'Stwórzcie menu i plan biznesowy dla food trucka',
+          duration: 3,
+          difficulty: 'medium',
+          rewards: { xp: 500, coins: 200 },
+          tasks: [
+            { id: 1, text: 'Koncepcja food trucka', completed: false },
+            { id: 2, text: 'Menu z cenami', completed: false },
+            { id: 3, text: 'Analiza konkurencji', completed: false },
+            { id: 4, text: 'Plan marketingowy', completed: false },
+            { id: 5, text: 'Symulacja kosztów', completed: false }
+          ]
+        }
+      ],
+      developer: [
+        {
+          id: 'app_duo',
+          title: 'Aplikacja dla NGO',
+          description: 'Zaprojektujcie aplikację pomagającą lokalnej organizacji charytatywnej',
+          duration: 5,
+          difficulty: 'hard',
+          rewards: { xp: 1000, coins: 400 },
+          tasks: [
+            { id: 1, text: 'Research potrzeb NGO', completed: false },
+            { id: 2, text: 'Wireframes aplikacji', completed: false },
+            { id: 3, text: 'Stack technologiczny', completed: false },
+            { id: 4, text: 'MVP features', completed: false },
+            { id: 5, text: 'Plan rozwoju', completed: false }
+          ]
+        }
+      ],
+      mixed: [
+        {
+          id: 'community_center',
+          title: 'Centrum Społeczne',
+          description: 'Zaprojektujcie wielofunkcyjne centrum dla lokalnej społeczności',
+          duration: 4,
+          difficulty: 'medium',
+          rewards: { xp: 700, coins: 300 },
+          tasks: [
+            { id: 1, text: 'Analiza potrzeb społeczności', completed: false },
+            { id: 2, text: 'Plan przestrzenny', completed: false },
+            { id: 3, text: 'Program zajęć', completed: false },
+            { id: 4, text: 'Budżet operacyjny', completed: false },
+            { id: 5, text: 'Strategia finansowania', completed: false }
+          ]
+        }
+      ]
+    };
+  }
+
+  findMatch(user) {
+    // Simulate finding a match
+    const mockPartner = {
+      id: 'partner_' + Date.now(),
+      name: ['Anna K.', 'Michał P.', 'Kasia W.', 'Tomek R.'][Math.floor(Math.random() * 4)],
+      level: user.level + Math.floor(Math.random() * 3) - 1,
+      career: Math.random() > 0.5 ? user.career : 'developer',
+      avatar: '👤',
+      completedProjects: Math.floor(Math.random() * 10),
+      rating: 3.5 + Math.random() * 1.5
+    };
+
+    const project = this.selectProject(user, mockPartner);
+    
+    return {
+      partner: mockPartner,
+      project,
+      roomId: 'room_' + Date.now(),
+      matchQuality: this.calculateMatchQuality(user, mockPartner)
+    };
+  }
+
+  selectProject(user1, user2) {
+    const sameCareer = user1.career === user2.career;
+    const templates = sameCareer 
+      ? this.projectTemplates[user1.career] || this.projectTemplates.mixed
+      : this.projectTemplates.mixed;
+    
+    return templates[Math.floor(Math.random() * templates.length)];
+  }
+
+  calculateMatchQuality(user1, user2) {
+    let score = 0;
+    
+    if (user1.career === user2.career) score += this.matchingCriteria.sameCareer;
+    
+    const levelDiff = Math.abs(user1.level - user2.level);
+    if (levelDiff <= 2) score += this.matchingCriteria.similarLevel;
+    
+    return Math.min(score, 100);
+  }
+}
+
+// ============================================
+// KOMPONENTY UI
+// ============================================
+
+const ProjectRoom = ({ match, user, onLeave, onComplete }) => {
+  const [messages, setMessages] = useState([
+    { id: 1, sender: 'system', text: '🎉 Witajcie w pokoju projektowym! Macie 3 dni na ukończenie zadania.', time: new Date() }
+  ]);
+  const [newMessage, setNewMessage] = useState('');
+  const [tasks, setTasks] = useState(match.project.tasks);
+  const [sharedFiles, setSharedFiles] = useState([]);
+  const [timeLeft, setTimeLeft] = useState(match.project.duration * 24 * 60 * 60);
+  const [isVideoOn, setIsVideoOn] = useState(false);
+  const [isMicOn, setIsMicOn] = useState(false);
+  const messagesEndRef = useRef(null);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTimeLeft(prev => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const sendMessage = () => {
+    if (!newMessage.trim()) return;
+    
+    setMessages([...messages, {
+      id: messages.length + 1,
+      sender: user.name,
+      text: newMessage,
+      time: new Date()
+    }]);
+    setNewMessage('');
+
+    // Simulate partner response
+    setTimeout(() => {
+      setMessages(prev => [...prev, {
+        id: prev.length + 1,
+        sender: match.partner.name,
+        text: ['Świetny pomysł!', 'Pracuję nad tym...', 'Co myślisz o tym rozwiązaniu?'][Math.floor(Math.random() * 3)],
+        time: new Date()
+      }]);
+    }, 2000);
+  };
+
+  const toggleTask = (taskId) => {
+    setTasks(tasks.map(task => 
+      task.id === taskId ? { ...task, completed: !task.completed } : task
+    ));
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setSharedFiles([...sharedFiles, {
+        id: sharedFiles.length + 1,
+        name: file.name,
+        size: (file.size / 1024).toFixed(2) + ' KB',
+        uploadedBy: user.name,
+        time: new Date()
+      }]);
+      
+      setMessages([...messages, {
+        id: messages.length + 1,
+        sender: user.name,
+        text: `📎 Dodał(a) plik: ${file.name}`,
+        time: new Date(),
+        isFile: true
+      }]);
+    }
+  };
+
+  const formatTime = (seconds) => {
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    return `${days}d ${hours}h ${minutes}m`;
+  };
+
+  const progress = (tasks.filter(t => t.completed).length / tasks.length) * 100;
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 p-4">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 mb-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="text-5xl">🤝</div>
+              <div>
+                <h1 className="text-2xl font-bold text-white">{match.project.title}</h1>
+                <p className="text-gray-300">{match.project.description}</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-white mb-2">
+                <Clock className="inline w-5 h-5 mr-2" />
+                {formatTime(timeLeft)}
+              </div>
+              <button
+                onClick={onLeave}
+                className="px-4 py-2 bg-red-500/20 text-red-300 rounded-lg hover:bg-red-500/30 transition-all"
+              >
+                <LogOut className="inline w-4 h-4 mr-2" />
+                Opuść projekt
+              </button>
+            </div>
+          </div>
+
+          {/* Progress Bar */}
+          <div className="mt-4">
+            <div className="flex justify-between text-sm text-gray-300 mb-2">
+              <span>Postęp projektu</span>
+              <span>{Math.round(progress)}%</span>
+            </div>
+            <div className="h-3 bg-black/30 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-green-400 to-blue-500 transition-all duration-500"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Panel - Tasks & Files */}
+          <div className="space-y-6">
+            {/* Partner Info */}
+            <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6">
+              <h3 className="text-lg font-bold text-white mb-4 flex items-center">
+                <Users className="w-5 h-5 mr-2" />
+                Twój partner
+              </h3>
+              <div className="flex items-center gap-4">
+                <div className="text-4xl">{match.partner.avatar}</div>
+                <div>
+                  <p className="text-white font-semibold">{match.partner.name}</p>
+                  <p className="text-gray-300 text-sm">Poziom {match.partner.level}</p>
+                  <div className="flex items-center gap-1 mt-1">
+                    {[...Array(5)].map((_, i) => (
+                      <Star 
+                        key={i} 
+                        className={`w-4 h-4 ${i < Math.floor(match.partner.rating) ? 'text-yellow-400 fill-yellow-400' : 'text-gray-600'}`}
+                      />
+                    ))}
+                    <span className="text-gray-300 text-sm ml-1">
+                      ({match.partner.completedProjects} projektów)
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Tasks */}
+            <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6">
+              <h3 className="text-lg font-bold text-white mb-4 flex items-center">
+                <CheckSquare className="w-5 h-5 mr-2" />
+                Zadania do wykonania
+              </h3>
+              <div className="space-y-3">
+                {tasks.map(task => (
+                  <label 
+                    key={task.id}
+                    className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all ${
+                      task.completed ? 'bg-green-500/20' : 'bg-black/20 hover:bg-black/30'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={task.completed}
+                      onChange={() => toggleTask(task.id)}
+                      className="w-5 h-5"
+                    />
+                    <span className={`text-white ${task.completed ? 'line-through opacity-60' : ''}`}>
+                      {task.text}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Shared Files */}
+            <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6">
+              <h3 className="text-lg font-bold text-white mb-4 flex items-center">
+                <FileText className="w-5 h-5 mr-2" />
+                Pliki projektu
+              </h3>
+              <div className="space-y-2 mb-4">
+                {sharedFiles.length === 0 ? (
+                  <p className="text-gray-400 text-sm">Brak plików</p>
+                ) : (
+                  sharedFiles.map(file => (
+                    <div key={file.id} className="bg-black/20 rounded-lg p-3">
+                      <p className="text-white text-sm font-medium">{file.name}</p>
+                      <p className="text-gray-400 text-xs">
+                        {file.size} • {file.uploadedBy}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+              <label className="block">
+                <input
+                  type="file"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+                <div className="bg-blue-500/20 text-blue-300 rounded-lg p-3 text-center cursor-pointer hover:bg-blue-500/30 transition-all">
+                  <Plus className="inline w-4 h-4 mr-2" />
+                  Dodaj plik
+                </div>
+              </label>
+            </div>
+          </div>
+
+          {/* Center - Project Instructions */}
+          <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6">
+            <h3 className="text-lg font-bold text-white mb-4 flex items-center">
+              <Target className="w-5 h-5 mr-2" />
+              Instrukcje projektu
+            </h3>
+            
+            <div className="space-y-6">
+              {/* Project Overview */}
+              <div className="bg-gradient-to-br from-purple-500/20 to-blue-500/20 rounded-xl p-4">
+                <h4 className="text-white font-semibold mb-2">📋 Cel projektu</h4>
+                <p className="text-gray-300 text-sm leading-relaxed">
+                  {match.project.description}
+                </p>
+              </div>
+
+              {/* Requirements */}
+              <div className="bg-black/20 rounded-xl p-4">
+                <h4 className="text-white font-semibold mb-3">✅ Wymagania</h4>
+                <ul className="space-y-2">
+                  <li className="text-gray-300 text-sm flex items-start">
+                    <span className="text-green-400 mr-2">•</span>
+                    Dokument minimum 2 strony
+                  </li>
+                  <li className="text-gray-300 text-sm flex items-start">
+                    <span className="text-green-400 mr-2">•</span>
+                    Wizualizacje lub schematy
+                  </li>
+                  <li className="text-gray-300 text-sm flex items-start">
+                    <span className="text-green-400 mr-2">•</span>
+                    Kosztorys z uzasadnieniem
+                  </li>
+                  <li className="text-gray-300 text-sm flex items-start">
+                    <span className="text-green-400 mr-2">•</span>
+                    Plan implementacji krok po kroku
+                  </li>
+                </ul>
+              </div>
+
+              {/* Tips */}
+              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4">
+                <h4 className="text-yellow-300 font-semibold mb-2 flex items-center">
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Wskazówki
+                </h4>
+                <ul className="space-y-1 text-gray-300 text-sm">
+                  <li>• Podzielcie się zadaniami na początku</li>
+                  <li>• Regularnie komunikujcie postępy</li>
+                  <li>• Używajcie video call dla trudnych tematów</li>
+                  <li>• Dokumentujcie wszystkie decyzje</li>
+                </ul>
+              </div>
+
+              {/* Rewards */}
+              <div className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 rounded-xl p-4">
+                <h4 className="text-white font-semibold mb-3">🏆 Nagrody</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center">
+                    <div className="text-3xl mb-1">⚡</div>
+                    <p className="text-yellow-300 font-bold">{match.project.rewards.xp} XP</p>
+                    <p className="text-gray-400 text-xs">Doświadczenie</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-3xl mb-1">💰</div>
+                    <p className="text-yellow-300 font-bold">{match.project.rewards.coins}</p>
+                    <p className="text-gray-400 text-xs">Monet</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Communication Tools */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setIsVideoOn(!isVideoOn)}
+                  className={`flex-1 py-3 rounded-lg font-semibold transition-all ${
+                    isVideoOn 
+                      ? 'bg-green-500/20 text-green-300' 
+                      : 'bg-black/20 text-gray-400 hover:bg-black/30'
+                  }`}
+                >
+                  {isVideoOn ? <Video className="inline w-4 h-4 mr-2" /> : <VideoOff className="inline w-4 h-4 mr-2" />}
+                  Video
+                </button>
+                <button
+                  onClick={() => setIsMicOn(!isMicOn)}
+                  className={`flex-1 py-3 rounded-lg font-semibold transition-all ${
+                    isMicOn 
+                      ? 'bg-green-500/20 text-green-300' 
+                      : 'bg-black/20 text-gray-400 hover:bg-black/30'
+                  }`}
+                >
+                  {isMicOn ? <Mic className="inline w-4 h-4 mr-2" /> : <MicOff className="inline w-4 h-4 mr-2" />}
+                  Audio
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Panel - Chat */}
+          <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 flex flex-col h-[600px]">
+            <h3 className="text-lg font-bold text-white mb-4 flex items-center">
+              <MessageCircle className="w-5 h-5 mr-2" />
+              Czat projektu
+            </h3>
+            
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto space-y-3 mb-4">
+              {messages.map(msg => (
+                <div 
+                  key={msg.id}
+                  className={`${msg.sender === user.name ? 'text-right' : ''}`}
+                >
+                  <div className={`inline-block max-w-[80%] ${
+                    msg.sender === 'system' 
+                      ? 'w-full'
+                      : msg.sender === user.name 
+                        ? 'bg-blue-500/20 text-blue-100' 
+                        : 'bg-purple-500/20 text-purple-100'
+                  } rounded-lg p-3`}>
+                    {msg.sender !== 'system' && (
+                      <p className="text-xs opacity-70 mb-1">{msg.sender}</p>
+                    )}
+                    <p className={`text-sm ${msg.sender === 'system' ? 'text-yellow-300 text-center' : ''}`}>
+                      {msg.text}
+                    </p>
+                    {msg.isFile && (
+                      <div className="mt-2 p-2 bg-black/20 rounded flex items-center gap-2">
+                        <FileText className="w-4 h-4" />
+                        <span className="text-xs">Plik dodany</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Input */}
+            <div className="flex gap-2">
+              <button className="p-3 bg-black/20 rounded-lg hover:bg-black/30 transition-all">
+                <Camera className="w-5 h-5 text-gray-400" />
+              </button>
+              <input
+                type="text"
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                placeholder="Napisz wiadomość..."
+                className="flex-1 bg-black/20 text-white rounded-lg px-4 py-3 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              />
+              <button
+                onClick={sendMessage}
+                className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all"
+              >
+                <Send className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom Action Bar */}
+        <div className="mt-6 bg-white/10 backdrop-blur-lg rounded-2xl p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="text-center">
+                <p className="text-gray-400 text-sm">Czas pozostały</p>
+                <p className="text-white font-bold text-xl">{formatTime(timeLeft)}</p>
+              </div>
+              <div className="h-12 w-px bg-white/20"></div>
+              <div className="text-center">
+                <p className="text-gray-400 text-sm">Ukończono</p>
+                <p className="text-white font-bold text-xl">{Math.round(progress)}%</p>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              {timeLeft < 86400 && (
+                <button className="px-6 py-3 bg-yellow-500/20 text-yellow-300 rounded-lg hover:bg-yellow-500/30 transition-all">
+                  <Clock className="inline w-4 h-4 mr-2" />
+                  Poproś o przedłużenie
+                </button>
+              )}
+              <button
+                onClick={onComplete}
+                disabled={progress < 100}
+                className={`px-8 py-3 rounded-lg font-bold transition-all ${
+                  progress === 100
+                    ? 'bg-green-500 text-white hover:bg-green-600'
+                    : 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                }`}
+              >
+                <CheckCircle className="inline w-5 h-5 mr-2" />
+                Zakończ projekt
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// EKRAN MATCHOWANIA
+// ============================================
+
+const DuoMatchingScreen = ({ user, onMatchFound, onCancel }) => {
+  const [searchTime, setSearchTime] = useState(0);
+  const [status, setStatus] = useState('searching'); // searching, found, timeout
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setSearchTime(prev => prev + 1);
+    }, 1000);
+
+    // Simulate finding a match after 3-8 seconds
+    const matchTimeout = setTimeout(() => {
+      setStatus('found');
+      setTimeout(() => {
+        const engine = new DuoMatchingEngine();
+        const match = engine.findMatch(user);
+        onMatchFound(match);
+      }, 2000);
+    }, 3000 + Math.random() * 5000);
+
+    return () => {
+      clearInterval(timer);
+      clearTimeout(matchTimeout);
+    };
+  }, []);
+
+  return (
+    <div className="fixed inset-0 bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center z-50">
+      <div className="text-center">
+        {status === 'searching' && (
+          <>
+            <div className="relative w-32 h-32 mx-auto mb-8">
+              <div className="absolute inset-0 bg-blue-500 rounded-full animate-ping opacity-20"></div>
+              <div className="absolute inset-0 bg-purple-500 rounded-full animate-ping animation-delay-200 opacity-20"></div>
+              <div className="relative w-32 h-32 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
+                <Users className="w-16 h-16 text-white animate-pulse" />
+              </div>
+            </div>
+            
+            <h2 className="text-3xl font-bold text-white mb-2">Szukamy partnera do projektu...</h2>
+            <p className="text-gray-300 mb-4">Dopasowujemy osobę o podobnym poziomie</p>
+            <p className="text-gray-400">{searchTime}s</p>
+            
+            <button
+              onClick={onCancel}
+              className="mt-8 px-6 py-3 bg-red-500/20 text-red-300 rounded-lg hover:bg-red-500/30 transition-all"
+            >
+              Anuluj
+            </button>
+          </>
+        )}
+
+        {status === 'found' && (
+          <>
+            <div className="text-8xl mb-8 animate-bounce">🎉</div>
+            <h2 className="text-3xl font-bold text-white mb-2">Partner znaleziony!</h2>
+            <p className="text-gray-300">Przygotowujemy pokój projektowy...</p>
+            <div className="mt-8">
+              <Loader className="w-8 h-8 text-white animate-spin mx-auto" />
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// GŁÓWNY KOMPONENT
+// ============================================
+
+const DuoProjectSystem = () => {
+  const [currentUser] = useState({
+    id: 'user_1',
+    name: 'Jan Kowalski',
+    level: 12,
+    career: 'electrician',
+    xp: 3400,
+    completedDuos: 5
+  });
+
+  const [screen, setScreen] = useState('menu'); // menu, matching, project
+  const [currentMatch, setCurrentMatch] = useState(null);
+
+  const handleStartMatching = () => {
+    setScreen('matching');
+  };
+
+  const handleMatchFound = (match) => {
+    setCurrentMatch(match);
+    setScreen('project');
+  };
+
+  const handleLeaveProject = () => {
+    if (window.confirm('Czy na pewno chcesz opuścić projekt? Stracisz postęp i otrzymasz karę -100 XP.')) {
+      setScreen('menu');
+      setCurrentMatch(null);
+    }
+  };
+
+  const handleCompleteProject = () => {
+    alert(`🎉 Gratulacje! Ukończyłeś projekt i otrzymałeś ${currentMatch.project.rewards.xp} XP!`);
+    setScreen('menu');
+    setCurrentMatch(null);
+  };
+
+  if (screen === 'matching') {
+    return (
+      <DuoMatchingScreen
+        user={currentUser}
+        onMatchFound={handleMatchFound}
+        onCancel={() => setScreen('menu')}
+      />
+    );
+  }
+
+  if (screen === 'project' && currentMatch) {
+    return (
+      <ProjectRoom
+        match={currentMatch}
+        user={currentUser}
+        onLeave={handleLeaveProject}
+        onComplete={handleCompleteProject}
+      />
+    );
+  }
+
+  // Menu Screen
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 p-6">
+      <div className="max-w-4xl mx-auto">
+        {/* Header */}
+        <div className="text-center mb-12">
+          <h1 className="text-5xl font-bold text-white mb-4">🤝 Projekty DUO</h1>
+          <p className="text-xl text-gray-300">Znajdź partnera i realizujcie projekty razem!</p>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-3 gap-6 mb-8">
+          <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 text-center">
+            <div className="text-4xl mb-2">🏆</div>
+            <p className="text-3xl font-bold text-white">{currentUser.completedDuos}</p>
+            <p className="text-gray-400">Ukończone projekty</p>
+          </div>
+          <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 text-center">
+            <div className="text-4xl mb-2">⭐</div>
+            <p className="text-3xl font-bold text-white">4.8</p>
+            <p className="text-gray-400">Średnia ocena</p>
+          </div>
+          <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 text-center">
+            <div className="text-4xl mb-2">🔥</div>
+            <p className="text-3xl font-bold text-white">3</p>
+            <p className="text-gray-400">Streak projektów</p>
+          </div>
+        </div>
+
+        {/* Main CTA */}
+        <div className="bg-gradient-to-br from-purple-600/30 to-blue-600/30 backdrop-blur-lg rounded-3xl p-8 mb-8 border border-white/10">
+          <div className="text-center mb-6">
+            <h2 className="text-3xl font-bold text-white mb-4">Rozpocznij nowy projekt DUO</h2>
+            <p className="text-gray-300 mb-6">
+              System automatycznie dobierze Ci partnera o podobnym poziomie.<br />
+              Będziecie mieli 3-5 dni na wspólne wykonanie projektu.
+            </p>
+            
+            <button
+              onClick={handleStartMatching}
+              className="px-12 py-4 bg-gradient-to-r from-green-500 to-blue-500 text-white text-xl font-bold rounded-2xl hover:from-green-600 hover:to-blue-600 transform hover:scale-105 transition-all shadow-lg"
+            >
+              <UserPlus className="inline w-6 h-6 mr-3" />
+              Znajdź partnera
+            </button>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4 mt-8">
+            <div className="text-center">
+              <Lock className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
+              <p className="text-white font-semibold">Binding na 3 dni</p>
+              <p className="text-gray-400 text-sm">Nie możesz zmienić partnera</p>
+            </div>
+            <div className="text-center">
+              <Target className="w-8 h-8 text-green-400 mx-auto mb-2" />
+              <p className="text-white font-semibold">Prawdziwe projekty</p>
+              <p className="text-gray-400 text-sm">Zadania z życia wzięte</p>
+            </div>
+            <div className="text-center">
+              <Gift className="w-8 h-8 text-purple-400 mx-auto mb-2" />
+              <p className="text-white font-semibold">Podwójne nagrody</p>
+              <p className="text-gray-400 text-sm">XP + bonusy za współpracę</p>
+            </div>
+          </div>
+        </div>
+
+        {/* How it works */}
+        <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 mb-8">
+          <h3 className="text-2xl font-bold text-white mb-6">Jak to działa?</h3>
+          <div className="space-y-4">
+            {[
+              { icon: '1️⃣', title: 'Matchmaking', desc: 'System znajdzie Ci partnera o podobnym poziomie i kompatybilnych umiejętnościach' },
+              { icon: '2️⃣', title: 'Projekt', desc: 'Otrzymacie wspólny projekt dopasowany do Waszych zawodów' },
+              { icon: '3️⃣', title: 'Współpraca', desc: 'Macie 3-5 dni na realizację. Używajcie czatu, video i dzielcie się plikami' },
+              { icon: '4️⃣', title: 'Nagrody', desc: 'Po ukończeniu oboje otrzymujecie XP, monety i ocenę współpracy' }
+            ].map((step, idx) => (
+              <div key={idx} className="flex items-start gap-4">
+                <div className="text-3xl">{step.icon}</div>
+                <div>
+                  <h4 className="text-white font-semibold">{step.title}</h4>
+                  <p className="text-gray-400">{step.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Recent Projects */}
+        <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8">
+          <h3 className="text-2xl font-bold text-white mb-6">Ostatnie projekty społeczności</h3>
+          <div className="space-y-4">
+            {[
+              { users: 'Anna K. & Michał P.', project: 'Smart Home dla Seniora', time: '2h temu', status: 'completed' },
+              { users: 'Kasia W. & Tomek R.', project: 'Food Truck Menu', time: '5h temu', status: 'in-progress' },
+              { users: 'Piotr L. & Magda S.', project: 'Aplikacja NGO', time: '1d temu', status: 'completed' }
+            ].map((project, idx) => (
+              <div key={idx} className="flex items-center justify-between p-4 bg-black/20 rounded-xl">
+                <div className="flex items-center gap-4">
+                  <div className="text-2xl">👥</div>
+                  <div>
+                    <p className="text-white font-semibold">{project.users}</p>
+                    <p className="text-gray-400 text-sm">{project.project}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-gray-400 text-sm">{project.time}</p>
+                  {project.status === 'completed' ? (
+                    <span className="text-green-400 text-sm">✅ Ukończone</span>
+                  ) : (
+                    <span className="text-yellow-400 text-sm">⏳ W trakcie</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Warning */}
+        <div className="mt-8 bg-red-500/10 border border-red-500/30 rounded-xl p-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-red-400 mt-1" />
+            <div>
+              <p className="text-red-300 font-semibold">Ważne zasady:</p>
+              <ul className="text-red-200 text-sm mt-2 space-y-1">
+                <li>• Porzucenie projektu = -100 XP kary</li>
+                <li>• Po 3 dniach możesz przedłużyć termin za zgodą partnera</li>
+                <li>• Ocena współpracy wpływa na przyszłe dopasowania</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default DuoProjectSystem;
