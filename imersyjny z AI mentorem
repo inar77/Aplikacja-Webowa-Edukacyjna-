@@ -765,3 +765,773 @@ export default ImmersiveCareerSystem;selection');
     });
     
     setStage('career-
+
+
+////NIE NIEDZIAŁA////
+
+
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Heart, Brain, Sparkles, User, MessageCircle, Trophy, 
+  TrendingUp, Calendar, Star, Shield, Zap, Coffee,
+  Sunrise, Moon, ChevronRight, ArrowRight, Smile,
+  Frown, Meh, ThumbsUp, Award, Target, Clock
+} from 'lucide-react';
+
+// ============================================
+// AI MENTOR - EMOCJONALNY SYSTEM
+// ============================================
+
+class EmotionalAI {
+  constructor() {
+    this.userProfile = {
+      name: '',
+      career: '',
+      mood: [],
+      motivations: [],
+      challenges: [],
+      achievements: [],
+      conversations: [],
+      emotionalState: 'neutral',
+      lastInteraction: null
+    };
+
+    this.narratives = {
+      electrician: {
+        intro: "⚡ Od teraz jesteś Czeladnikiem Prądu. Twój mistrz czeka w warsztacie z pierwszym zadaniem.",
+        daily: [
+          "Każde gniazdko, które naprawisz, to bezpieczeństwo czyjejś rodziny.",
+          "Pamiętaj - kontrolujesz moc, która napędza cały świat.",
+          "Dziś nauczysz się, jak światło pokonuje ciemność - dosłownie."
+        ],
+        motivation: "Elektryczność to krew nowoczesnego świata. Bez Ciebie wszystko staje."
+      },
+      chef: {
+        intro: "👨‍🍳 Witaj w kuchni mistrzów! Twój fartuch czeka, a pierwszy przepis już paruje na kuchence.",
+        daily: [
+          "Każde danie to historia opowiedziana smakiem.",
+          "Dziś stworzysz coś, co ktoś zapamięta na zawsze.",
+          "Kuchnia to alchemia - zamieniasz składniki w emocje."
+        ],
+        motivation: "Karmisz nie tylko ciała, ale i dusze. To szlachetna misja."
+      },
+      mechanic: {
+        intro: "🔧 Masz już fartuch i klucze – czas zanurzyć się w oleju i odkryć tajemnice silników.",
+        daily: [
+          "Każdy naprawiony samochód to czyjaś wolność przywrócona.",
+          "Silnik to serce maszyny - dziś nauczysz się je leczyć.",
+          "Twoje ręce przywracają życie metalowym gigantom."
+        ],
+        motivation: "Mechanicy to współcześni kowale - kujesz bezpieczeństwo na drogach."
+      },
+      developer: {
+        intro: "💻 Witaj w cyfrowym warsztacie! Terminal czeka na Twoje pierwsze polecenie.",
+        daily: [
+          "Każda linia kodu to cegiełka w cyfrowej przyszłości.",
+          "Dziś stworzysz coś z niczego - tylko z logiki i kreatywności.",
+          "Debugowanie to jak rozwiązywanie zagadek - satysfakcja gwarantowana."
+        ],
+        motivation: "Programiści to architekci cyfrowego świata. Budujesz przyszłość."
+      }
+    };
+
+    this.moodResponses = {
+      happy: [
+        "Świetnie się cieszę, że masz dobry dzień! Ta energia pomoże Ci w nauce.",
+        "Twój entuzjazm jest zaraźliwy! Wykorzystajmy go do czegoś wielkiego.",
+        "Z taką pozytywną energią możesz góry przenosić!"
+      ],
+      sad: [
+        "Hej, każdy ma gorsze dni. Pamiętaj, że uczysz się dla siebie i swojej przyszłości.",
+        "Wiem, że jest ciężko. Ale właśnie w takich momentach wykuwa się charakter.",
+        "Może zróbmy dziś coś łatwiejszego? Małe kroki też prowadzą do celu."
+      ],
+      stressed: [
+        "Widzę, że masz dużo na głowie. Pamiętaj - nie musisz wszystkiego robić naraz.",
+        "Stres to znak, że to dla Ciebie ważne. Weź głęboki oddech, podzielimy to na małe kroki.",
+        "Każdy ekspert kiedyś był początkującym. Daj sobie czas."
+      ],
+      motivated: [
+        "WOW! Z taką motywacją możesz wszystko! Co chcesz dziś osiągnąć?",
+        "Czuję Twoją determinację! To jest moment, żeby zrobić coś wielkiego.",
+        "Twoja motywacja mnie inspiruje! Działajmy!"
+      ]
+    };
+  }
+
+  analyzeMood(moodData) {
+    const moodScore = moodData.reduce((acc, m) => acc + m.value, 0) / moodData.length;
+    
+    if (moodScore > 7) return 'happy';
+    if (moodScore > 5) return 'motivated';
+    if (moodScore > 3) return 'neutral';
+    if (moodScore > 2) return 'stressed';
+    return 'sad';
+  }
+
+  generateDailyGreeting(user) {
+    const hour = new Date().getHours();
+    const daysSinceStart = Math.floor((Date.now() - user.startDate) / (1000 * 60 * 60 * 24));
+    const lastMood = user.moods[user.moods.length - 1];
+    
+    let greeting = '';
+    
+    // Time-based greeting
+    if (hour < 6)       greeting = `${user.name}, wcześnie wstałeś! Podziwiam Twoją determinację. `;
+    else if (hour < 12) greeting = `Dzień dobry, ${user.name}! `;
+    else if (hour < 18) greeting = `Cześć ${user.name}! `;
+    else if (hour < 22) greeting = `Dobry wieczór, ${user.name}! `;
+    else greeting = `${user.name}, pracujesz do późna! `;
+
+    // Personalized follow-up based on history
+    if (daysSinceStart === 0) {
+      greeting += "Jak się czujesz przed pierwszym dniem nauki?";
+    } else if (user.streak > 7) {
+      greeting += `${user.streak} dni z rzędu! Jesteś nie do zatrzymania! 🔥`;
+    } else if (lastMood && lastMood.value < 5) {
+      greeting += "Wczoraj miałeś trudny dzień. Dziś będzie lepiej, obiecuję!";
+    } else if (user.lastAchievement) {
+      greeting += `Pamiętasz jak wczoraj zdobyłeś '${user.lastAchievement}'? Dziś czeka kolejne wyzwanie!`;
+    } else {
+      const narrative = this.narratives[user.career]?.daily;
+      if (narrative) {
+        greeting += narrative[Math.floor(Math.random() * narrative.length)];
+      }
+    }
+
+    return greeting;
+  }
+
+  generateMotivation(user, context) {
+    const career = user.career;
+    const narrative = this.narratives[career];
+    
+    if (!narrative) return "Każdy krok przybliża Cię do celu!";
+
+    let motivation = narrative.motivation + " ";
+
+    // Add context-specific motivation
+    if (context.type === 'failure') {
+      motivation += "Błędy to najlepsi nauczyciele. Edison też nie wynalazł żarówki za pierwszym razem.";
+    } else if (context.type === 'success') {
+      motivation += `Właśnie udowodniłeś, że masz to, czego potrzeba. ${user.completedTasks} zadań za Tobą!`;
+    } else if (context.type === 'streak') {
+      motivation += `${user.streak} dni ciągłej nauki! Statystycznie, jesteś w top 5% najbardziej zdeterminowanych.`;
+    }
+
+    // Add social impact
+    motivation += this.getSocialImpact(career);
+
+    return motivation;
+  }
+
+  getSocialImpact(career) {
+    const impacts = {
+      electrician: " Twoja praca ratuje życie - wadliwa instalacja to śmiertelne zagrożenie. Jesteś bohaterem bezpieczeństwa.",
+      chef: " Gotowanie to miłość podana na talerzu. Tworzysz wspomnienia i łączysz ludzi przy stole.",
+      mechanic: " Każdy naprawiony pojazd to rodzina bezpiecznie docierająca do domu. To wielka odpowiedzialność.",
+      developer: " Twój kod może zmienić życie milionów. Facebook, Google - wszystko zaczęło się od jednej osoby z laptopem.",
+      nurse: " Będziesz pierwszą osobą, którą zobaczą chorzy. Twój uśmiech może być ich jedyną nadzieją.",
+      carpenter: " Budujesz schronienie, bezpieczeństwo, dom. To fundament cywilizacji."
+    };
+
+    return impacts[career] || " Twoja praca ma znaczenie. Świat potrzebuje takich jak Ty.";
+  }
+
+  rememberConversation(topic, response, emotion) {
+    this.userProfile.conversations.push({
+      date: new Date(),
+      topic,
+      response,
+      emotion,
+      id: Date.now()
+    });
+
+    // Keep only last 50 conversations
+    if (this.userProfile.conversations.length > 50) {
+      this.userProfile.conversations.shift();
+    }
+  }
+
+  getFollowUp() {
+    const lastConvo = this.userProfile.conversations[this.userProfile.conversations.length - 1];
+    
+    if (!lastConvo) return null;
+
+    const daysSince = Math.floor((Date.now() - lastConvo.date) / (1000 * 60 * 60 * 24));
+    
+    if (daysSince > 3 && daysSince < 7) {
+      return `Pamiętasz jak ${daysSince} dni temu rozmawialiśmy o ${lastConvo.topic}? Jak Ci poszło?`;
+    }
+
+    return null;
+  }
+}
+
+// ============================================
+// CAREER PATH QUIZ - PSYCHOLOGICZNY TEST
+// ============================================
+
+const CareerQuiz = ({ onComplete }) => {
+  const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [answers, setAnswers] = useState([]);
+  
+  const questions = [
+    {
+      id: 'work_environment',
+      question: "Wyobraź sobie idealny dzień pracy. Gdzie jesteś?",
+      answers: [
+        { text: "W warsztacie pełnym narzędzi", value: ['mechanic', 'electrician', 'carpenter'], emoji: "🔧" },
+        { text: "Przy komputerze w cichym biurze", value: ['developer', 'designer', 'analyst'], emoji: "💻" },
+        { text: "W kuchni pełnej aromatów", value: ['chef', 'baker'], emoji: "👨‍🍳" },
+        { text: "Wśród ludzi, pomagając im", value: ['nurse', 'teacher', 'therapist'], emoji: "🤝" }
+      ]
+    },
+    {
+      id: 'problem_solving',
+      question: "Popsул się telewizor. Co robisz?",
+      answers: [
+        { text: "Otwieram go i sprawdzam co jest nie tak", value: ['electrician', 'mechanic'], emoji: "🔌" },
+        { text: "Szukam rozwiązania w internecie", value: ['developer', 'analyst'], emoji: "🔍" },
+        { text: "Dzwonię do specjalisty", value: ['manager', 'coordinator'], emoji: "📞" },
+        { text: "To dobra okazja żeby kupić nowy", value: ['sales', 'marketing'], emoji: "🛍️" }
+      ]
+    },
+    {
+      id: 'creativity',
+      question: "Dostajesz pudełko losowych przedmiotów. Co z nimi robisz?",
+      answers: [
+        { text: "Buduję coś użytecznego", value: ['carpenter', 'engineer'], emoji: "🏗️" },
+        { text: "Tworzę dzieło sztuki", value: ['designer', 'artist'], emoji: "🎨" },
+        { text: "Organizuję je systematycznie", value: ['analyst', 'accountant'], emoji: "📊" },
+        { text: "Wymyślam historię o nich", value: ['writer', 'teacher'], emoji: "📖" }
+      ]
+    },
+    {
+      id: 'stress_response',
+      question: "Jest deadline za 2 godziny, a praca w połowie. Co czujesz?",
+      answers: [
+        { text: "Adrenalina! Teraz dam z siebie 200%", value: ['paramedic', 'chef'], emoji: "⚡" },
+        { text: "Spokojnie planuję co najważniejsze", value: ['developer', 'engineer'], emoji: "📋" },
+        { text: "Stresuję się, ale działam", value: ['teacher', 'nurse'], emoji: "😰" },
+        { text: "Szukam pomocy zespołu", value: ['manager', 'coordinator'], emoji: "👥" }
+      ]
+    },
+    {
+      id: 'satisfaction',
+      question: "Co daje Ci największą satysfakcję?",
+      answers: [
+        { text: "Gdy coś, co zepsute, znów działa", value: ['mechanic', 'electrician'], emoji: "✅" },
+        { text: "Gdy ktoś mówi 'dziękuję'", value: ['nurse', 'teacher', 'therapist'], emoji: "🙏" },
+        { text: "Gdy widzę efekt swojej pracy", value: ['carpenter', 'chef', 'designer'], emoji: "🏆" },
+        { text: "Gdy rozwiążę skomplikowany problem", value: ['developer', 'analyst'], emoji: "🧩" }
+      ]
+    }
+  ];
+
+  const handleAnswer = (answer) => {
+    const newAnswers = [...answers, answer];
+    setAnswers(newAnswers);
+
+    if (currentQuestion < questions.length - 1) {
+      setCurrentQuestion(currentQuestion + 1);
+    } else {
+      // Analyze answers
+      const careerScores = {};
+      newAnswers.forEach(ans => {
+        ans.value.forEach(career => {
+          careerScores[career] = (careerScores[career] || 0) + 1;
+        });
+      });
+
+      // Get top 3 careers
+      const sortedCareers = Object.entries(careerScores)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3);
+
+      onComplete({
+        topCareer: sortedCareers[0][0],
+        alternatives: sortedCareers.slice(1).map(c => c[0]),
+        scores: careerScores
+      });
+    }
+  };
+
+  const progress = ((currentQuestion + 1) / questions.length) * 100;
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-purple-600 via-blue-600 to-cyan-600 p-6">
+      <div className="max-w-2xl mx-auto">
+        {/* Progress Bar */}
+        <div className="mb-8">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-white font-semibold">Pytanie {currentQuestion + 1} z {questions.length}</span>
+            <span className="text-white">{Math.round(progress)}%</span>
+          </div>
+          <div className="h-3 bg-white/20 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-white transition-all duration-500 ease-out"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Question Card */}
+        <div className="bg-white rounded-3xl shadow-2xl p-8 transform transition-all duration-500">
+          <div className="text-center mb-8">
+            <div className="text-6xl mb-4">🤔</div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">
+              {questions[currentQuestion].question}
+            </h2>
+          </div>
+
+          <div className="space-y-4">
+            {questions[currentQuestion].answers.map((answer, idx) => (
+              <button
+                key={idx}
+                onClick={() => handleAnswer(answer)}
+                className="w-full p-6 bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl hover:from-blue-100 hover:to-purple-100 transform hover:scale-105 transition-all duration-300 text-left flex items-center space-x-4 group"
+              >
+                <span className="text-4xl group-hover:animate-bounce">{answer.emoji}</span>
+                <span className="text-lg font-medium text-gray-800">{answer.text}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// DAILY MOOD CHECK - EMOCJONALNY CHECK-IN
+// ============================================
+
+const DailyMoodCheck = ({ onComplete, userName, previousMoods = [] }) => {
+  const [mood, setMood] = useState(5);
+  const [feeling, setFeeling] = useState('');
+  const [motivation, setMotivation] = useState('');
+  const [showFollowUp, setShowFollowUp] = useState(false);
+  
+  const ai = useRef(new EmotionalAI()).current;
+
+  const feelings = [
+    { emoji: '😊', label: 'Szczęśliwy', value: 'happy' },
+    { emoji: '😔', label: 'Smutny', value: 'sad' },
+    { emoji: '😟', label: 'Zestresowany', value: 'stressed' },
+    { emoji: '😴', label: 'Zmęczony', value: 'tired' },
+    { emoji: '💪', label: 'Zmotywowany', value: 'motivated' },
+    { emoji: '😐', label: 'Neutralny', value: 'neutral' }
+  ];
+
+  const motivations = [
+    "Chcę lepiej zarabiać",
+    "Szukam nowej pasji",
+    "Rodzina na mnie liczy",
+    "Chcę być niezależny",
+    "Nudzi mnie obecna praca",
+    "Marzę o własnym biznesie"
+  ];
+
+  const handleSubmit = () => {
+    const moodData = {
+      date: new Date(),
+      mood,
+      feeling,
+      motivation,
+      followUp: null
+    };
+
+    // Generate AI response based on mood
+    const aiMood = ai.analyzeMood([{ value: mood }]);
+    const response = ai.moodResponses[aiMood][Math.floor(Math.random() * ai.moodResponses[aiMood].length)];
+    
+    moodData.aiResponse = response;
+
+    // Check if we should ask follow-up based on patterns
+    if (previousMoods.length > 2) {
+      const lastThreeMoods = previousMoods.slice(-3);
+      const avgMood = lastThreeMoods.reduce((a, b) => a + b.mood, 0) / 3;
+      
+      if (avgMood < 4) {
+        setShowFollowUp(true);
+        return;
+      }
+    }
+
+    onComplete(moodData);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-6 z-50">
+      <div className="bg-white rounded-3xl max-w-lg w-full p-8 transform transition-all">
+        {!showFollowUp ? (
+          <>
+            <div className="text-center mb-6">
+              <h2 className="text-2xl font-bold mb-2">
+                Cześć {userName}! 👋
+              </h2>
+              <p className="text-gray-600">Jak się dziś czujesz?</p>
+            </div>
+
+            {/* Mood Slider */}
+            <div className="mb-8">
+              <div className="flex justify-between mb-4">
+                <span className="text-3xl">😢</span>
+                <span className="text-3xl">😐</span>
+                <span className="text-3xl">😊</span>
+              </div>
+              <input
+                type="range"
+                min="1"
+                max="10"
+                value={mood}
+                onChange={(e) => setMood(Number(e.target.value))}
+                className="w-full h-3 bg-gradient-to-r from-red-400 via-yellow-400 to-green-400 rounded-full appearance-none cursor-pointer"
+              />
+              <div className="text-center mt-2 text-4xl font-bold">
+                {mood}/10
+              </div>
+            </div>
+
+            {/* Feelings */}
+            <div className="mb-6">
+              <p className="font-semibold mb-3">Co najbardziej opisuje Twój stan?</p>
+              <div className="grid grid-cols-3 gap-3">
+                {feelings.map(f => (
+                  <button
+                    key={f.value}
+                    onClick={() => setFeeling(f.value)}
+                    className={`p-3 rounded-xl transition-all ${
+                      feeling === f.value 
+                        ? 'bg-blue-100 border-2 border-blue-500' 
+                        : 'bg-gray-50 hover:bg-gray-100'
+                    }`}
+                  >
+                    <div className="text-2xl mb-1">{f.emoji}</div>
+                    <div className="text-xs">{f.label}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Motivation */}
+            <div className="mb-6">
+              <p className="font-semibold mb-3">Co Cię motywuje do nauki?</p>
+              <div className="space-y-2">
+                {motivations.map(m => (
+                  <button
+                    key={m}
+                    onClick={() => setMotivation(m)}
+                    className={`w-full text-left p-3 rounded-lg transition-all ${
+                      motivation === m
+                        ? 'bg-purple-100 border-2 border-purple-500'
+                        : 'bg-gray-50 hover:bg-gray-100'
+                    }`}
+                  >
+                    {m}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button
+              onClick={handleSubmit}
+              className="w-full py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-bold hover:from-blue-700 hover:to-purple-700 transition-all"
+            >
+              Zacznij dzień nauki →
+            </button>
+          </>
+        ) : (
+          <div className="text-center">
+            <div className="text-6xl mb-4">🤗</div>
+            <h3 className="text-xl font-bold mb-4">
+              Zauważyłem, że ostatnio jest Ci ciężko...
+            </h3>
+            <p className="text-gray-600 mb-6">
+              Pamiętaj, że nie jesteś sam. Każdy sukces zaczyna się od małego kroku.
+              Może dziś zróbmy coś łatwiejszego? Albo po prostu porozmawiajmy?
+            </p>
+            <div className="space-y-3">
+              <button
+                onClick={() => onComplete({ needsSupport: true })}
+                className="w-full py-3 bg-green-500 text-white rounded-xl font-bold"
+              >
+                Tak, potrzebuję wsparcia
+              </button>
+              <button
+                onClick={() => onComplete({ needsSupport: false })}
+                className="w-full py-3 bg-gray-200 text-gray-700 rounded-xl"
+              >
+                Nie, dam radę
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// MAIN IMMERSIVE CAREER SYSTEM
+// ============================================
+
+const ImmersiveCareerSystem = () => {
+  const [stage, setStage] = useState('welcome'); // welcome, quiz, mood, career
+  const [userData, setUserData] = useState({
+    name: '',
+    career: null,
+    level: 1,
+    xp: 0,
+    streak: 0,
+    moods: [],
+    lastInteraction: null
+  });
+  
+  const [showDailyMood, setShowDailyMood] = useState(false);
+  const [selectedPath, setSelectedPath] = useState(null);
+  
+  const ai = useRef(new EmotionalAI()).current;
+
+  // Career narratives with immersive descriptions
+  const careers = {
+    electrician: {
+      title: "Elektryk - Mistrz Prądu",
+      emoji: "⚡",
+      narrative: "Kontrolujesz niewidzialną siłę, która napędza świat. Każde Twoje działanie to bezpieczeństwo tysięcy ludzi.",
+      firstDay: "Pierwszy dzień w warsztacie. Mistrz Kowalski, 30 lat doświadczenia, wita Cię słowami: 'Prąd nie wybacza błędów, ale szanuje tych, którzy go rozumieją.'",
+      missions: [
+        "Misja 1: Pierwsza Instalacja - Podłącz gniazdko w sposób bezpieczny",
+        "Misja 2: Diagnostyka - Znajdź usterkę w domowej instalacji",
+        "Misja 3: Modernizacja - Wymień stary bezpiecznik na nowoczesny"
+      ]
+    },
+    chef: {
+      title: "Szef Kuchni - Alchemik Smaków",
+      emoji: "👨‍🍳",
+      narrative: "Tworzysz sztukę, którą można zjeść. Każde danie to emocja podana na talerzu.",
+      firstDay: "Szef kuchni prowadzi Cię do stanowiska: 'Nóż to przedłużenie Twojej ręki, a kuchnia to Twoja scena. Pokaż, co potrafisz.'",
+      missions: [
+        "Misja 1: Mise en Place - Przygotuj idealne stanowisko pracy",
+        "Misja 2: Pierwszy Sos - Stwórz klasyczny sos holenderski",
+        "Misja 3: Serwis - Wydaj 10 dań w czasie kolacji"
+      ]
+    },
+    developer: {
+      title: "Programista - Architekt Cyfrowego Świata",
+      emoji: "💻",
+      narrative: "Piszesz przyszłość linijka po linijce. Twój kod może zmienić życie milionów.",
+      firstDay: "Senior developer wita Cię: 'Pierwszy pull request zawsze pamięta się najdłużej. Kod to poezja - ma być piękny i funkcjonalny.'",
+      missions: [
+        "Misja 1: Hello World - Stwórz pierwszą aplikację",
+        "Misja 2: Debug Master - Znajdź i napraw 5 błędów",
+        "Misja 3: Feature - Dodaj nową funkcjonalność do projektu"
+      ]
+    },
+    mechanic: {
+      title: "Mechanik - Lekarz Maszyn",
+      emoji: "🔧",
+      narrative: "Rozumiesz język silników. Każda naprawa to przywrócona wolność podróżowania.",
+      firstDay: "Warsztat pachnie olejem i metalem. Majster podaje Ci klucze: 'Silnik ma duszę. Naucz się jej słuchać.'",
+      missions: [
+        "Misja 1: Diagnoza - Zidentyfikuj problem w silniku",
+        "Misja 2: Wymiana - Wymień klocki hamulcowe",
+        "Misja 3: Tuning - Zwiększ moc silnika o 10%"
+      ]
+    }
+  };
+
+  useEffect(() => {
+    // Check if it's a new day
+    const lastInteraction = localStorage.getItem('lastInteraction');
+    if (lastInteraction) {
+      const last = new Date(lastInteraction);
+      const now = new Date();
+      
+      if (last.getDate() !== now.getDate()) {
+        setShowDailyMood(true);
+      }
+    }
+  }, []);
+
+  const handleQuizComplete = (results) => {
+    setUserData({
+      ...userData,
+      recommendedCareer: results.topCareer,
+      alternatives: results.alternatives
+    });
+    setStage('career-intro');
+  };
+
+  // Render different stages
+  if (stage === 'welcome') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center p-6">
+        <div className="bg-white rounded-3xl p-12 max-w-2xl text-center shadow-2xl">
+          <div className="text-8xl mb-6">🚀</div>
+          <h1 className="text-4xl font-bold mb-4">Witaj w PathFinder</h1>
+          <p className="text-xl text-gray-600 mb-8">
+            Znajdziemy dla Ciebie idealną ścieżkę kariery i poprowadzimy Cię przez nią krok po kroku
+          </p>
+          
+          <input
+            type="text"
+            placeholder="Jak masz na imię?"
+            className="w-full px-6 py-4 text-xl border-2 border-gray-300 rounded-2xl mb-6 focus:border-blue-500 focus:outline-none"
+            value={userData.name}
+            onChange={(e) => setUserData({...userData, name: e.target.value})}
+          />
+          
+          <button
+            onClick={() => userData.name && setStage('quiz')}
+            disabled={!userData.name}
+            className={`w-full py-4 text-xl font-bold rounded-2xl transition-all ${
+              userData.name
+                ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700'
+                : 'bg-gray-200 text-gray-400'
+            }`}
+          >
+            Rozpocznij Test Predyspozycji →
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (stage === 'quiz') {
+    return <CareerQuiz onComplete={handleQuizComplete} />;
+  }
+
+  if (showDailyMood) {
+    return (
+      <DailyMoodCheck
+        onComplete={handleMoodComplete}
+        userName={userData.name}
+        previousMoods={userData.moods}
+      />
+    );
+  }
+
+  if (stage === 'career-selection') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-600 to-purple-600 p-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white rounded-3xl p-8 shadow-2xl">
+            <h2 className="text-3xl font-bold mb-2 text-center">
+              {userData.name}, Twoja idealna ścieżka to:
+            </h2>
+            
+            <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-2xl p-6 mb-6">
+              <div className="text-center">
+                <div className="text-6xl mb-4">
+                  {careers[userData.recommendedCareer]?.emoji || '🎯'}
+                </div>
+                <h3 className="text-2xl font-bold mb-2">
+                  {careers[userData.recommendedCareer]?.title || userData.recommendedCareer}
+                </h3>
+                <p className="text-gray-600">
+                  {careers[userData.recommendedCareer]?.narrative}
+                </p>
+                <button
+                  onClick={() => selectCareer(userData.recommendedCareer)}
+                  className="mt-4 px-8 py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-all"
+                >
+                  Wybierz tę ścieżkę →
+                </button>
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <p className="font-semibold mb-3">Alternatywne ścieżki dla Ciebie:</p>
+              <div className="grid grid-cols-2 gap-4">
+                {userData.alternatives?.map(alt => (
+                  <button
+                    key={alt}
+                    onClick={() => selectCareer(alt)}
+                    className="p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-all text-left"
+                  >
+                    <div className="text-3xl mb-2">{careers[alt]?.emoji || '📚'}</div>
+                    <div className="font-semibold">{careers[alt]?.title || alt}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (stage === 'career-intro') {
+    const career = careers[selectedPath];
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-700 text-white p-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-8">
+            <div className="text-8xl mb-4 animate-pulse">{career.emoji}</div>
+            <h1 className="text-4xl font-bold mb-4">{career.title}</h1>
+            <p className="text-xl opacity-90 mb-8">{career.narrative}</p>
+          </div>
+
+          <div className="bg-white/10 backdrop-blur rounded-3xl p-8 mb-6">
+            <h2 className="text-2xl font-bold mb-4">📖 Rozdział 1: Pierwszy Dzień</h2>
+            <p className="text-lg leading-relaxed mb-6">{career.firstDay}</p>
+            
+            <div className="space-y-4">
+              <h3 className="text-xl font-semibold">Twoje pierwsze misje:</h3>
+              {career.missions.map((mission, idx) => (
+                <div key={idx} className="bg-white/5 rounded-xl p-4 flex items-center space-x-4">
+                  <div className="text-3xl">🎯</div>
+                  <div>
+                    <p className="font-semibold">{mission}</p>
+                    <p className="text-sm opacity-75">+100 XP • Czas: 30 min</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <button
+            className="w-full py-4 bg-gradient-to-r from-green-600 to-blue-600 rounded-2xl font-bold text-xl hover:from-green-700 hover:to-blue-700 transition-all"
+            onClick={() => alert('Rozpoczynamy przygodę!')}
+          >
+            Zaczynam Pierwszą Misję →
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+};selection');
+  };
+
+  const handleMoodComplete = (moodData) => {
+    const newMoods = [...userData.moods, moodData];
+    setUserData({
+      ...userData,
+      moods: newMoods
+    });
+    
+    localStorage.setItem('lastInteraction', new Date().toISOString());
+    setShowDailyMood(false);
+
+    // Show AI response
+    if (moodData.aiResponse) {
+      alert(moodData.aiResponse); // In real app, use a nice notification
+    }
+  };
+
+  const selectCareer = (careerKey) => {
+    setSelectedPath(careerKey);
+    const career = careers[careerKey];
+    
+    // Show immersive narrative
+    setUserData({
+      ...userData,
+      career: careerKey,
+      narrative: career.narrative
+    });
+    
+    setStage('career-
