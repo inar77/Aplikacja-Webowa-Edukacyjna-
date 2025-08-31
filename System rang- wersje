@@ -1,0 +1,843 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  Trophy, TrendingUp, Star, Award, ChevronUp, 
+  Hammer, Zap, Wrench, ChefHat, Code, Car,
+  Briefcase, Heart, Camera, Scissors, Truck, Palette
+} from 'lucide-react';
+
+// ============================================
+// PROFESJONALNE RANGI - PRAWDZIWY ŻARGON
+// ============================================
+
+const ProfessionalRanks = {
+  construction: {
+    icon: '🏗️',
+    name: 'Budownictwo',
+    ranks: [
+      { level: 1, title: 'Pomocnik na budowie', subtitle: 'Nosi worki, podaje cegły', xp: 0, icon: '🧱' },
+      { level: 2, title: 'Majster od łopaty', subtitle: 'Kopie jak szalony', xp: 500, icon: '⛏️' },
+      { level: 3, title: 'Złota rączka', subtitle: 'Wszędzie się przyda', xp: 1500, icon: '🔨' },
+      { level: 4, title: 'Brygadzista', subtitle: 'Dowodzi małą ekipą', xp: 3000, icon: '👷' },
+      { level: 5, title: 'Majster', subtitle: 'Prowadzi budowę', xp: 6000, icon: '🏗️' },
+      { level: 6, title: 'Kierownik robót', subtitle: 'Boss wszystkich budów', xp: 12000, icon: '🎩' }
+    ],
+    achievements: {
+      'pierwsza_cegla': 'Położył pierwszą cegłę',
+      'betonowy_mixer': 'Wymieszał 100m³ betonu',
+      'pan_poziomnica': 'Mistrz idealnych kątów'
+    }
+  },
+  
+  electrician: {
+    icon: '⚡',
+    name: 'Elektryk',
+    ranks: [
+      { level: 1, title: 'Uczeń od kabli', subtitle: 'Zwija i podaje przewody', xp: 0, icon: '🔌' },
+      { level: 2, title: 'Łącznik żarówkowy', subtitle: 'Wie gdzie plus, gdzie minus', xp: 500, icon: '💡' },
+      { level: 3, title: 'Tester fazy', subtitle: 'Czuje prąd w powietrzu', xp: 1500, icon: '⚡' },
+      { level: 4, title: 'Fachowiec od gniazdek', subtitle: 'Montaż bez patrzenia', xp: 3000, icon: '🔧' },
+      { level: 5, title: 'Mistrz iskry', subtitle: 'Rozdzielnie to jego żywioł', xp: 6000, icon: '⚡' },
+      { level: 6, title: 'Inspektor SEP', subtitle: 'Legenda wysokiego napięcia', xp: 12000, icon: '🎓' }
+    ],
+    achievements: {
+      'pierwszy_prad': 'Podłączył pierwsze gniazdko',
+      'bezpiecznik': '100 wymienionych bezpieczników',
+      'gumowe_rece': 'Przeżył porażenie (nie próbuj w domu!)'
+    }
+  },
+
+  plumber: {
+    icon: '🔧',
+    name: 'Hydraulik',
+    ranks: [
+      { level: 1, title: 'Podawacz rur', subtitle: 'Nosi i sortuje', xp: 0, icon: '🪠' },
+      { level: 2, title: 'Królik od przecieków', subtitle: 'Zatyka dziury', xp: 500, icon: '💧' },
+      { level: 3, title: 'Spec od uszczelek', subtitle: 'Żadna kropla nie ucieknie', xp: 1500, icon: '🔧' },
+      { level: 4, title: 'Pan od kranów', subtitle: 'Montuje z zamkniętymi oczami', xp: 3000, icon: '🚿' },
+      { level: 5, title: 'Mistrz rur', subtitle: 'Projektuje całe instalacje', xp: 6000, icon: '🔨' },
+      { level: 6, title: 'Król kanalizacji', subtitle: 'Władca podziemnego królestwa', xp: 12000, icon: '👑' }
+    ],
+    achievements: {
+      'pierwsza_rura': 'Pierwsza spawana rura',
+      'suchy_jak_pieprz': '7 dni bez zalania',
+      'nurek_kanalizacyjny': 'Udrożnił 100 odpływów'
+    }
+  },
+
+  chef: {
+    icon: '👨‍🍳',
+    name: 'Kucharz',
+    ranks: [
+      { level: 1, title: 'Obieracz ziemniaków', subtitle: '10kg dziennie minimum', xp: 0, icon: '🥔' },
+      { level: 2, title: 'Mieszacz zupy', subtitle: 'Nie przypala dna', xp: 500, icon: '🍲' },
+      { level: 3, title: 'Spec od jajecznicy', subtitle: 'Perfekcyjna każdego ranka', xp: 1500, icon: '🍳' },
+      { level: 4, title: 'Szef patelni', subtitle: 'Żongluje 4 daniami naraz', xp: 3000, icon: '🥘' },
+      { level: 5, title: 'Sous Chef', subtitle: 'Prawa ręka szefa', xp: 6000, icon: '👨‍🍳' },
+      { level: 6, title: 'Executive Chef', subtitle: 'Gwiazdki Michelin w zasięgu', xp: 12000, icon: '⭐' }
+    ],
+    achievements: {
+      'pierwsza_zupa': 'Ugotował pierwszą zupę',
+      'zloty_noz': '1000 pokrojonych warzyw',
+      'piec_gwiazdek': 'Perfekcyjna kolacja dla 50 osób'
+    }
+  },
+
+  developer: {
+    icon: '💻',
+    name: 'Programista',
+    ranks: [
+      { level: 1, title: 'Copy-Paste Developer', subtitle: 'Stack Overflow to dom', xp: 0, icon: '📋' },
+      { level: 2, title: 'Junior od Bugów', subtitle: 'Tworzy ich więcej niż naprawia', xp: 500, icon: '🐛' },
+      { level: 3, title: 'Mid od Commitów', subtitle: 'Git push --force czasem', xp: 1500, icon: '💾' },
+      { level: 4, title: 'Senior Refaktoringu', subtitle: 'Czyści kod innych', xp: 3000, icon: '🧹' },
+      { level: 5, title: 'Architekt Chaosu', subtitle: 'Projektuje systemy', xp: 6000, icon: '🏛️' },
+      { level: 6, title: '10x Developer', subtitle: 'Mityczna bestia IT', xp: 12000, icon: '🦄' }
+    ],
+    achievements: {
+      'hello_world': 'Pierwszy Hello World',
+      'nocny_marek': '10 nocek z kodem',
+      'stackoverflow_hero': '100 rozwiązań ze Stack Overflow'
+    }
+  },
+
+  mechanic: {
+    icon: '🔧',
+    name: 'Mechanik',
+    ranks: [
+      { level: 1, title: 'Podawacz kluczy', subtitle: 'Wie który to "17"', xp: 0, icon: '🔩' },
+      { level: 2, title: 'Wymieniacz oleju', subtitle: 'Nie myli oleju z płynem', xp: 500, icon: '🛢️' },
+      { level: 3, title: 'Diagnosta dźwięków', subtitle: 'Słyszy co stuka', xp: 1500, icon: '👂' },
+      { level: 4, title: 'Mistrz hamulców', subtitle: 'Zatrzyma wszystko', xp: 3000, icon: '🛑' },
+      { level: 5, title: 'Czarodziej silników', subtitle: 'Wskrzesza martwe motory', xp: 6000, icon: '🔥' },
+      { level: 6, title: 'Legenda warsztatu', subtitle: 'Naprawi okiem', xp: 12000, icon: '🏆' }
+    ],
+    achievements: {
+      'pierwszy_olej': 'Pierwsza wymiana oleju',
+      'detektyw_usterek': '100 znalezionych usterek',
+      'zlote_rece': 'Naprawił auto z 1960 roku'
+    }
+  },
+
+  barber: {
+    icon: '✂️',
+    name: 'Fryzjer/Barber',
+    ranks: [
+      { level: 1, title: 'Zamiatacz włosów', subtitle: 'Czysto musi być', xp: 0, icon: '🧹' },
+      { level: 2, title: 'Praktykant od grzywek', subtitle: 'Prosto tnie... czasami', xp: 500, icon: '✂️' },
+      { level: 3, title: 'Spec od fade', subtitle: 'Gradient jak malowany', xp: 1500, icon: '💈' },
+      { level: 4, title: 'Mistrz brzytwy', subtitle: 'Goli na żyletke', xp: 3000, icon: '🪒' },
+      { level: 5, title: 'Artysta włosów', subtitle: 'Fryzury z Instagrama', xp: 6000, icon: '🎨' },
+      { level: 6, title: 'Legendarny Barber', subtitle: 'Kolejki na miesiąc', xp: 12000, icon: '👑' }
+    ],
+    achievements: {
+      'pierwsza_fryzura': 'Pierwsze obcięte włosy',
+      'fade_master': '50 perfekcyjnych fade',
+      'instagram_famous': '1000 lajków na fryzurze'
+    }
+  },
+
+  driver: {
+    icon: '🚚',
+    name: 'Kierowca',
+    ranks: [
+      { level: 1, title: 'Świeżak z prawkiem', subtitle: 'Kat. B od wczoraj', xp: 0, icon: '🚗' },
+      { level: 2, title: 'Kurier miejski', subtitle: 'Zna każdą uliczkę', xp: 500, icon: '📦' },
+      { level: 3, title: 'Kierowca busa', subtitle: 'Mieści się wszędzie', xp: 1500, icon: '🚐' },
+      { level: 4, title: 'Dalekobieżny', subtitle: 'TIR to drugi dom', xp: 3000, icon: '🚚' },
+      { level: 5, title: 'Król autostrad', subtitle: 'Million mile driver', xp: 6000, icon: '🛣️' },
+      { level: 6, title: 'Legenda asfaltu', subtitle: 'Jeździ z zamkniętymi oczami', xp: 12000, icon: '🏁' }
+    ],
+    achievements: {
+      'pierwszy_kurs': 'Pierwsza dostawa',
+      'milion_km': 'Milion kilometrów',
+      'bez_mandatu': '365 dni bez mandatu'
+    }
+  },
+
+  nurse: {
+    icon: '👩‍⚕️',
+    name: 'Pielęgniarka/Pielęgniarz',
+    ranks: [
+      { level: 1, title: 'Stażysta od termometrów', subtitle: 'Mierzy temperaturę', xp: 0, icon: '🌡️' },
+      { level: 2, title: 'Mistrz zastrzyków', subtitle: 'Nie czujesz igły', xp: 500, icon: '💉' },
+      { level: 3, title: 'Spec od wenflonów', subtitle: 'Trafia za pierwszym', xp: 1500, icon: '🩸' },
+      { level: 4, title: 'Pielęgniarka oddziałowa', subtitle: 'Ogarnia cały oddział', xp: 3000, icon: '🏥' },
+      { level: 5, title: 'Anioł szpitala', subtitle: 'Pacjenci ją uwielbiają', xp: 6000, icon: '😇' },
+      { level: 6, title: 'Legenda w bieli', subtitle: 'Mentor wszystkich', xp: 12000, icon: '👑' }
+    ],
+    achievements: {
+      'pierwszy_pacjent': 'Pierwszy uratowany pacjent',
+      'nocna_zmiana': '100 nocnych dyżurów',
+      'aniol_stróż': 'Uratował życie'
+    }
+  }
+};
+
+// ============================================
+// KOMPONENTY UI
+// ============================================
+
+const RankCard = ({ rank, currentXP, nextRank, isActive }) => {
+  const progress = nextRank 
+    ? ((currentXP - rank.xp) / (nextRank.xp - rank.xp)) * 100
+    : 100;
+
+  return (
+    <div className={`relative p-6 rounded-2xl transition-all duration-500 ${
+      isActive 
+        ? 'bg-gradient-to-br from-blue-600 to-purple-600 text-white scale-105 shadow-2xl' 
+        : 'bg-gray-100 opacity-50'
+    }`}>
+      {isActive && (
+        <div className="absolute -top-3 -right-3 bg-yellow-400 text-black px-3 py-1 rounded-full text-sm font-bold animate-pulse">
+          OBECNA RANGA
+        </div>
+      )}
+      
+      <div className="flex items-center justify-between mb-4">
+        <div className="text-5xl">{rank.icon}</div>
+        <div className="text-right">
+          <div className="text-sm opacity-75">Poziom {rank.level}</div>
+          <div className="font-bold">{rank.xp} XP</div>
+        </div>
+      </div>
+      
+      <h3 className="text-xl font-bold mb-1">{rank.title}</h3>
+      <p className={`text-sm ${isActive ? 'text-white/80' : 'text-gray-600'}`}>
+        {rank.subtitle}
+      </p>
+      
+      {isActive && nextRank && (
+        <div className="mt-4">
+          <div className="flex justify-between text-xs mb-1">
+            <span>Postęp do awansu</span>
+            <span>{Math.round(progress)}%</span>
+          </div>
+          <div className="h-2 bg-white/20 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-white transition-all duration-1000"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const AchievementBadge = ({ achievement, unlocked }) => (
+  <div className={`p-4 rounded-xl transition-all ${
+    unlocked 
+      ? 'bg-gradient-to-br from-yellow-400 to-orange-400 text-white' 
+      : 'bg-gray-200 text-gray-400'
+  }`}>
+    <div className="text-3xl mb-2">{unlocked ? '🏆' : '🔒'}</div>
+    <div className="text-sm font-semibold">{achievement}</div>
+  </div>
+);
+
+// ============================================
+// GŁÓWNY SYSTEM RANG
+// ============================================
+
+const ProfessionalRankSystem = () => {
+  const [selectedCareer, setSelectedCareer] = useState('construction');
+  const [userXP, setUserXP] = useState(2100);
+  const [showRankUp, setShowRankUp] = useState(false);
+  const [unlockedAchievements, setUnlockedAchievements] = useState(['pierwsza_cegla']);
+  
+  const career = ProfessionalRanks[selectedCareer];
+  const currentRank = career.ranks.findLast(r => r.xp <= userXP) || career.ranks[0];
+  const currentRankIndex = career.ranks.indexOf(currentRank);
+  const nextRank = career.ranks[currentRankIndex + 1];
+
+  // Simulate XP gain
+  const addXP = (amount) => {
+    const newXP = userXP + amount;
+    setUserXP(newXP);
+    
+    // Check for rank up
+    if (nextRank && newXP >= nextRank.xp) {
+      setShowRankUp(true);
+      setTimeout(() => setShowRankUp(false), 3000);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white p-6">
+      {/* Rank Up Animation */}
+      {showRankUp && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-pulse">
+          <div className="bg-white text-black p-8 rounded-3xl text-center transform scale-110">
+            <div className="text-6xl mb-4">🎉</div>
+            <h2 className="text-3xl font-bold mb-2">AWANS!</h2>
+            <p className="text-xl">Zostałeś: {nextRank?.title}</p>
+          </div>
+        </div>
+      )}
+
+      <div className="max-w-6xl mx-auto">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold mb-2">System Rang Zawodowych</h1>
+          <p className="text-gray-400">Prawdziwe nazwy, prawdziwy progres</p>
+        </div>
+
+        {/* Career Selector */}
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold mb-4">Wybierz swoją ścieżkę:</h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+            {Object.entries(ProfessionalRanks).map(([key, prof]) => (
+              <button
+                key={key}
+                onClick={() => setSelectedCareer(key)}
+                className={`p-4 rounded-xl transition-all ${
+                  selectedCareer === key
+                    ? 'bg-gradient-to-br from-blue-600 to-purple-600'
+                    : 'bg-gray-800 hover:bg-gray-700'
+                }`}
+              >
+                <div className="text-3xl mb-2">{prof.icon}</div>
+                <div className="text-sm font-semibold">{prof.name}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Current Status */}
+        <div className="bg-gray-800/50 backdrop-blur rounded-3xl p-6 mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-2xl font-bold">{career.name}</h2>
+              <p className="text-gray-400">Twoja obecna pozycja w hierarchii</p>
+            </div>
+            <div className="text-right">
+              <div className="text-3xl font-bold">{userXP} XP</div>
+              <button
+                onClick={() => addXP(250)}
+                className="mt-2 px-4 py-2 bg-green-600 rounded-lg hover:bg-green-700 transition-all"
+              >
+                +250 XP (Ukończ zadanie)
+              </button>
+            </div>
+          </div>
+
+          {/* Progress to next rank */}
+          {nextRank && (
+            <div className="bg-gray-900/50 rounded-xl p-4">
+              <div className="flex justify-between items-center mb-2">
+                <span>Do awansu na: <strong>{nextRank.title}</strong></span>
+                <span className="text-yellow-400 font-bold">
+                  {nextRank.xp - userXP} XP
+                </span>
+              </div>
+              <div className="h-3 bg-gray-700 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-green-500 to-blue-500 transition-all duration-1000"
+                  style={{ 
+                    width: `${((userXP - currentRank.xp) / (nextRank.xp - currentRank.xp)) * 100}%` 
+                  }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Ranks Progression */}
+        <div className="mb-8">
+          <h3 className="text-xl font-semibold mb-4">Ścieżka kariery:</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {career.ranks.map((rank, idx) => (
+              <RankCard
+                key={idx}
+                rank={rank}
+                currentXP={userXP}
+                nextRank={career.ranks[idx + 1]}
+                isActive={rank === currentRank}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Achievements */}
+        <div>
+          <h3 className="text-xl font-semibold mb-4">Odznaki branżowe:</h3>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {Object.entries(career.achievements).map(([key, achievement]) => (
+              <AchievementBadge
+                key={key}
+                achievement={achievement}
+                unlocked={unlockedAchievements.includes(key)}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Motivational Quote */}
+        <div className="mt-12 text-center p-6 bg-gradient-to-r from-blue-900/50 to-purple-900/50 rounded-2xl">
+          <p className="text-lg italic">
+            "{currentRank.title} to nie tylko tytuł - to doświadczenie zdobyte własnymi rękami."
+          </p>
+          <p className="text-sm text-gray-400 mt-2">
+            - Każdy mistrz kiedyś był uczniem
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ProfessionalRankSystem;
+
+
+
+
+/////NIEDZIAŁA////
+
+
+
+import React, { useState, useEffect } from 'react';
+import { 
+  Trophy, TrendingUp, Star, Award, ChevronUp, 
+  Hammer, Zap, Wrench, ChefHat, Code, Car,
+  Briefcase, Heart, Camera, Scissors, Truck, Palette,
+  Music, Package, Shield, Glasses, Home, Trees,
+  Sparkles, Droplets, Flame
+} from 'lucide-react';
+
+// ============================================
+// PROFESJONALNE RANGI - PRAWDZIWY ŻARGON
+// ============================================
+
+const ProfessionalRanks = {
+  construction: {
+    icon: '🏗️',
+    name: 'Budownictwo',
+    theme: {
+      primary: 'from-orange-600 to-amber-600',
+      secondary: 'from-stone-700 to-orange-900',
+      accent: 'orange',
+      bg: 'bg-gradient-to-br from-stone-900 via-orange-950 to-stone-900',
+      card: 'from-orange-900/20 to-stone-800/20'
+    },
+    ranks: [
+      { level: 1, title: 'Pomocnik na budowie', subtitle: 'Nosi worki, podaje cegły', xp: 0, icon: '🧱' },
+      { level: 2, title: 'Majster od łopaty', subtitle: 'Kopie jak szalony', xp: 500, icon: '⛏️' },
+      { level: 3, title: 'Złota rączka', subtitle: 'Wszędzie się przyda', xp: 1500, icon: '🔨' },
+      { level: 4, title: 'Brygadzista', subtitle: 'Dowodzi małą ekipą', xp: 3000, icon: '👷' },
+      { level: 5, title: 'Majster', subtitle: 'Prowadzi budowę', xp: 6000, icon: '🏗️' },
+      { level: 6, title: 'Kierownik robót', subtitle: 'Boss wszystkich budów', xp: 12000, icon: '🎩' }
+    ],
+    achievements: {
+      'pierwsza_cegla': 'Położył pierwszą cegłę',
+      'betonowy_mixer': 'Wymieszał 100m³ betonu',
+      'pan_poziomnica': 'Mistrz idealnych kątów'
+    }
+  },
+  
+  electrician: {
+    icon: '⚡',
+    name: 'Elektryk',
+    theme: {
+      primary: 'from-yellow-400 to-green-400',
+      secondary: 'from-gray-900 to-yellow-900',
+      accent: 'yellow',
+      bg: 'bg-gradient-to-br from-gray-900 via-green-950 to-black',
+      card: 'from-green-900/30 to-yellow-900/20'
+    },
+    ranks: [
+      { level: 1, title: 'Uczeń od kabli', subtitle: 'Zwija i podaje przewody', xp: 0, icon: '🔌' },
+      { level: 2, title: 'Łącznik żarówkowy', subtitle: 'Wie gdzie plus, gdzie minus', xp: 500, icon: '💡' },
+      { level: 3, title: 'Tester fazy', subtitle: 'Czuje prąd w powietrzu', xp: 1500, icon: '⚡' },
+      { level: 4, title: 'Fachowiec od gniazdek', subtitle: 'Montaż bez patrzenia', xp: 3000, icon: '🔧' },
+      { level: 5, title: 'Mistrz iskry', subtitle: 'Rozdzielnie to jego żywioł', xp: 6000, icon: '⚡' },
+      { level: 6, title: 'Inspektor SEP', subtitle: 'Legenda wysokiego napięcia', xp: 12000, icon: '🎓' }
+    ],
+    achievements: {
+      'pierwszy_prad': 'Podłączył pierwsze gniazdko',
+      'bezpiecznik': '100 wymienionych bezpieczników',
+      'gumowe_rece': 'Przeżył porażenie (nie próbuj w domu!)'
+    }
+  },
+
+  plumber: {
+    icon: '🔧',
+    name: 'Hydraulik',
+    theme: {
+      primary: 'from-blue-600 to-cyan-600',
+      secondary: 'from-blue-900 to-gray-800',
+      accent: 'blue',
+      bg: 'bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900',
+      card: 'from-blue-900/30 to-cyan-900/20'
+    },
+    ranks: [
+      { level: 1, title: 'Podawacz rur', subtitle: 'Nosi i sortuje', xp: 0, icon: '🪠' },
+      { level: 2, title: 'Królik od przecieków', subtitle: 'Zatyka dziury', xp: 500, icon: '💧' },
+      { level: 3, title: 'Spec od uszczelek', subtitle: 'Żadna kropla nie ucieknie', xp: 1500, icon: '🔧' },
+      { level: 4, title: 'Pan od kranów', subtitle: 'Montuje z zamkniętymi oczami', xp: 3000, icon: '🚿' },
+      { level: 5, title: 'Mistrz rur', subtitle: 'Projektuje całe instalacje', xp: 6000, icon: '🔨' },
+      { level: 6, title: 'Król kanalizacji', subtitle: 'Władca podziemnego królestwa', xp: 12000, icon: '👑' }
+    ],
+    achievements: {
+      'pierwsza_rura': 'Pierwsza spawana rura',
+      'suchy_jak_pieprz': '7 dni bez zalania',
+      'nurek_kanalizacyjny': 'Udrożnił 100 odpływów'
+    }
+  },
+
+  chef: {
+    icon: '👨‍🍳',
+    name: 'Kucharz',
+    theme: {
+      primary: 'from-red-600 to-orange-500',
+      secondary: 'from-red-900 to-yellow-900',
+      accent: 'red',
+      bg: 'bg-gradient-to-br from-red-950 via-orange-950 to-yellow-950',
+      card: 'from-red-900/30 to-orange-900/20'
+    },
+    ranks: [
+      { level: 1, title: 'Obieracz ziemniaków', subtitle: '10kg dziennie minimum', xp: 0, icon: '🥔' },
+      { level: 2, title: 'Mieszacz zupy', subtitle: 'Nie przypala dna', xp: 500, icon: '🍲' },
+      { level: 3, title: 'Spec od jajecznicy', subtitle: 'Perfekcyjna każdego ranka', xp: 1500, icon: '🍳' },
+      { level: 4, title: 'Szef patelni', subtitle: 'Żongluje 4 daniami naraz', xp: 3000, icon: '🥘' },
+      { level: 5, title: 'Sous Chef', subtitle: 'Prawa ręka szefa', xp: 6000, icon: '👨‍🍳' },
+      { level: 6, title: 'Executive Chef', subtitle: 'Gwiazdki Michelin w zasięgu', xp: 12000, icon: '⭐' }
+    ],
+    achievements: {
+      'pierwsza_zupa': 'Ugotował pierwszą zupę',
+      'zloty_noz': '1000 pokrojonych warzyw',
+      'piec_gwiazdek': 'Perfekcyjna kolacja dla 50 osób'
+    }
+  },
+
+  developer: {
+    icon: '💻',
+    name: 'Programista',
+    theme: {
+      primary: 'from-purple-600 to-pink-600',
+      secondary: 'from-gray-900 to-purple-900',
+      accent: 'purple',
+      bg: 'bg-gradient-to-br from-gray-900 via-purple-950 to-pink-950',
+      card: 'from-purple-900/30 to-pink-900/20'
+    },
+    ranks: [
+      { level: 1, title: 'Copy-Paste Developer', subtitle: 'Stack Overflow to dom', xp: 0, icon: '📋' },
+      { level: 2, title: 'Junior od Bugów', subtitle: 'Tworzy ich więcej niż naprawia', xp: 500, icon: '🐛' },
+      { level: 3, title: 'Mid od Commitów', subtitle: 'Git push --force czasem', xp: 1500, icon: '💾' },
+      { level: 4, title: 'Senior Refaktoringu', subtitle: 'Czyści kod innych', xp: 3000, icon: '🧹' },
+      { level: 5, title: 'Architekt Chaosu', subtitle: 'Projektuje systemy', xp: 6000, icon: '🏛️' },
+      { level: 6, title: '10x Developer', subtitle: 'Mityczna bestia IT', xp: 12000, icon: '🦄' }
+    ],
+    achievements: {
+      'hello_world': 'Pierwszy Hello World',
+      'nocny_marek': '10 nocek z kodem',
+      'stackoverflow_hero': '100 rozwiązań ze Stack Overflow'
+    }
+  },
+
+  mechanic: {
+    icon: '🔧',
+    name: 'Mechanik',
+    theme: {
+      primary: 'from-gray-600 to-slate-800',
+      secondary: 'from-zinc-900 to-gray-900',
+      accent: 'gray',
+      bg: 'bg-gradient-to-br from-zinc-950 via-gray-900 to-black',
+      card: 'from-zinc-900/40 to-gray-900/30'
+    },
+    ranks: [
+      { level: 1, title: 'Podawacz kluczy', subtitle: 'Wie który to "17"', xp: 0, icon: '🔩' },
+      { level: 2, title: 'Wymieniacz oleju', subtitle: 'Nie myli oleju z płynem', xp: 500, icon: '🛢️' },
+      { level: 3, title: 'Diagnosta dźwięków', subtitle: 'Słyszy co stuka', xp: 1500, icon: '👂' },
+      { level: 4, title: 'Mistrz hamulców', subtitle: 'Zatrzyma wszystko', xp: 3000, icon: '🛑' },
+      { level: 5, title: 'Czarodziej silników', subtitle: 'Wskrzesza martwe motory', xp: 6000, icon: '🔥' },
+      { level: 6, title: 'Legenda warsztatu', subtitle: 'Naprawi okiem', xp: 12000, icon: '🏆' }
+    ],
+    achievements: {
+      'pierwszy_olej': 'Pierwsza wymiana oleju',
+      'detektyw_usterek': '100 znalezionych usterek',
+      'zlote_rece': 'Naprawił auto z 1960 roku'
+    }
+  },
+
+  barber: {
+    icon: '✂️',
+    name: 'Fryzjer/Barber',
+    theme: {
+      primary: 'from-pink-600 to-rose-600',
+      secondary: 'from-pink-900 to-red-900',
+      accent: 'pink',
+      bg: 'bg-gradient-to-br from-slate-900 via-pink-950 to-rose-950',
+      card: 'from-pink-900/30 to-rose-900/20'
+    },
+    ranks: [
+      { level: 1, title: 'Zamiatacz włosów', subtitle: 'Czysto musi być', xp: 0, icon: '🧹' },
+      { level: 2, title: 'Praktykant od grzywek', subtitle: 'Prosto tnie... czasami', xp: 500, icon: '✂️' },
+      { level: 3, title: 'Spec od fade', subtitle: 'Gradient jak malowany', xp: 1500, icon: '💈' },
+      { level: 4, title: 'Mistrz brzytwy', subtitle: 'Goli na żyletke', xp: 3000, icon: '🪒' },
+      { level: 5, title: 'Artysta włosów', subtitle: 'Fryzury z Instagrama', xp: 6000, icon: '🎨' },
+      { level: 6, title: 'Legendarny Barber', subtitle: 'Kolejki na miesiąc', xp: 12000, icon: '👑' }
+    ],
+    achievements: {
+      'pierwsza_fryzura': 'Pierwsze obcięte włosy',
+      'fade_master': '50 perfekcyjnych fade',
+      'instagram_famous': '1000 lajków na fryzurze'
+    }
+  },
+
+  driver: {
+    icon: '🚚',
+    name: 'Kierowca',
+    theme: {
+      primary: 'from-amber-600 to-yellow-600',
+      secondary: 'from-amber-900 to-gray-800',
+      accent: 'amber',
+      bg: 'bg-gradient-to-br from-gray-900 via-amber-950 to-black',
+      card: 'from-amber-900/30 to-yellow-900/20'
+    },
+    ranks: [
+      { level: 1, title: 'Świeżak z prawkiem', subtitle: 'Kat. B od wczoraj', xp: 0, icon: '🚗' },
+      { level: 2, title: 'Kurier miejski', subtitle: 'Zna każdą uliczkę', xp: 500, icon: '📦' },
+      { level: 3, title: 'Kierowca busa', subtitle: 'Mieści się wszędzie', xp: 1500, icon: '🚐' },
+      { level: 4, title: 'Dalekobieżny', subtitle: 'TIR to drugi dom', xp: 3000, icon: '🚚' },
+      { level: 5, title: 'Król autostrad', subtitle: 'Million mile driver', xp: 6000, icon: '🛣️' },
+      { level: 6, title: 'Legenda asfaltu', subtitle: 'Jeździ z zamkniętymi oczami', xp: 12000, icon: '🏁' }
+    ],
+    achievements: {
+      'pierwszy_kurs': 'Pierwsza dostawa',
+      'milion_km': 'Milion kilometrów',
+      'bez_mandatu': '365 dni bez mandatu'
+    }
+  },
+
+  nurse: {
+    icon: '👩‍⚕️',
+    name: 'Pielęgniarka/Pielęgniarz',
+    theme: {
+      primary: 'from-teal-500 to-cyan-500',
+      secondary: 'from-teal-900 to-blue-900',
+      accent: 'teal',
+      bg: 'bg-gradient-to-br from-teal-950 via-cyan-950 to-blue-950',
+      card: 'from-teal-900/30 to-cyan-900/20'
+    },
+    ranks: [
+      { level: 1, title: 'Stażysta od termometrów', subtitle: 'Mierzy temperaturę', xp: 0, icon: '🌡️' },
+      { level: 2, title: 'Mistrz zastrzyków', subtitle: 'Nie czujesz igły', xp: 500, icon: '💉' },
+      { level: 3, title: 'Spec od wenflonów', subtitle: 'Trafia za pierwszym', xp: 1500, icon: '🩸' },
+      { level: 4, title: 'Pielęgniarka oddziałowa', subtitle: 'Ogarnia cały oddział', xp: 3000, icon: '🏥' },
+      { level: 5, title: 'Anioł szpitala', subtitle: 'Pacjenci ją uwielbiają', xp: 6000, icon: '😇' },
+      { level: 6, title: 'Legenda w bieli', subtitle: 'Mentor wszystkich', xp: 12000, icon: '👑' }
+    ],
+    achievements: {
+      'pierwszy_pacjent': 'Pierwszy uratowany pacjent',
+      'nocna_zmiana': '100 nocnych dyżurów',
+      'aniol_stróż': 'Uratował życie'
+    }
+  },
+
+  // NOWE ZAWODY
+
+  taxi: {
+    icon: '🚕',
+    name: 'Taksówkarz',
+    theme: {
+      primary: 'from-yellow-500 to-amber-500',
+      secondary: 'from-yellow-900 to-black',
+      accent: 'yellow',
+      bg: 'bg-gradient-to-br from-gray-900 via-yellow-950 to-black',
+      card: 'from-yellow-900/40 to-amber-900/30'
+    },
+    ranks: [
+      { level: 1, title: 'Młody za kółkiem', subtitle: 'GPS w telefonie', xp: 0, icon: '📱' },
+      { level: 2, title: 'Znawca skrótów', subtitle: 'Omija korki', xp: 500, icon: '🗺️' },
+      { level: 3, title: 'Nocny jeździec', subtitle: 'Wozi imprezowiczów', xp: 1500, icon: '🌙' },
+      { level: 4, title: 'Król objazdu', subtitle: 'Zna każdą dziurę', xp: 3000, icon: '👑' },
+      { level: 5, title: 'GPS w głowie', subtitle: 'Nie potrzebuje nawigacji', xp: 6000, icon: '🧠' },
+      { level: 6, title: 'Legenda postoju', subtitle: '30 lat za kółkiem', xp: 12000, icon: '🏆' }
+    ],
+    achievements: {
+      'pierwszy_kurs': 'Pierwszy klient',
+      'nocny_marek': '100 nocnych kursów',
+      'piec_gwiazdek': '1000 ocen 5/5'
+    }
+  },
+
+  welder: {
+    icon: '🔥',
+    name: 'Spawacz',
+    theme: {
+      primary: 'from-orange-600 to-red-600',
+      secondary: 'from-gray-900 to-orange-900',
+      accent: 'orange',
+      bg: 'bg-gradient-to-br from-gray-900 via-orange-950 to-red-950',
+      card: 'from-orange-900/40 to-red-900/30'
+    },
+    ranks: [
+      { level: 1, title: 'Pomocnik spawacza', subtitle: 'Trzyma elementy', xp: 0, icon: '🥽' },
+      { level: 2, title: 'Elektrodzista', subtitle: 'Spawanie łukowe', xp: 500, icon: '⚡' },
+      { level: 3, title: 'Migomag', subtitle: 'MIG/MAG master', xp: 1500, icon: '🔥' },
+      { level: 4, title: 'TIG-owiec', subtitle: 'Precyzja jak chirurg', xp: 3000, icon: '💎' },
+      { level: 5, title: 'Mistrz spoiny', subtitle: 'Rentgen zawsze OK', xp: 6000, icon: '✨' },
+      { level: 6, title: 'Spawacz orbital', subtitle: 'Rury podmorskie', xp: 12000, icon: '🌊' }
+    ],
+    achievements: {
+      'pierwsza_spoina': 'Pierwsza spoina',
+      'stal_nierdzewna': 'Spawanie stali nierdzewnej',
+      'certyfikat': 'Uprawnienia spawalnicze'
+    }
+  },
+
+  painter: {
+    icon: '🎨',
+    name: 'Malarz',
+    theme: {
+      primary: 'from-indigo-600 to-purple-600',
+      secondary: 'from-indigo-900 to-purple-900',
+      accent: 'indigo',
+      bg: 'bg-gradient-to-br from-indigo-950 via-purple-950 to-pink-950',
+      card: 'from-indigo-900/30 to-purple-900/20'
+    },
+    ranks: [
+      { level: 1, title: 'Mieszacz farb', subtitle: 'Kolory się uczą', xp: 0, icon: '🎨' },
+      { level: 2, title: 'Pędzelkowicz', subtitle: 'Maluje równo', xp: 500, icon: '🖌️' },
+      { level: 3, title: 'Wałkowy zawodnik', subtitle: 'Ściany jak lustro', xp: 1500, icon: '🎢' },
+      { level: 4, title: 'Spec od szpachli', subtitle: 'Gładzie bez zarzutu', xp: 3000, icon: '🔪' },
+      { level: 5, title: 'Artysta tynków', subtitle: 'Dekoracje i ornamenty', xp: 6000, icon: '🏛️' },
+      { level: 6, title: 'Mistrz koloru', subtitle: 'Freski i murale', xp: 12000, icon: '🌈' }
+    ],
+    achievements: {
+      'pierwsza_sciana': 'Pierwsza pomalowana ściana',
+      'bez_smug': '30 dni bez smug',
+      'mural': 'Pierwszy mural miejski'
+    }
+  },
+
+  gardener: {
+    icon: '🌳',
+    name: 'Ogrodnik',
+    theme: {
+      primary: 'from-green-600 to-lime-600',
+      secondary: 'from-green-900 to-emerald-900',
+      accent: 'green',
+      bg: 'bg-gradient-to-br from-green-950 via-emerald-950 to-lime-950',
+      card: 'from-green-900/30 to-lime-900/20'
+    },
+    ranks: [
+      { level: 1, title: 'Grabarz liści', subtitle: 'Porządki to podstawa', xp: 0, icon: '🍂' },
+      { level: 2, title: 'Kosiarz trawników', subtitle: 'Równo jak po sznurku', xp: 500, icon: '🌱' },
+      { level: 3, title: 'Przycinacz żywopłotów', subtitle: 'Geometria w krzakach', xp: 1500, icon: '✂️' },
+      { level: 4, title: 'Projektant zieleni', subtitle: 'Układa kompozycje', xp: 3000, icon: '📐' },
+      { level: 5, title: 'Dendrolog', subtitle: 'Leczy drzewa', xp: 6000, icon: '🌳' },
+      { level: 6, title: 'Architekt krajobrazu', subtitle: 'Tworzy ogrody marzeń', xp: 12000, icon: '🏞️' }
+    ],
+    achievements: {
+      'pierwsza_roza': 'Posadził pierwszą różę',
+      'zlota_konewka': '1000 podlanych roślin',
+      'mistrz_bonsai': 'Wyhodował bonsai'
+    }
+  },
+
+  cleaner: {
+    icon: '🧹',
+    name: 'Sprzątacz/Cleaning',
+    theme: {
+      primary: 'from-sky-600 to-blue-600',
+      secondary: 'from-sky-900 to-slate-900',
+      accent: 'sky',
+      bg: 'bg-gradient-to-br from-slate-900 via-sky-950 to-blue-950',
+      card: 'from-sky-900/30 to-blue-900/20'
+    },
+    ranks: [
+      { level: 1, title: 'Rekrut od mopa', subtitle: 'Uczy się podstaw', xp: 0, icon: '🧽' },
+      { level: 2, title: 'Żołnierz czystości', subtitle: 'Walczy z brudem', xp: 500, icon: '🧹' },
+      { level: 3, title: 'Sierżant higieny', subtitle: 'Dowodzi ekipą', xp: 1500, icon: '✨' },
+      { level: 4, title: 'Spec od plam', subtitle: 'Żadna nie się ostanie', xp: 3000, icon: '🧪' },
+      { level: 5, title: 'Manager czystości', subtitle: 'Zarządza obiektami', xp: 6000, icon: '📋' },
+      { level: 6, title: 'Król błysku', subtitle: 'Czyści na lśniąco', xp: 12000, icon: '💎' }
+    ],
+    achievements: {
+      'pierwsza_podloga': 'Pierwsza umyta podłoga',
+      'okna_bez_smug': '100 okien bez smug',
+      'industrial_clean': 'Wyczyszczony magazyn 1000m²'
+    }
+  },
+
+  security: {
+    icon: '🛡️',
+    name: 'Ochroniarz',
+    theme: {
+      primary: 'from-gray-700 to-black',
+      secondary: 'from-gray-900 to-black',
+      accent: 'gray',
+      bg: 'bg-gradient-to-br from-black via-gray-900 to-slate-900',
+      card: 'from-gray-900/50 to-black/40'
+    },
+    ranks: [
+      { level: 1, title: 'Portier', subtitle: 'Sprawdza wejściówki', xp: 0, icon: '🎫' },
+      { level: 2, title: 'Bramkarz', subtitle: 'Pilnuje wejścia', xp: 500, icon: '🚪' },
+      { level: 3, title: 'Patrolowy', subtitle: 'Obchodzi teren', xp: 1500, icon: '🔦' },
+      { level: 4, title: 'Ochroniarz klubowy', subtitle: 'Selekcja przy drzwiach', xp: 3000, icon: '💪' },
+      { level: 5, title: 'Bodyguard', subtitle: 'Ochrona osobista', xp: 6000, icon: '🕴️' },
+      { level: 6, title: 'Szef ochrony', subtitle: 'Zarządza bezpieczeństwem', xp: 12000, icon: '🛡️' }
+    ],
+    achievements: {
+      'pierwsza_noc': 'Pierwsza nocna zmiana',
+      'czujne_oko': '100 wykrytych incydentów',
+      'vip_protection': 'Ochrona VIP-a'
+    }
+  }
+};
+
+// ============================================
+// EFEKTY WIZUALNE I ANIMACJE
+// ============================================
+
+const FloatingParticle = ({ emoji, delay }) => (
+  <div 
+    className="absolute animate-float opacity-20"
+    style={{
+      left: `${Math.random() * 100}%`,
+      animationDelay: `${delay}s`,
+      animationDuration: `${10 + Math.random() * 10}s`
+    }}
+  >
+    <div className="text-6xl">{emoji}</div>
+  </div>
+);
+
+// ============================================
+// KOMPONENTY UI
+// ============================================
+
+const RankCard = ({ rank, currentXP, nextRank, isActive, theme }) => {
+  const progress = nextRank 
+    ? ((currentXP - rank.xp) / (nextRank.xp - rank.xp)) * 100
+    : 100;
+
+  return (
+    <div className={`relative p-6 rounded-2xl transition-all duration-500 backdrop-blur-md ${
+      isActive 
+        ? `bg-gradient-to-br ${theme.primary} text-white scale-105 shadow-2xl ring-4 ring-white/20` 
+        : 'bg-gray-800/50 opacity-50'
+    }`}>
+      {isActive && (
+        <>
+          <div className="absolute -top-3 -right-3 bg-yellow-400 text-black px-3 py-1 rounded-full text-sm font-bold animate-pulse">
+            OBECNA RANGA
+          </div>
+          <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent rounded-2xl"></div>
+        </>
+      )}
+      
+      <div className="relative z-10">
+        <div className="flex items-center justify-between mb-4">
+          <div className="text-5xl animate-bounce-slow">{rank.icon}</div>
+          <div className="text-right">
+            <div className="text-sm opacity-75">Poziom {rank.level}</div>
+            <div className="font-bold">{rank.xp} XP</div>
+          </div>
+        </div>
+        
+        <h3 className="text-xl font-bold mb-1">{rank.title}</h3>
+        <p className={`text-sm ${isActive ? 'text-white/80' : 'text-gray-400'}`}>
+          {rank.subtitle}
