@@ -1,0 +1,1040 @@
+import React, { 
+  useState, useEffect, useRef, useCallback, useReducer, memo, 
+  createContext, useContext, useMemo 
+} from 'react';
+import {
+  Send, Play, RotateCcw, ChevronRight, ChevronLeft,
+  Check, X, Info, Zap, Shield, Wrench,
+  AlertTriangle, Clock, Brain, HelpCircle,
+  Trophy, Target, MessageSquare, BarChart3,
+  Star, Award, TrendingUp, Sparkles,
+  BookOpen, Users, Activity, Layers,
+  ExternalLink, Book, GraduationCap,
+  Loader2, Edit3, Undo, Settings,
+  Accessibility, Volume2, Moon, Sun,
+  Timer, Medal, Hash, Cpu
+} from 'lucide-react';
+
+// ============================================
+// ADVANCED CURRICULUM SYSTEM
+// ============================================
+
+const Curriculum = {
+  beginner: {
+    id: 'beginner',
+    name: 'Podstawy Elektryki',
+    topics: [
+      {
+        id: 'electrical_fuse',
+        title: 'Bezpiecznik Elektryczny',
+        difficulty: 1,
+        estimatedTime: 5,
+        completed: false
+      },
+      {
+        id: 'basic_circuit',
+        title: 'Prosty Obwód Elektryczny',
+        difficulty: 1,
+        estimatedTime: 7,
+        completed: false
+      },
+      {
+        id: 'voltage_current',
+        title: 'Napięcie i Natężenie',
+        difficulty: 2,
+        estimatedTime: 10,
+        completed: false
+      }
+    ]
+  },
+  intermediate: {
+    id: 'intermediate',
+    name: 'Obwody i Połączenia',
+    topics: [
+      {
+        id: 'series_parallel',
+        title: 'Obwody Szeregowe i Równoległe',
+        difficulty: 3,
+        estimatedTime: 15,
+        completed: false
+      },
+      {
+        id: 'resistance',
+        title: 'Rezystancja i Prawo Ohma',
+        difficulty: 3,
+        estimatedTime: 12,
+        completed: false
+      },
+      {
+        id: 'power_calculation',
+        title: 'Obliczanie Mocy',
+        difficulty: 4,
+        estimatedTime: 15,
+        completed: false
+      }
+    ]
+  },
+  advanced: {
+    id: 'advanced',
+    name: 'Półprzewodniki i Elektronika',
+    topics: [
+      {
+        id: 'diodes_led',
+        title: 'Diody i LED',
+        difficulty: 4,
+        estimatedTime: 20,
+        completed: false
+      },
+      {
+        id: 'transistors',
+        title: 'Tranzystory',
+        difficulty: 5,
+        estimatedTime: 25,
+        completed: false
+      },
+      {
+        id: 'digital_electronics',
+        title: 'Podstawy Elektroniki Cyfrowej',
+        difficulty: 5,
+        estimatedTime: 30,
+        completed: false
+      }
+    ]
+  }
+};
+
+// ============================================
+// ENHANCED KNOWLEDGE BASE
+// ============================================
+
+const KnowledgeBase = {
+  'bezpiecznik': {
+    term: 'Bezpiecznik',
+    definition: 'Element zabezpieczający instalację elektryczną przed przeciążeniem i zwarciem.',
+    details: 'Bezpiecznik topikowy zawiera drut z materiału o niskiej temperaturze topnienia. Gdy prąd przekroczy wartość nominalną, drut się przegrzewa i topi, przerywając obwód.',
+    examples: ['16A w mieszkaniu', '10A samochodowy'],
+    formula: 'I = P/U',
+    icon: '⚡',
+    category: 'elektryka',
+    audioDescription: 'Element zabezpieczający przed przepięciem'
+  },
+  'przeciążenie': {
+    term: 'Przeciążenie',
+    definition: 'Stan gdy przez obwód płynie prąd większy niż dopuszczalny.',
+    details: 'Występuje gdy podłączymy zbyt wiele urządzeń. Może spowodować przegrzanie i pożar.',
+    examples: ['Kilka grzejników na jednym gniazdku'],
+    formula: 'P = U × I',
+    icon: '🔥',
+    category: 'bezpieczeństwo',
+    audioDescription: 'Zbyt duży prąd w obwodzie'
+  },
+  'obwód': {
+    term: 'Obwód elektryczny',
+    definition: 'Zamknięta droga przepływu prądu.',
+    details: 'Składa się ze źródła napięcia, przewodów i odbiornika.',
+    visualAid: '🔌→💡→🔌',
+    icon: '🔄',
+    category: 'podstawy',
+    audioDescription: 'Zamknięta pętla dla prądu'
+  }
+};
+
+// ============================================
+// ADAPTIVE LEARNING ENGINE
+// ============================================
+
+class AdaptiveLearningEngine {
+  constructor() {
+    this.userProfile = {
+      learningSpeed: 'normal',
+      preferredDifficulty: 2,
+      strongConcepts: [],
+      weakConcepts: [],
+      avgResponseTime: 0,
+      totalResponses: 0
+    };
+  }
+
+  analyzeResponse(text, timeSpent) {
+    const analysis = {
+      score: 0,
+      quality: 'poor',
+      speed: 'normal',
+      suggestions: [],
+      nextDifficulty: this.userProfile.preferredDifficulty
+    };
+
+    const normalized = text.toLowerCase();
+    const wordCount = text.split(' ').length;
+    
+    if (wordCount > 50) analysis.score += 30;
+    else if (wordCount > 20) analysis.score += 20;
+    else analysis.score += 10;
+
+    if (timeSpent < 30) {
+      analysis.speed = 'fast';
+      analysis.score += 10;
+    } else if (timeSpent > 120) {
+      analysis.speed = 'slow';
+      analysis.suggestions.push('Spróbuj odpowiadać szybciej');
+    }
+
+    this.updateUserProfile(analysis.score, timeSpent);
+    
+    if (this.userProfile.learningSpeed === 'fast' && analysis.score > 70) {
+      analysis.nextDifficulty = Math.min(5, this.userProfile.preferredDifficulty + 1);
+      analysis.suggestions.push('Zwiększam poziom trudności');
+    } else if (this.userProfile.learningSpeed === 'slow' && analysis.score < 40) {
+      analysis.nextDifficulty = Math.max(1, this.userProfile.preferredDifficulty - 1);
+      analysis.suggestions.push('Zmniejszam poziom trudności');
+    }
+
+    if (analysis.score >= 70) analysis.quality = 'excellent';
+    else if (analysis.score >= 50) analysis.quality = 'good';
+    else if (analysis.score >= 30) analysis.quality = 'moderate';
+
+    return analysis;
+  }
+
+  updateUserProfile(score, timeSpent) {
+    this.userProfile.totalResponses++;
+    this.userProfile.avgResponseTime = 
+      (this.userProfile.avgResponseTime * (this.userProfile.totalResponses - 1) + timeSpent) 
+      / this.userProfile.totalResponses;
+
+    if (this.userProfile.avgResponseTime < 45 && score > 60) {
+      this.userProfile.learningSpeed = 'fast';
+    } else if (this.userProfile.avgResponseTime > 90 || score < 40) {
+      this.userProfile.learningSpeed = 'slow';
+    } else {
+      this.userProfile.learningSpeed = 'normal';
+    }
+  }
+
+  getSuggestedTopic() {
+    const allTopics = Object.values(Curriculum).flatMap(level => level.topics);
+    const uncompletedTopics = allTopics.filter(t => !t.completed);
+    
+    return uncompletedTopics.find(t => 
+      Math.abs(t.difficulty - this.userProfile.preferredDifficulty) <= 1
+    ) || uncompletedTopics[0];
+  }
+}
+
+// ============================================
+// ACCESSIBILITY CONTEXT
+// ============================================
+
+const AccessibilityContext = createContext({
+  highContrast: false,
+  fontSize: 'normal',
+  reduceMotion: false,
+  screenReaderMode: false,
+  darkMode: false
+});
+
+const AccessibilityProvider = ({ children }) => {
+  const [settings, setSettings] = useState({
+    highContrast: false,
+    fontSize: 'normal',
+    reduceMotion: false,
+    screenReaderMode: false,
+    darkMode: false
+  });
+
+  useEffect(() => {
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const prefersDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    
+    setSettings(prev => ({
+      ...prev,
+      reduceMotion: prefersReducedMotion,
+      darkMode: prefersDarkMode
+    }));
+  }, []);
+
+  return (
+    <AccessibilityContext.Provider value={{ settings, setSettings }}>
+      {children}
+    </AccessibilityContext.Provider>
+  );
+};
+
+// ============================================
+// ENHANCED TOOLTIP WITH ACCESSIBILITY
+// ============================================
+
+const EnhancedTooltip = memo(({ term, children }) => {
+  const [isVisible, setIsVisible] = useState(false);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [focusVisible, setFocusVisible] = useState(false);
+  const tooltipRef = useRef(null);
+  const timeoutRef = useRef(null);
+  const { settings } = useContext(AccessibilityContext);
+
+  const knowledge = KnowledgeBase[term.toLowerCase()] || null;
+
+  const showTooltip = useCallback((e) => {
+    if (!knowledge) return;
+    
+    const rect = e.currentTarget.getBoundingClientRect();
+    setPosition({
+      x: rect.left + rect.width / 2,
+      y: rect.top
+    });
+    
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
+      setIsVisible(true);
+    }, 500);
+  }, [knowledge]);
+
+  const hideTooltip = useCallback(() => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    setIsVisible(false);
+    setFocusVisible(false);
+  }, []);
+
+  const handleKeyDown = useCallback((e) => {
+    if (e.key === 'Escape') {
+      hideTooltip();
+    }
+  }, [hideTooltip]);
+
+  if (!knowledge) return <span>{children}</span>;
+
+  return (
+    <>
+      <span
+        className={`
+          relative inline-block border-b-2 border-dotted cursor-help
+          ${settings.highContrast ? 'border-black text-black font-bold' : 'border-blue-400 text-blue-700'}
+          hover:border-blue-600 transition-colors
+          focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded
+        `}
+        onMouseEnter={showTooltip}
+        onMouseLeave={hideTooltip}
+        onFocus={(e) => {
+          setFocusVisible(true);
+          showTooltip(e);
+        }}
+        onBlur={hideTooltip}
+        onKeyDown={handleKeyDown}
+        tabIndex={0}
+        role="button"
+        aria-label={`${children} - kliknij aby zobaczyć definicję`}
+        aria-describedby={isVisible ? 'tooltip-content' : undefined}
+      >
+        {children}
+      </span>
+      
+      {isVisible && (
+        <div
+          ref={tooltipRef}
+          className="fixed z-[9999] pointer-events-none"
+          style={{
+            left: `${position.x}px`,
+            top: `${position.y - 10}px`,
+            transform: 'translate(-50%, -100%)'
+          }}
+          role="tooltip"
+          aria-live="polite"
+        >
+          <div className={`
+            ${settings.darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'}
+            ${settings.highContrast ? 'border-4 border-black' : 'border border-gray-200'}
+            rounded-xl shadow-2xl p-4 max-w-sm
+          `}>
+            <div className="flex items-start gap-3 mb-3">
+              <span className="text-2xl" aria-hidden="true">{knowledge.icon}</span>
+              <div className="flex-1">
+                <h4 className={`font-bold ${settings.fontSize === 'large' ? 'text-lg' : 'text-base'}`}>
+                  {knowledge.term}
+                </h4>
+                <span className={`
+                  ${settings.darkMode ? 'bg-blue-900 text-blue-100' : 'bg-blue-50 text-blue-600'}
+                  px-2 py-0.5 rounded-full inline-block mt-1
+                  ${settings.fontSize === 'large' ? 'text-sm' : 'text-xs'}
+                `}>
+                  {knowledge.category}
+                </span>
+              </div>
+            </div>
+
+            <p className={`${settings.fontSize === 'large' ? 'text-base' : 'text-sm'} mb-3`}>
+              {knowledge.definition}
+            </p>
+
+            {knowledge.examples && (
+              <div className="border-t pt-3">
+                <p className={`font-semibold mb-2 ${settings.fontSize === 'large' ? 'text-sm' : 'text-xs'}`}>
+                  Przykłady:
+                </p>
+                <ul className={settings.fontSize === 'large' ? 'text-sm' : 'text-xs'}>
+                  {knowledge.examples.map((example, idx) => (
+                    <li key={idx}>• {example}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {focusVisible && (
+              <button
+                onClick={hideTooltip}
+                className="mt-3 text-xs underline"
+                aria-label="Zamknij podpowiedź"
+              >
+                Zamknij (ESC)
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
+});
+
+// ============================================
+// ENHANCED REDUCER WITH UNDO
+// ============================================
+
+const initialState = {
+  phase: 'welcome',
+  selectedLevel: 'beginner',
+  selectedTopic: null,
+  selectedDuck: 'beginner',
+  understanding: 0,
+  messages: [],
+  messageHistory: [],
+  inputText: '',
+  timer: 0,
+  responseStartTime: null,
+  isActive: false,
+  showHint: false,
+  isTyping: false,
+  isLoading: false,
+  sessionStats: {
+    questionsAnswered: 0,
+    hintsUsed: 0,
+    accuracy: 0,
+    termsExplored: [],
+    avgResponseTime: 0,
+    undoCount: 0
+  },
+  achievements: [],
+  errors: [],
+  adaptiveDifficulty: 2
+};
+
+const enhancedReducer = (state, action) => {
+  switch (action.type) {
+    case 'START_LEARNING':
+      return {
+        ...state,
+        phase: 'learning',
+        isActive: true,
+        selectedTopic: action.payload.topic,
+        messages: action.payload.messages,
+        responseStartTime: Date.now()
+      };
+    
+    case 'SEND_MESSAGE':
+      return {
+        ...state,
+        messages: [...state.messages, action.payload],
+        messageHistory: [...state.messageHistory, state.messages],
+        inputText: '',
+        isTyping: true,
+        isLoading: true
+      };
+    
+    case 'UNDO_MESSAGE':
+      if (state.messageHistory.length > 0) {
+        const previousMessages = state.messageHistory[state.messageHistory.length - 1];
+        return {
+          ...state,
+          messages: previousMessages,
+          messageHistory: state.messageHistory.slice(0, -1),
+          sessionStats: {
+            ...state.sessionStats,
+            undoCount: state.sessionStats.undoCount + 1
+          }
+        };
+      }
+      return state;
+    
+    case 'RECEIVE_RESPONSE':
+      const responseTime = Date.now() - state.responseStartTime;
+      return {
+        ...state,
+        messages: [...state.messages, action.payload.message],
+        understanding: Math.min(100, state.understanding + action.payload.scoreIncrease),
+        isTyping: false,
+        isLoading: false,
+        responseStartTime: Date.now(),
+        sessionStats: {
+          ...state.sessionStats,
+          questionsAnswered: state.sessionStats.questionsAnswered + 1,
+          accuracy: action.payload.accuracy,
+          avgResponseTime: 
+            (state.sessionStats.avgResponseTime * state.sessionStats.questionsAnswered + responseTime) 
+            / (state.sessionStats.questionsAnswered + 1)
+        },
+        adaptiveDifficulty: action.payload.nextDifficulty || state.adaptiveDifficulty
+      };
+    
+    case 'ADD_ERROR':
+      return {
+        ...state,
+        errors: [...state.errors, { 
+          id: Date.now(), 
+          message: action.payload, 
+          severity: action.severity || 'error' 
+        }],
+        isLoading: false,
+        isTyping: false
+      };
+    
+    case 'CLEAR_ERROR':
+      return {
+        ...state,
+        errors: state.errors.filter(e => e.id !== action.payload)
+      };
+    
+    case 'UNLOCK_ACHIEVEMENT':
+      if (!state.achievements.find(a => a.id === action.payload.id)) {
+        return {
+          ...state,
+          achievements: [...state.achievements, action.payload]
+        };
+      }
+      return state;
+    
+    case 'UPDATE_TIMER':
+      return {
+        ...state,
+        timer: state.timer + 1
+      };
+    
+    case 'COMPLETE_SESSION':
+      return {
+        ...state,
+        phase: 'complete',
+        isActive: false
+      };
+    
+    case 'RESET_SESSION':
+      return {
+        ...initialState,
+        achievements: state.achievements
+      };
+    
+    default:
+      return state;
+  }
+};
+
+// ============================================
+// HEADER COMPONENT
+// ============================================
+
+const Header = memo(({ state, onReset, onSettings }) => {
+  const { settings } = useContext(AccessibilityContext);
+  
+  return (
+    <header className={`
+      ${settings.darkMode ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}
+      border-b sticky top-0 z-40 backdrop-blur-md bg-opacity-90
+    `}>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            {state.phase !== 'welcome' && (
+              <button
+                onClick={onReset}
+                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                aria-label="Wróć do menu głównego"
+              >
+                <ChevronLeft className="w-5 h-5"/>
+              </button>
+            )}
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
+                <GraduationCap className="w-6 h-6 text-white"/>
+              </div>
+              <div>
+                <h1 className={`font-bold ${settings.fontSize === 'large' ? 'text-2xl' : 'text-xl'}`}>
+                  Duck Teaching System
+                </h1>
+                <p className={`text-gray-500 ${settings.fontSize === 'large' ? 'text-base' : 'text-xs'}`}>
+                  Adaptacyjne uczenie z AI
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          <button
+            onClick={onSettings}
+            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            aria-label="Ustawienia dostępności"
+          >
+            <Settings className="w-5 h-5"/>
+          </button>
+        </div>
+      </div>
+    </header>
+  );
+});
+
+// ============================================
+// MESSAGE LIST COMPONENT
+// ============================================
+
+const MessageList = memo(({ messages, isTyping }) => {
+  const messagesEndRef = useRef(null);
+  const { settings } = useContext(AccessibilityContext);
+  
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: settings.reduceMotion ? 'auto' : 'smooth' });
+  }, [messages, settings.reduceMotion]);
+  
+  return (
+    <div className="flex-1 overflow-y-auto p-6" role="log" aria-live="polite">
+      <div className="space-y-4">
+        {messages.map((msg, idx) => (
+          <div key={idx} className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`max-w-lg ${msg.type === 'user' ? 'order-2' : 'order-1'}`}>
+              {msg.type === 'duck' && (
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-2xl" aria-hidden="true">{msg.avatar}</span>
+                  <span className={`font-medium ${settings.fontSize === 'large' ? 'text-base' : 'text-sm'}`}>
+                    {msg.sender}
+                  </span>
+                </div>
+              )}
+              <div className={`
+                rounded-2xl px-5 py-3
+                ${msg.type === 'user' 
+                  ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white' 
+                  : msg.type === 'system'
+                  ? 'bg-gray-100 text-gray-700 italic'
+                  : 'bg-white border border-gray-200 text-gray-800 shadow-md'
+                }
+                ${settings.fontSize === 'large' ? 'text-base' : 'text-sm'}
+              `}>
+                <p>{msg.content}</p>
+              </div>
+            </div>
+          </div>
+        ))}
+        
+        {isTyping && (
+          <div className="flex justify-start">
+            <div className="bg-white border border-gray-200 rounded-2xl px-5 py-3 shadow-md">
+              <Loader2 className="w-4 h-4 animate-spin"/>
+            </div>
+          </div>
+        )}
+        
+        <div ref={messagesEndRef}/>
+      </div>
+    </div>
+  );
+});
+
+// ============================================
+// INPUT AREA COMPONENT
+// ============================================
+
+const InputArea = memo(({ 
+  inputText, 
+  onInputChange, 
+  onSend, 
+  onUndo, 
+  disabled, 
+  canUndo 
+}) => {
+  const { settings } = useContext(AccessibilityContext);
+  
+  return (
+    <div className={`
+      border-t p-4
+      ${settings.darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}
+    `}>
+      <div className="flex gap-3">
+        {canUndo && (
+          <button
+            onClick={onUndo}
+            className="p-3 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            aria-label="Cofnij ostatnią wiadomość"
+            title="Cofnij (Ctrl+Z)"
+          >
+            <Undo className="w-5 h-5"/>
+          </button>
+        )}
+        
+        <input
+          type="text"
+          value={inputText}
+          onChange={(e) => onInputChange(e.target.value)}
+          onKeyPress={(e) => e.key === 'Enter' && !disabled && onSend()}
+          placeholder="Wyjaśnij używając poznanych pojęć..."
+          className={`
+            flex-1 px-4 py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-blue-500
+            ${settings.darkMode 
+              ? 'bg-gray-700 border-gray-600 text-white' 
+              : 'bg-gray-50 border-gray-200 text-gray-900'
+            }
+            ${settings.fontSize === 'large' ? 'text-base' : 'text-sm'}
+          `}
+          disabled={disabled}
+          aria-label="Pole tekstowe do wpisania wyjaśnienia"
+        />
+        
+        <button
+          onClick={onSend}
+          disabled={!inputText.trim() || disabled}
+          className={`
+            px-6 py-3 rounded-xl font-medium transition-all
+            ${!inputText.trim() || disabled
+              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              : 'bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700'
+            }
+            flex items-center gap-2
+          `}
+          aria-label="Wyślij wiadomość"
+        >
+          <Send className="w-4 h-4"/>
+          <span>Wyślij</span>
+        </button>
+      </div>
+    </div>
+  );
+});
+
+// ============================================
+// SETTINGS MODAL
+// ============================================
+
+const SettingsModal = memo(({ isOpen, onClose }) => {
+  const { settings, setSettings } = useContext(AccessibilityContext);
+  
+  if (!isOpen) return null;
+  
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+      <div className={`
+        ${settings.darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'}
+        rounded-2xl shadow-2xl p-6 max-w-md w-full
+      `}>
+        <h2 className="text-xl font-bold mb-6">Ustawienia dostępności</h2>
+        
+        <div className="space-y-4">
+          <label className="flex items-center justify-between">
+            <span>Tryb ciemny</span>
+            <button
+              onClick={() => setSettings({...settings, darkMode: !settings.darkMode})}
+              className={`
+                w-12 h-6 rounded-full transition-colors
+                ${settings.darkMode ? 'bg-blue-500' : 'bg-gray-300'}
+              `}
+              role="switch"
+              aria-checked={settings.darkMode}
+            >
+              <div className={`
+                w-5 h-5 bg-white rounded-full transition-transform
+                ${settings.darkMode ? 'translate-x-6' : 'translate-x-0.5'}
+              `}/>
+            </button>
+          </label>
+          
+          <label className="flex items-center justify-between">
+            <span>Wysoki kontrast</span>
+            <button
+              onClick={() => setSettings({...settings, highContrast: !settings.highContrast})}
+              className={`
+                w-12 h-6 rounded-full transition-colors
+                ${settings.highContrast ? 'bg-blue-500' : 'bg-gray-300'}
+              `}
+              role="switch"
+              aria-checked={settings.highContrast}
+            >
+              <div className={`
+                w-5 h-5 bg-white rounded-full transition-transform
+                ${settings.highContrast ? 'translate-x-6' : 'translate-x-0.5'}
+              `}/>
+            </button>
+          </label>
+          
+          <label className="flex items-center justify-between">
+            <span>Duża czcionka</span>
+            <button
+              onClick={() => setSettings({...settings, fontSize: settings.fontSize === 'large' ? 'normal' : 'large'})}
+              className={`
+                w-12 h-6 rounded-full transition-colors
+                ${settings.fontSize === 'large' ? 'bg-blue-500' : 'bg-gray-300'}
+              `}
+              role="switch"
+              aria-checked={settings.fontSize === 'large'}
+            >
+              <div className={`
+                w-5 h-5 bg-white rounded-full transition-transform
+                ${settings.fontSize === 'large' ? 'translate-x-6' : 'translate-x-0.5'}
+              `}/>
+            </button>
+          </label>
+          
+          <label className="flex items-center justify-between">
+            <span>Ograniczone animacje</span>
+            <button
+              onClick={() => setSettings({...settings, reduceMotion: !settings.reduceMotion})}
+              className={`
+                w-12 h-6 rounded-full transition-colors
+                ${settings.reduceMotion ? 'bg-blue-500' : 'bg-gray-300'}
+              `}
+              role="switch"
+              aria-checked={settings.reduceMotion}
+            >
+              <div className={`
+                w-5 h-5 bg-white rounded-full transition-transform
+                ${settings.reduceMotion ? 'translate-x-6' : 'translate-x-0.5'}
+              `}/>
+            </button>
+          </label>
+        </div>
+        
+        <button
+          onClick={onClose}
+          className="w-full mt-6 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+        >
+          Zamknij
+        </button>
+      </div>
+    </div>
+  );
+});
+
+// ============================================
+// MAIN ULTIMATE DUCK TEACHING COMPONENT
+// ============================================
+
+const UltimateDuckTeaching = () => {
+  const [state, dispatch] = useReducer(enhancedReducer, initialState);
+  const [showSettings, setShowSettings] = useState(false);
+  const adaptiveEngine = useRef(new AdaptiveLearningEngine()).current;
+  
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.ctrlKey && e.key === 'z') {
+        e.preventDefault();
+        dispatch({ type: 'UNDO_MESSAGE' });
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+  
+  // Timer
+  useEffect(() => {
+    let interval = null;
+    if (state.isActive) {
+      interval = setInterval(() => {
+        dispatch({ type: 'UPDATE_TIMER' });
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [state.isActive]);
+  
+  // Auto-save progress
+  useEffect(() => {
+    if (state.phase === 'learning') {
+      const progress = {
+        selectedLevel: state.selectedLevel,
+        selectedTopic: state.selectedTopic,
+        understanding: state.understanding,
+        achievements: state.achievements,
+        adaptiveDifficulty: state.adaptiveDifficulty
+      };
+      localStorage.setItem('ultimateDuckProgress', JSON.stringify(progress));
+    }
+  }, [state.selectedLevel, state.selectedTopic, state.understanding, state.achievements, state.adaptiveDifficulty, state.phase]);
+  
+  // Load saved progress
+  useEffect(() => {
+    const saved = localStorage.getItem('ultimateDuckProgress');
+    if (saved) {
+      try {
+        const progress = JSON.parse(saved);
+        if (progress.achievements) {
+          progress.achievements.forEach(achievement => {
+            dispatch({ type: 'UNLOCK_ACHIEVEMENT', payload: achievement });
+          });
+        }
+      } catch (e) {
+        console.error('Failed to load saved progress:', e);
+      }
+    }
+  }, []);
+  
+  // Check achievements
+  const checkAchievements = useCallback(() => {
+    if (state.sessionStats.questionsAnswered === 1 && !state.achievements.find(a => a.id === 'first_explanation')) {
+      dispatch({
+        type: 'UNLOCK_ACHIEVEMENT',
+        payload: {
+          id: 'first_explanation',
+          name: 'Pierwszy krok',
+          description: 'Ukończ pierwsze wyjaśnienie',
+          icon: '🎯',
+          xp: 50
+        }
+      });
+    }
+    
+    if (state.understanding >= 100 && state.sessionStats.hintsUsed === 0 && !state.achievements.find(a => a.id === 'no_hints')) {
+      dispatch({
+        type: 'UNLOCK_ACHIEVEMENT',
+        payload: {
+          id: 'no_hints',
+          name: 'Samodzielny',
+          description: 'Ukończ bez podpowiedzi',
+          icon: '💪',
+          xp: 100
+        }
+      });
+    }
+    
+    if (state.timer < 120 && state.understanding >= 100 && !state.achievements.find(a => a.id === 'speed_demon')) {
+      dispatch({
+        type: 'UNLOCK_ACHIEVEMENT',
+        payload: {
+          id: 'speed_demon',
+          name: 'Błyskawiczny',
+          description: 'Ukończ w mniej niż 2 minuty',
+          icon: '⚡',
+          xp: 75
+        }
+      });
+    }
+  }, [state.sessionStats, state.understanding, state.timer, state.achievements]);
+  
+  // Start learning
+  const startLearning = useCallback((topic) => {
+    const messages = [
+      {
+        type: 'system',
+        content: `📚 Temat: ${topic.title}`,
+        timestamp: new Date()
+      },
+      {
+        type: 'duck',
+        sender: 'Kaczka AI',
+        avatar: '🦆',
+        content: 'Cześć! Wytłumacz mi to zagadnienie tak, jakbyś uczył kogoś pierwszy raz.',
+        timestamp: new Date()
+      }
+    ];
+    
+    dispatch({
+      type: 'START_LEARNING',
+      payload: { topic, messages }
+    });
+  }, []);
+  
+  // Send message
+  const sendMessage = useCallback(() => {
+    if (!state.inputText.trim()) return;
+    
+    const userMessage = {
+      type: 'user',
+      content: state.inputText,
+      timestamp: new Date()
+    };
+    
+    dispatch({ type: 'SEND_MESSAGE', payload: userMessage });
+    
+    setTimeout(() => {
+      try {
+        const timeSpent = Math.floor((Date.now() - state.responseStartTime) / 1000);
+        const analysis = adaptiveEngine.analyzeResponse(state.inputText, timeSpent);
+        
+        let responseContent = '';
+        if (analysis.quality === 'excellent') {
+          responseContent = 'Świetne wyjaśnienie! Wszystko rozumiem.';
+          if (state.understanding + 30 >= 100) {
+            setTimeout(() => {
+              checkAchievements();
+              dispatch({ type: 'COMPLETE_SESSION' });
+            }, 2000);
+          }
+        } else if (analysis.quality === 'good') {
+          responseContent = 'Dobrze, ale możesz rozwinąć niektóre aspekty.';
+        } else {
+          responseContent = 'Hmm, nie do końca rozumiem. Możesz wyjaśnić inaczej?';
+        }
+        
+        if (analysis.suggestions.length > 0) {
+          responseContent += ` ${analysis.suggestions[0]}`;
+        }
+        
+        dispatch({
+          type: 'RECEIVE_RESPONSE',
+          payload: {
+            message: {
+              type: 'duck',
+              sender: 'Kaczka AI',
+              avatar: '🦆',
+              content: responseContent,
+              timestamp: new Date()
+            },
+            scoreIncrease: 30,
+            accuracy: 85,
+            nextDifficulty: analysis.nextDifficulty
+          }
+        });
+      } catch (error) {
+        dispatch({
+          type: 'ADD_ERROR',
+          payload: 'Wystąpił błąd podczas przetwarzania odpowiedzi',
+          severity: 'error'
+        });
+      }
+    }, 1500);
+  }, [state.inputText, state.responseStartTime, state.understanding, adaptiveEngine, checkAchievements]);
+  
+  // Format time
+  const formatTime = useCallback((seconds) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  }, []);
+  
+  // ============================================
+  // RENDER PHASES
+  // ============================================
+  
+  if (state.phase === 'welcome') {
+    return (
+      <AccessibilityProvider>
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+          <Header 
+            state={state} 
+            onReset={() => dispatch({ type: 'RESET_SESSION' })}
+            onSettings={() => setShowSettings(true)}
+          />
+          
+          <SettingsModal 
+            isOpen={showSettings}
+            onClose={() => setShowSettings(false)}
+          />
+          
+          <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl md:text-4xl font-bold text-gray-800 mb-4">
+                System Adaptacyjnego Uczenia
+              </h2>
+              <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+                Wybierz poziom i temat. System dostosuje trudność do Twojego tempa nauki.
+              </
