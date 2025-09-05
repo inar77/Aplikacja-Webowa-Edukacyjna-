@@ -1,0 +1,759 @@
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { 
+  MessageCircle, Brain, Heart, Zap, Trophy, Eye, ChevronRight, ChevronLeft,
+  Sparkles, Target, Lock, Unlock, AlertCircle, CheckCircle, XCircle,
+  RotateCw, TrendingUp, Clock, Layers, Package, Send, HelpCircle,
+  BookOpen, Users, Activity, Award, Star, ArrowRight, Lightbulb,
+  Shield, Wrench, AlertTriangle, BarChart3, PlayCircle, PauseCircle,
+  SkipForward, Flame, Droplet, Wind, Leaf, Moon, Sun,
+  Coffee, Battery, Wifi, Globe, Map, Navigation, Compass, Plus,
+  Hammer, Code, Palette, ChefHat, Dumbbell, Camera, Music, 
+  PenTool, Database, Cpu, Settings, Gift, Gem, Coins, Video,
+  FileText, Mic, Image, Shuffle, MoreVertical, HandHeart,
+  Home, MapPin, Earth
+} from 'lucide-react';
+
+// ==================== CONSTANTS ====================
+const CONSTANTS = {
+  THRESHOLDS: {
+    FATIGUE: 0.8,
+    FRUSTRATION: 0.7,
+    ENGAGEMENT_LOW: 0.3
+  },
+  XP: {
+    PER_LEVEL: 500,
+    STREAK_BONUS: 5,
+    DAILY_LOGIN: 50,
+    QUESTION_BONUS: 15,
+    HELP_BONUS: 30,
+    HUMILITY_BONUS: 20,
+    MISTAKE_ADMISSION: 25,
+    HELPING_OTHERS: 40
+  },
+  ANIMATIONS: {
+    DUCK_HAPPY: 'bounce',
+    DUCK_CONFUSED: 'shake', 
+    DUCK_THINKING: 'pulse',
+    DUCK_IMPRESSED: 'tada'
+  }
+};
+
+// ==================== EGO-PROTECTIVE SYSTEM ====================
+const EgoProtectiveSystem = {
+  responses: {
+    firstAttempt: [
+      "Ciekawe podejście! Spróbujmy spojrzeć na to z innej strony...",
+      "Dobry kierunek myślenia! Rozwijmy to dalej...",
+      "To pokazuje, że myślisz kreatywnie! Dodajmy jeszcze jeden element..."
+    ],
+    secondAttempt: [
+      "To rzeczywiście skomplikowane. Pokażę ci wskazówkę...",
+      "Wielu ludzi ma z tym problem. Rozłóżmy to na mniejsze części...",
+      "Nawet eksperci potrzebowali czasu, żeby to zrozumieć. Spróbujmy razem..."
+    ],
+    thirdAttempt: [
+      "Razem to rozgryzemy! Zacznijmy od podstaw...",
+      "To normalne, że to wymaga czasu. Każdy uczy się w swoim tempie.",
+      "Cenię twoją wytrwałość! Podejdźmy do tego krok po kroku..."
+    ],
+    encouragement: [
+      "Pamiętaj: każdy ekspert był kiedyś początkującym",
+      "To, że pytasz, pokazuje mądrość - głupcy udają, że wszystko wiedzą",
+      "Twoja ciekawość to twoja siła",
+      "Błędy to najlepsi nauczyciele"
+    ]
+  },
+  
+  getResponse(attemptNumber) {
+    const responses = attemptNumber === 1 ? this.responses.firstAttempt :
+                     attemptNumber === 2 ? this.responses.secondAttempt :
+                     this.responses.thirdAttempt;
+    return responses[Math.floor(Math.random() * responses.length)];
+  },
+  
+  getEncouragement() {
+    return this.responses.encouragement[Math.floor(Math.random() * this.responses.encouragement.length)];
+  }
+};
+
+// ==================== SOCIAL IMPACT TRACKER ====================
+const SocialImpactTracker = () => {
+  const impacts = [
+    { 
+      scale: 'Rodzina', 
+      description: 'Zaoszczędzisz ~2000 zł rocznie na naprawach',
+      icon: Home,
+      color: 'text-blue-500'
+    },
+    { 
+      scale: 'Okolica', 
+      description: 'Możesz pomóc 5-10 sąsiadom miesięcznie',
+      icon: MapPin,
+      color: 'text-green-500'
+    },
+    { 
+      scale: 'Społeczeństwo', 
+      description: 'Zmniejszysz zapotrzebowanie na drogie usługi',
+      icon: Earth,
+      color: 'text-purple-500'
+    }
+  ];
+  
+  return (
+    <div className="bg-gradient-to-r from-green-900/20 to-blue-900/20 p-6 rounded-2xl mb-6 border border-green-500/30">
+      <h3 className="font-bold text-white mb-4 text-lg">Twój realny wpływ na świat:</h3>
+      <div className="space-y-3">
+        {impacts.map((impact, idx) => {
+          const Icon = impact.icon;
+          return (
+            <div key={idx} className="flex items-center gap-4 p-3 bg-black/20 rounded-lg">
+              <Icon className={`w-8 h-8 ${impact.color}`} />
+              <div className="flex-1">
+                <span className="font-semibold text-white">{impact.scale}:</span>
+                <p className="text-gray-300 text-sm mt-1">{impact.description}</p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-4 p-3 bg-yellow-900/30 rounded-lg border border-yellow-500/30">
+        <p className="text-yellow-300 text-sm italic">
+          "Ucząc się sam, dajesz przykład innym. To prawdziwa zmiana społeczna."
+        </p>
+      </div>
+    </div>
+  );
+};
+
+// ==================== COMMUNITY SUPPORT (No Competition) ====================
+const CommunitySupport = () => {
+  const [helpRequests] = useState([
+    { id: 1, type: 'electric', description: 'wymiana gniazdka', location: 'Twoja okolica', anonymous: true },
+    { id: 2, type: 'plumbing', description: 'cieknący kran', location: '2 km od Ciebie', anonymous: true }
+  ]);
+  
+  const [communityStats] = useState({
+    weeklyHelps: 47,
+    savedMoney: 12500,
+    learnedSkills: 23
+  });
+  
+  return (
+    <div className="bg-gradient-to-r from-purple-900/20 to-pink-900/20 p-6 rounded-2xl border border-purple-500/30">
+      <h3 className="font-bold text-white mb-4 flex items-center gap-2">
+        <HandHeart className="w-5 h-5 text-purple-400" />
+        Społeczność Wzajemnej Pomocy
+      </h3>
+      
+      <div className="space-y-3 mb-4">
+        {helpRequests.map(request => (
+          <div key={request.id} className="p-4 bg-black/30 rounded-lg border-l-4 border-blue-500">
+            <p className="text-gray-300 text-sm">
+              Ktoś z <span className="font-semibold">{request.location}</span> potrzebuje pomocy:
+            </p>
+            <p className="text-white font-medium mt-1">{request.description}</p>
+            <button className="text-blue-400 text-sm mt-2 hover:text-blue-300">
+              Mogę pomóc (anonimowo) →
+            </button>
+          </div>
+        ))}
+      </div>
+      
+      <div className="bg-black/20 rounded-lg p-4">
+        <p className="text-center text-gray-300">
+          Razem w tym tygodniu:
+        </p>
+        <div className="grid grid-cols-3 gap-3 mt-3">
+          <div className="text-center">
+            <p className="text-2xl font-bold text-green-400">{communityStats.weeklyHelps}</p>
+            <p className="text-xs text-gray-400">napraw</p>
+          </div>
+          <div className="text-center">
+            <p className="text-2xl font-bold text-yellow-400">{communityStats.savedMoney} zł</p>
+            <p className="text-xs text-gray-400">zaoszczędzone</p>
+          </div>
+          <div className="text-center">
+            <p className="text-2xl font-bold text-purple-400">{communityStats.learnedSkills}</p>
+            <p className="text-xs text-gray-400">nowych umiejętności</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ==================== SKILL JOURNEY MAP ====================
+const SkillJourneyMap = ({ currentPosition, completedStations, nextStation }) => {
+  const stations = [
+    { name: 'Start', position: 10 },
+    { name: 'Podstawy', position: 25 },
+    { name: 'Praktyka', position: 40 },
+    { name: 'Doświadczenie', position: 55 },
+    { name: 'Pewność', position: 70 },
+    { name: 'Mistrzostwo', position: 85 },
+    { name: 'Mentor', position: 100 }
+  ];
+  
+  return (
+    <div className="bg-gradient-to-r from-blue-900/20 to-purple-900/20 p-6 rounded-2xl border border-blue-500/30">
+      <h3 className="font-bold text-white mb-4">Twoja droga rozwoju</h3>
+      
+      <div className="relative h-24">
+        <svg viewBox="0 0 400 100" className="w-full h-full">
+          {/* Trasa */}
+          <path
+            d="M 20 50 Q 100 30 200 50 T 380 50"
+            stroke="rgba(59, 130, 246, 0.3)"
+            strokeWidth="3"
+            fill="none"
+            strokeDasharray="5,5"
+          />
+          
+          {/* Stacje */}
+          {stations.map((station, idx) => {
+            const x = (station.position / 100) * 360 + 20;
+            const isCompleted = completedStations >= idx;
+            
+            return (
+              <g key={idx}>
+                <circle
+                  cx={x}
+                  cy={50}
+                  r={isCompleted ? 8 : 6}
+                  fill={isCompleted ? '#10B981' : '#6B7280'}
+                  className={isCompleted ? 'drop-shadow-lg' : ''}
+                />
+                <text
+                  x={x}
+                  y={75}
+                  textAnchor="middle"
+                  className="fill-gray-400 text-xs"
+                >
+                  {station.name}
+                </text>
+              </g>
+            );
+          })}
+          
+          {/* Aktualna pozycja */}
+          <circle
+            cx={(currentPosition / 100) * 360 + 20}
+            cy={50}
+            r={10}
+            fill="#F59E0B"
+            className="animate-pulse"
+          />
+        </svg>
+      </div>
+      
+      <div className="mt-4 text-center">
+        <p className="text-gray-400 text-sm">
+          Następny przystanek: <span className="font-bold text-white">{nextStation}</span>
+        </p>
+        <p className="text-xs text-gray-500 mt-1">
+          Pamiętaj: to nie wyścig, to podróż
+        </p>
+      </div>
+    </div>
+  );
+};
+
+// ==================== MICRO REWARDS ====================
+const MicroReward = ({ type, message }) => {
+  const rewards = {
+    curiosity: { emoji: '🔍', bg: 'bg-blue-100', border: 'border-blue-300', text: 'text-blue-700' },
+    persistence: { emoji: '💪', bg: 'bg-orange-100', border: 'border-orange-300', text: 'text-orange-700' },
+    helpfulness: { emoji: '🤝', bg: 'bg-green-100', border: 'border-green-300', text: 'text-green-700' },
+    creativity: { emoji: '💡', bg: 'bg-yellow-100', border: 'border-yellow-300', text: 'text-yellow-700' },
+    humility: { emoji: '🙏', bg: 'bg-purple-100', border: 'border-purple-300', text: 'text-purple-700' }
+  };
+  
+  const reward = rewards[type] || rewards.curiosity;
+  
+  return (
+    <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full ${reward.bg} ${reward.border} border animate-bounce-in`}>
+      <span className="text-lg">{reward.emoji}</span>
+      <span className={`text-xs font-medium ${reward.text}`}>{message}</span>
+    </div>
+  );
+};
+
+// ==================== ENHANCED DUCK ENGINE WITH NATURAL BEHAVIORS ====================
+class DuckEngine {
+  constructor(personality = 'humble') {
+    this.personalities = {
+      humble: {
+        name: 'Skromna Kaczka',
+        icon: '🦆',
+        frustrationThreshold: 1.0, // Nigdy się nie frustruje
+        encouragementRate: 0.9,
+        hintGenerosity: 0.8,
+        style: 'przyjacielski i cierpliwy',
+        behaviors: {
+          thinking: "🦆💭 *zastanawia się chwilę*",
+          excited: "🦆✨ *macha skrzydłami z entuzjazmem*",
+          confused: "🦆🤔 *drapie się po głowie*",
+          happy: "🦆😊 *kiwa głową z aprobatą*",
+          tired: "🦆😴 *ziewa*"
+        },
+        responses: {
+          greeting: [
+            "Cześć! Też się uczę. Wytłumaczysz mi to po swojemu?",
+            "Hej! Jestem ciekaw jak ty to rozumiesz. Opowiesz?"
+          ],
+          confused: [
+            "Hmm, to skomplikowane. Może spróbujmy razem to uprościć?",
+            "Nie jestem pewien czy dobrze rozumiem. Możesz inaczej?"
+          ],
+          understanding: [
+            "O! Zaczynam łapać! Ale powiedz jeszcze...",
+            "Super! To ma sens. A co z...?"
+          ],
+          impressed: [
+            "Wow! Teraz rozumiem! Jesteś świetnym nauczycielem!",
+            "Genialnie tłumaczysz! Wszystko jasne!"
+          ]
+        }
+      }
+    };
+    
+    this.currentPersonality = this.personalities[personality];
+    this.emotionalState = {
+      mood: 1.0,
+      engagement: 0.8,
+      understanding: 0,
+      attemptCount: 0
+    };
+    
+    this.history = [];
+    this.streakCounter = 0;
+    this.lastResponseTime = Date.now();
+    this.difficulty = 0.5; // Adaptacyjna trudność
+  }
+  
+  adjustDifficulty() {
+    if (this.history.length < 3) return;
+    
+    const recentScores = this.history.slice(-3).map(h => h.score);
+    const avgScore = recentScores.reduce((a, b) => a + b, 0) / recentScores.length;
+    
+    if (avgScore > 0.8) {
+      this.difficulty = Math.min(1.0, this.difficulty + 0.1);
+    } else if (avgScore < 0.4) {
+      this.difficulty = Math.max(0.3, this.difficulty - 0.1);
+    }
+    
+    // Dostosuj hojność podpowiedzi
+    this.currentPersonality.hintGenerosity = 1 - avgScore * 0.5;
+  }
+  
+  generateNaturalBehavior() {
+    const hour = new Date().getHours();
+    
+    if (hour >= 22 || hour < 6) {
+      return { behavior: this.currentPersonality.behaviors.tired, suggestion: 'late_night' };
+    } else if (this.emotionalState.understanding > 0.8) {
+      return { behavior: this.currentPersonality.behaviors.excited, suggestion: 'excited' };
+    } else if (this.emotionalState.understanding < 0.3) {
+      return { behavior: this.currentPersonality.behaviors.confused, suggestion: 'confused' };
+    }
+    
+    return { behavior: this.currentPersonality.behaviors.thinking, suggestion: 'normal' };
+  }
+  
+  generateResponse(userAnswer, expectedConcepts) {
+    const currentTime = Date.now();
+    const responseTime = currentTime - this.lastResponseTime;
+    this.lastResponseTime = currentTime;
+    
+    // Analiza odpowiedzi
+    const lowerAnswer = userAnswer.toLowerCase();
+    
+    // Punkty za pokorę i ciekawość
+    let score = 0;
+    let bonusType = null;
+    
+    // Sprawdź koncepty
+    expectedConcepts.forEach(concept => {
+      if (lowerAnswer.includes(concept.toLowerCase())) {
+        score += 25;
+      }
+    });
+    
+    // Bonusy za postawę
+    if (userAnswer.includes('?')) {
+      score += CONSTANTS.XP.QUESTION_BONUS;
+      bonusType = 'curiosity';
+    }
+    
+    if (/nie wiem|może|chyba|wydaje mi się/i.test(lowerAnswer)) {
+      score += CONSTANTS.XP.HUMILITY_BONUS;
+      bonusType = 'humility';
+    }
+    
+    if (/pomóż|pokaż|wyjaśnij/i.test(lowerAnswer)) {
+      score += CONSTANTS.XP.QUESTION_BONUS;
+      bonusType = 'curiosity';
+    }
+    
+    score = Math.min(100, score);
+    
+    // Zapisz do historii
+    this.history.push({ score, timestamp: currentTime, answer: userAnswer });
+    
+    // Dostosuj trudność
+    this.adjustDifficulty();
+    
+    // Aktualizuj stan emocjonalny
+    this.emotionalState.understanding = Math.min(1, this.emotionalState.understanding + score/200);
+    this.emotionalState.attemptCount++;
+    
+    // Generuj naturalną reakcję
+    const naturalBehavior = this.generateNaturalBehavior();
+    
+    // Wybierz odpowiedź
+    let responseType;
+    if (score >= 80) {
+      responseType = 'impressed';
+      this.streakCounter++;
+    } else if (score >= 60) {
+      responseType = 'understanding';
+    } else {
+      responseType = 'confused';
+      this.streakCounter = 0;
+    }
+    
+    const responses = this.currentPersonality.responses[responseType];
+    const message = responses[Math.floor(Math.random() * responses.length)];
+    
+    return {
+      message,
+      behavior: naturalBehavior.behavior,
+      score,
+      streak: this.streakCounter,
+      xpBonus: score * 0.5 + (this.streakCounter * CONSTANTS.XP.STREAK_BONUS),
+      bonusType,
+      egoProtection: this.emotionalState.attemptCount <= 3 ? 
+        EgoProtectiveSystem.getResponse(this.emotionalState.attemptCount) : null,
+      encouragement: Math.random() < 0.3 ? EgoProtectiveSystem.getEncouragement() : null
+    };
+  }
+  
+  generateHint(concepts, previousAnswers = []) {
+    const unusedConcepts = concepts.filter(concept => 
+      !previousAnswers.some(answer => 
+        answer.toLowerCase().includes(concept.toLowerCase())
+      )
+    );
+    
+    if (unusedConcepts.length > 0) {
+      const concept = unusedConcepts[0];
+      const masked = concept.charAt(0) + '*'.repeat(concept.length - 2) + concept.charAt(concept.length - 1);
+      return `💡 Pomyśl o: "${masked}" (${concept.length} liter) - ${this.getDifficultyHint(concept)}`;
+    }
+    
+    return "💡 Spróbuj podać przykład z życia codziennego";
+  }
+  
+  getDifficultyHint(concept) {
+    const hints = {
+      'bezpiecznik': 'chroni przed przeciążeniem',
+      'zwarcie': 'gdy prąd idzie na skróty',
+      'przeciążenie': 'za dużo urządzeń naraz'
+    };
+    return hints[concept] || 'kluczowy element';
+  }
+}
+
+// ==================== MAIN ENHANCED COMPONENT ====================
+const EnhancedDuckTeaching = () => {
+  const [phase, setPhase] = useState('hub');
+  const [userProfile, setUserProfile] = useState({
+    name: 'Odkrywca',
+    level: 1,
+    xp: 0,
+    journeyPosition: 10,
+    completedStations: 0,
+    nextStation: 'Podstawy',
+    helpedPeople: 0,
+    questionsAsked: 0
+  });
+  
+  const [messages, setMessages] = useState([]);
+  const [userInput, setUserInput] = useState('');
+  const [duckEngine] = useState(() => new DuckEngine('humble'));
+  const [microRewards, setMicroRewards] = useState([]);
+  const [previousAnswers, setPreviousAnswers] = useState([]);
+  
+  const handleSendMessage = () => {
+    if (!userInput.trim()) return;
+    
+    // Dodaj wiadomość użytkownika
+    setMessages(prev => [...prev, {
+      type: 'user',
+      content: userInput
+    }]);
+    
+    setPreviousAnswers(prev => [...prev, userInput]);
+    
+    // Generuj odpowiedź kaczki
+    const response = duckEngine.generateResponse(
+      userInput,
+      ['bezpiecznik', 'prąd', 'przeciążenie', 'zwarcie']
+    );
+    
+    // Dodaj mikro-nagrodę jeśli jest
+    if (response.bonusType) {
+      const rewardMessage = response.bonusType === 'curiosity' ? 
+        `+${CONSTANTS.XP.QUESTION_BONUS} XP za ciekawość!` :
+        response.bonusType === 'humility' ?
+        `+${CONSTANTS.XP.HUMILITY_BONUS} XP za pokorę!` :
+        `+${response.xpBonus} XP!`;
+        
+      setMicroRewards(prev => [...prev, {
+        id: Date.now(),
+        type: response.bonusType,
+        message: rewardMessage
+      }]);
+      
+      // Usuń mikro-nagrodę po 3 sekundach
+      setTimeout(() => {
+        setMicroRewards(prev => prev.filter(r => r.id !== Date.now()));
+      }, 3000);
+    }
+    
+    // Odpowiedź kaczki
+    setTimeout(() => {
+      const messagesToAdd = [];
+      
+      // Ochrona ego jeśli potrzebna
+      if (response.egoProtection) {
+        messagesToAdd.push({
+          type: 'system',
+          content: response.egoProtection
+        });
+      }
+      
+      // Główna odpowiedź
+      messagesToAdd.push({
+        type: 'duck',
+        content: response.message,
+        behavior: response.behavior
+      });
+      
+      // Zachęta jeśli jest
+      if (response.encouragement) {
+        messagesToAdd.push({
+          type: 'system',
+          content: response.encouragement
+        });
+      }
+      
+      setMessages(prev => [...prev, ...messagesToAdd]);
+      
+      // Aktualizuj XP i poziom
+      const newXP = userProfile.xp + response.xpBonus;
+      const newLevel = Math.floor(newXP / CONSTANTS.XP.PER_LEVEL) + 1;
+      const journeyProgress = (newXP % CONSTANTS.XP.PER_LEVEL) / CONSTANTS.XP.PER_LEVEL * 100;
+      
+      setUserProfile(prev => ({
+        ...prev,
+        xp: newXP,
+        level: newLevel,
+        journeyPosition: Math.min(100, 10 + journeyProgress * 0.9),
+        completedStations: Math.floor(journeyProgress / 15),
+        questionsAsked: response.bonusType === 'curiosity' ? prev.questionsAsked + 1 : prev.questionsAsked
+      }));
+      
+      // Streak celebration
+      if (response.streak > 0 && response.streak % 3 === 0) {
+        setMessages(prev => [...prev, {
+          type: 'system',
+          content: `🔥 Seria ${response.streak} dobrych odpowiedzi! Świetnie ci idzie!`
+        }]);
+      }
+    }, 1500);
+    
+    setUserInput('');
+  };
+  
+  // Hub Screen
+  if (phase === 'hub') {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-900 via-purple-900/20 to-gray-900 p-6">
+        <div className="max-w-6xl mx-auto">
+          {/* Header with Journey Progress */}
+          <div className="mb-8">
+            <h1 className="text-4xl font-bold text-white text-center mb-2">
+              Twoja Droga Rozwoju
+            </h1>
+            <p className="text-gray-300 text-center">
+              Poziom {userProfile.level} • {userProfile.xp} XP
+            </p>
+          </div>
+          
+          {/* Journey Map */}
+          <SkillJourneyMap 
+            currentPosition={userProfile.journeyPosition}
+            completedStations={userProfile.completedStations}
+            nextStation={userProfile.nextStation}
+          />
+          
+          {/* Social Impact */}
+          <div className="mt-8">
+            <SocialImpactTracker />
+          </div>
+          
+          {/* Community Support */}
+          <div className="grid lg:grid-cols-2 gap-6">
+            <CommunitySupport />
+            
+            {/* Start Learning */}
+            <div className="bg-gradient-to-r from-blue-900/20 to-green-900/20 rounded-2xl p-6 border border-blue-500/30">
+              <h3 className="font-bold text-white mb-4">Gotowy na naukę?</h3>
+              
+              <div className="space-y-4">
+                <button
+                  onClick={() => setPhase('teaching')}
+                  className="w-full p-4 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl text-white font-bold hover:from-blue-700 hover:to-purple-700 transition-all transform hover:scale-[1.02]"
+                >
+                  <MessageCircle className="w-6 h-6 inline mr-2" />
+                  Rozpocznij rozmowę z Kaczką
+                </button>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-black/30 rounded-lg p-3 text-center">
+                    <p className="text-2xl font-bold text-blue-400">{userProfile.questionsAsked}</p>
+                    <p className="text-xs text-gray-400">pytań zadanych</p>
+                  </div>
+                  <div className="bg-black/30 rounded-lg p-3 text-center">
+                    <p className="text-2xl font-bold text-green-400">{userProfile.helpedPeople}</p>
+                    <p className="text-xs text-gray-400">osobom pomożono</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  // Teaching Phase
+  if (phase === 'teaching') {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-900 via-purple-900/20 to-gray-900 p-6">
+        <div className="max-w-4xl mx-auto">
+          <button
+            onClick={() => setPhase('hub')}
+            className="text-gray-400 hover:text-white mb-6 flex items-center gap-2"
+          >
+            <ChevronLeft className="w-5 h-5" />
+            Powrót do centrum
+          </button>
+          
+          {/* Micro Rewards Display */}
+          <div className="fixed top-20 right-6 space-y-2 z-50">
+            {microRewards.map(reward => (
+              <div key={reward.id} className="animate-slideIn">
+                <MicroReward type={reward.type} message={reward.message} />
+              </div>
+            ))}
+          </div>
+          
+          {/* Duck Visual */}
+          <div className="text-center mb-6">
+            <div className="text-8xl inline-block animate-pulse">
+              🦆
+            </div>
+            <p className="text-gray-400 mt-2">Skromna Kaczka - zawsze chętna do nauki</p>
+          </div>
+          
+          {/* Messages */}
+          <div className="bg-gray-800/50 rounded-2xl p-6 h-[400px] overflow-y-auto space-y-4">
+            {messages.length === 0 && (
+              <div className="text-center text-gray-400 mt-20">
+                <p className="text-lg mb-2">Cześć! Jestem kaczką, która chce się uczyć.</p>
+                <p>Możesz mi wytłumaczyć coś o bezpiecznikach? Słyszałam, że to ważne...</p>
+              </div>
+            )}
+            
+            {messages.map((msg, idx) => (
+              <div key={idx} className={`${msg.type === 'user' ? 'text-right' : 'text-left'}`}>
+                <div className={`inline-block max-w-md px-4 py-3 rounded-2xl ${
+                  msg.type === 'user' 
+                    ? 'bg-purple-600 text-white' 
+                    : msg.type === 'system'
+                      ? 'bg-yellow-900/50 text-yellow-300 border border-yellow-500/30'
+                      : 'bg-gray-700 text-white'
+                }`}>
+                  {msg.behavior && (
+                    <p className="text-xs opacity-75 mb-1 italic">{msg.behavior}</p>
+                  )}
+                  {msg.content}
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          {/* Helpful Prompts */}
+          <div className="mt-4 flex gap-2 flex-wrap justify-center">
+            <button 
+              onClick={() => setUserInput("Nie jestem pewien, czy dobrze rozumiem...")}
+              className="px-3 py-1 bg-purple-600/30 text-purple-300 rounded-lg hover:bg-purple-600/50 text-sm"
+            >
+              "Nie jestem pewien..."
+            </button>
+            <button 
+              onClick={() => setUserInput("Czy możesz mi pomóc zrozumieć?")}
+              className="px-3 py-1 bg-blue-600/30 text-blue-300 rounded-lg hover:bg-blue-600/50 text-sm"
+            >
+              "Pomóż mi zrozumieć"
+            </button>
+            <button 
+              onClick={() => setUserInput("Chyba zaczynam rozumieć, ale...")}
+              className="px-3 py-1 bg-green-600/30 text-green-300 rounded-lg hover:bg-green-600/50 text-sm"
+            >
+              "Chyba rozumiem..."
+            </button>
+          </div>
+          
+          {/* Input Area */}
+          <div className="mt-4 flex gap-2">
+            <input
+              type="text"
+              value={userInput}
+              onChange={(e) => setUserInput(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+              placeholder="Dziel się swoimi przemyśleniami, pytaj, eksploruj..."
+              className="flex-1 px-4 py-3 bg-gray-800 text-white rounded-xl border border-gray-600 focus:border-purple-500 focus:outline-none"
+            />
+            <button
+              onClick={() => {
+                const hint = duckEngine.generateHint(['bezpiecznik', 'prąd', 'przeciążenie'], previousAnswers);
+                setMessages(prev => [...prev, {
+                  type: 'system',
+                  content: hint
+                }]);
+              }}
+              className="px-4 py-3 bg-yellow-600 text-white rounded-xl hover:bg-yellow-700"
+              title="Podpowiedź"
+            >
+              💡
+            </button>
+            <button
+              onClick={handleSendMessage}
+              className="px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl hover:from-purple-700 hover:to-blue-700"
+            >
+              Wyślij
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  return null;
+};
+
+export default EnhancedDuckTeaching;
