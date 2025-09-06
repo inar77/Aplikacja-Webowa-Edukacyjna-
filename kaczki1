@@ -1,0 +1,651 @@
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { 
+  MessageCircle, Brain, Heart, Zap, Trophy, Eye, ChevronRight, ChevronLeft,
+  Sparkles, Target, Lock, Unlock, AlertCircle, CheckCircle, XCircle,
+  RotateCw, TrendingUp, Clock, Layers, Package, Send, HelpCircle,
+  BookOpen, Users, Activity, Award, Star, ArrowRight, Lightbulb,
+  Shield, Wrench, AlertTriangle, BarChart3, PlayCircle, PauseCircle,
+  Home, MapPin, Earth, HandHeart, Droplet, Hammer, Code, ChefHat,
+  Flame, Battery, Compass, Gift, Gem, Coins, Video, FileText, 
+  Mic, Image, Shuffle, MoreVertical, Settings, User, Bell
+} from 'lucide-react';
+
+// ==================== SKILL MODULES SYSTEM ====================
+const SkillModules = {
+  elektryka: {
+    id: 'elektryka',
+    name: 'Elektryka',
+    icon: '⚡',
+    color: 'from-yellow-600 to-orange-600',
+    mentor: { name: 'Sowa Elektra', emoji: '🦉', personality: 'mądra i metodyczna' },
+    concepts: ['bezpiecznik', 'prąd', 'zwarcie', 'przeciążenie', 'napięcie', 'uziemienie'],
+    hints: {
+      'bezpiecznik': 'chroni instalację przed przeciążeniem',
+      'zwarcie': 'gdy prąd idzie na skróty',
+      'przeciążenie': 'za dużo urządzeń naraz',
+      'napięcie': 'siła która pcha prąd',
+      'uziemienie': 'bezpieczna droga dla prądu'
+    },
+    intro: "Cześć! Jestem Sowa Elektra. Fascynuje mnie elektryczność! Możesz mi wytłumaczyć jak to działa?",
+    realWorldImpact: "Elektryk może zaoszczędzić rodzinie 2000 zł rocznie na naprawach",
+    challenges: [
+      { id: 1, description: "Wymiana gniazdka", xp: 100, difficulty: 1 },
+      { id: 2, description: "Instalacja lampy", xp: 150, difficulty: 2 },
+      { id: 3, description: "Naprawa bezpiecznika", xp: 200, difficulty: 3 }
+    ],
+    visualElements: {
+      background: 'bg-gradient-to-br from-yellow-900/20 via-orange-900/20 to-red-900/20',
+      accent: 'border-yellow-500/30',
+      glow: 'shadow-yellow-500/20'
+    }
+  },
+  
+  hydraulika: {
+    id: 'hydraulika',
+    name: 'Hydraulika',
+    icon: '💧',
+    color: 'from-blue-600 to-cyan-600',
+    mentor: { name: 'Bóbr Hydrox', emoji: '🦫', personality: 'praktyczny i cierpliwy' },
+    concepts: ['uszczelka', 'syfon', 'zawór', 'ciśnienie', 'odpływ', 'rura'],
+    hints: {
+      'syfon': 'blokuje zapachy z kanalizacji',
+      'uszczelka': 'zapobiega wyciekom',
+      'zawór': 'kontroluje przepływ wody',
+      'ciśnienie': 'siła wody w rurach',
+      'odpływ': 'droga wody do kanalizacji'
+    },
+    intro: "Hej! Jestem Bóbr Hydrox. Słyszałem że rury potrafią cieknąć... Opowiesz mi jak to naprawić?",
+    realWorldImpact: "Hydraulik oszczędza 100 litrów wody dziennie naprawiając krany",
+    challenges: [
+      { id: 1, description: "Naprawa cieknącego kranu", xp: 120, difficulty: 1 },
+      { id: 2, description: "Wymiana syfonu", xp: 180, difficulty: 2 },
+      { id: 3, description: "Udrożnienie rury", xp: 220, difficulty: 3 }
+    ],
+    visualElements: {
+      background: 'bg-gradient-to-br from-blue-900/20 via-cyan-900/20 to-teal-900/20',
+      accent: 'border-blue-500/30',
+      glow: 'shadow-blue-500/20'
+    }
+  }
+};
+
+// ==================== MODULAR ENGINE SYSTEM ====================
+class DuckEmotionEngine {
+  constructor() {
+    this.state = {
+      mood: 1.0,
+      engagement: 0.8,
+      understanding: 0,
+      curiosity: 0.8
+    };
+  }
+  
+  updateEmotion(score) {
+    this.state.understanding = Math.min(1, this.state.understanding + score/200);
+    this.state.mood = (this.state.understanding + this.state.engagement) / 2;
+    
+    return {
+      emoji: this.state.mood > 0.7 ? '😊' : this.state.mood > 0.4 ? '🤔' : '😕',
+      animation: this.state.mood > 0.7 ? 'bounce' : 'pulse'
+    };
+  }
+  
+  getBehavior() {
+    const hour = new Date().getHours();
+    if (hour >= 22 || hour < 6) return "*ziewa* Późno już...";
+    if (this.state.mood > 0.7) return "*macha skrzydłami z entuzjazmem*";
+    if (this.state.mood < 0.3) return "*drapie się po głowie*";
+    return "*słucha uważnie*";
+  }
+}
+
+class DuckResponseEngine {
+  constructor(skillModule) {
+    this.module = skillModule;
+    this.attemptCount = 0;
+  }
+  
+  analyzeResponse(text) {
+    const lowerText = text.toLowerCase();
+    let score = 0;
+    let foundConcepts = [];
+    
+    this.module.concepts.forEach(concept => {
+      if (lowerText.includes(concept.toLowerCase())) {
+        score += 20;
+        foundConcepts.push(concept);
+      }
+    });
+    
+    const bonuses = {
+      hasQuestion: text.includes('?') ? 15 : 0,
+      showsHumility: /nie wiem|może|chyba/i.test(lowerText) ? 20 : 0,
+      asksForHelp: /pomóż|pokaż|wyjaśnij/i.test(lowerText) ? 15 : 0
+    };
+    
+    score += Object.values(bonuses).reduce((a, b) => a + b, 0);
+    
+    return {
+      score: Math.min(100, score),
+      foundConcepts,
+      bonuses,
+      bonusType: bonuses.hasQuestion > 0 ? 'curiosity' : 
+                 bonuses.showsHumility > 0 ? 'humility' : 
+                 bonuses.asksForHelp > 0 ? 'helpfulness' : null
+    };
+  }
+  
+  generateResponse(analysis) {
+    this.attemptCount++;
+    
+    const responses = {
+      excellent: ["Wow! Teraz rozumiem! Świetnie tłumaczysz!", "Genialnie! Wszystko się układa!"],
+      good: ["Hmm, zaczynam rozumieć... Ale powiedz jeszcze...", "Dobry kierunek! Co dalej?"],
+      confused: ["Hmm, jeszcze nie łapię... Możesz inaczej?", "To skomplikowane... Może przykład?"]
+    };
+    
+    let type = analysis.score >= 80 ? 'excellent' : 
+               analysis.score >= 50 ? 'good' : 'confused';
+    
+    let egoProtection = null;
+    if (type === 'confused' && this.attemptCount <= 3) {
+      egoProtection = "To normalne że to wymaga czasu. Każdy uczy się w swoim tempie.";
+    }
+    
+    const message = responses[type][Math.floor(Math.random() * responses[type].length)];
+    
+    return { message, type, egoProtection };
+  }
+}
+
+// ==================== EVOLUTION SYSTEM ====================
+const EvolutionSystem = {
+  creatures: [
+    { level: 0, name: 'Jajko', emoji: '🥚', size: 'text-4xl' },
+    { level: 5, name: 'Pisklak', emoji: '🐣', size: 'text-5xl' },
+    { level: 10, name: 'Kurczak', emoji: '🐤', size: 'text-6xl' },
+    { level: 20, name: 'Kaczka', emoji: '🦆', size: 'text-7xl' },
+    { level: 30, name: 'Łabędź', emoji: '🦢', size: 'text-8xl' },
+    { level: 50, name: 'Orzeł', emoji: '🦅', size: 'text-8xl' }
+  ],
+  
+  getCurrentCreature(level) {
+    for (let i = this.creatures.length - 1; i >= 0; i--) {
+      if (level >= this.creatures[i].level) {
+        return this.creatures[i];
+      }
+    }
+    return this.creatures[0];
+  }
+};
+
+// ==================== VISUAL COMPONENTS ====================
+const VisualDiagram = ({ skill }) => {
+  const [hoveredPart, setHoveredPart] = useState(null);
+  const [clickedParts, setClickedParts] = useState(new Set());
+  
+  const diagrams = {
+    elektryka: {
+      parts: [
+        { id: 'fuse', x: 100, y: 50, width: 80, height: 60, label: 'Bezpiecznik', description: 'Chroni przed przeciążeniem' },
+        { id: 'wire', x: 200, y: 50, width: 100, height: 60, label: 'Przewód', description: 'Przewodzi prąd elektryczny' },
+        { id: 'socket', x: 320, y: 50, width: 80, height: 60, label: 'Gniazdko', description: 'Punkt podłączenia urządzeń' }
+      ]
+    },
+    hydraulika: {
+      parts: [
+        { id: 'valve', x: 100, y: 50, width: 80, height: 60, label: 'Zawór', description: 'Kontroluje przepływ' },
+        { id: 'pipe', x: 200, y: 50, width: 100, height: 60, label: 'Rura', description: 'Transportuje wodę' },
+        { id: 'siphon', x: 320, y: 50, width: 80, height: 60, label: 'Syfon', description: 'Blokuje zapachy' }
+      ]
+    }
+  };
+  
+  const currentDiagram = diagrams[skill.id] || diagrams.elektryka;
+  
+  return (
+    <div className={`${skill.visualElements.background} rounded-xl p-6 border ${skill.visualElements.accent}`}>
+      <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+        <Eye className="w-5 h-5" />
+        Interaktywny schemat
+      </h3>
+      
+      <svg viewBox="0 0 500 150" className="w-full bg-black/20 rounded-lg">
+        {currentDiagram.parts.map(part => (
+          <g key={part.id}>
+            <rect
+              x={part.x}
+              y={part.y}
+              width={part.width}
+              height={part.height}
+              fill={clickedParts.has(part.id) ? '#10B981' : hoveredPart === part.id ? '#3B82F6' : '#4B5563'}
+              stroke="white"
+              strokeWidth="2"
+              rx="5"
+              className="cursor-pointer transition-all"
+              onMouseEnter={() => setHoveredPart(part.id)}
+              onMouseLeave={() => setHoveredPart(null)}
+              onClick={() => setClickedParts(prev => new Set([...prev, part.id]))}
+            />
+            <text
+              x={part.x + part.width/2}
+              y={part.y + part.height/2}
+              textAnchor="middle"
+              alignmentBaseline="middle"
+              fill="white"
+              fontSize="12"
+              className="pointer-events-none"
+            >
+              {part.label}
+            </text>
+          </g>
+        ))}
+        
+        <line x1="180" y1="80" x2="200" y2="80" stroke="#60A5FA" strokeWidth="2" />
+        <line x1="300" y1="80" x2="320" y2="80" stroke="#60A5FA" strokeWidth="2" />
+      </svg>
+      
+      {hoveredPart && (
+        <div className="mt-3 p-2 bg-black/30 rounded text-sm text-gray-300">
+          {currentDiagram.parts.find(p => p.id === hoveredPart)?.description}
+        </div>
+      )}
+      
+      <div className="mt-3 flex gap-1">
+        {currentDiagram.parts.map(part => (
+          <div
+            key={part.id}
+            className={`h-2 flex-1 rounded-full transition-all ${
+              clickedParts.has(part.id) ? 'bg-green-500' : 'bg-gray-600'
+            }`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const ProgressDashboard = ({ stats, creature }) => (
+  <div className="bg-gradient-to-br from-purple-900/20 to-blue-900/20 rounded-xl p-6 border border-purple-500/30">
+    <h3 className="text-white font-bold mb-4">Twój Postęp</h3>
+    
+    <div className="flex items-center justify-between mb-6">
+      <div>
+        <p className="text-gray-400 text-sm">Poziom {stats.level}</p>
+        <p className="text-white font-bold text-2xl">{creature.name}</p>
+      </div>
+      <div className={`${creature.size} animate-pulse`}>
+        {creature.emoji}
+      </div>
+    </div>
+    
+    <div className="space-y-3">
+      <div>
+        <div className="flex justify-between text-sm mb-1">
+          <span className="text-gray-400">XP</span>
+          <span className="text-yellow-400">{stats.totalXP} / {(stats.level + 1) * 500}</span>
+        </div>
+        <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+          <div 
+            className="h-full bg-gradient-to-r from-yellow-400 to-orange-500 transition-all"
+            style={{ width: `${(stats.totalXP % 500) / 5}%` }}
+          />
+        </div>
+      </div>
+      
+      <div>
+        <div className="flex justify-between text-sm mb-1">
+          <span className="text-gray-400">Zrozumienie</span>
+          <span className="text-green-400">{Math.round(stats.understanding * 100)}%</span>
+        </div>
+        <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+          <div 
+            className="h-full bg-gradient-to-r from-green-400 to-emerald-500 transition-all"
+            style={{ width: `${stats.understanding * 100}%` }}
+          />
+        </div>
+      </div>
+      
+      <div className="grid grid-cols-2 gap-3 mt-4">
+        <div className="bg-black/30 rounded-lg p-3 text-center">
+          <p className="text-2xl font-bold text-blue-400">{stats.questionsAsked}</p>
+          <p className="text-xs text-gray-400">Pytań</p>
+        </div>
+        <div className="bg-black/30 rounded-lg p-3 text-center">
+          <p className="text-2xl font-bold text-purple-400">{stats.streak}</p>
+          <p className="text-xs text-gray-400">Seria</p>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+const ChallengesList = ({ challenges, completedChallenges, skill }) => (
+  <div className={`${skill.visualElements.background} rounded-xl p-6 border ${skill.visualElements.accent}`}>
+    <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+      <Trophy className="w-5 h-5" />
+      Wyzwania
+    </h3>
+    
+    <div className="space-y-3">
+      {challenges.map(challenge => {
+        const isCompleted = completedChallenges.includes(challenge.id);
+        return (
+          <div
+            key={challenge.id}
+            className={`p-4 rounded-lg border transition-all ${
+              isCompleted 
+                ? 'bg-green-900/30 border-green-500/50' 
+                : 'bg-black/20 border-gray-700 hover:border-gray-600'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {isCompleted ? (
+                  <CheckCircle className="w-5 h-5 text-green-400" />
+                ) : (
+                  <div className="w-5 h-5 rounded-full border-2 border-gray-600" />
+                )}
+                <div>
+                  <p className="text-white font-medium">{challenge.description}</p>
+                  <div className="flex gap-2 mt-1">
+                    <span className="text-xs text-yellow-400">+{challenge.xp} XP</span>
+                    <span className="text-xs text-gray-400">
+                      {'⭐'.repeat(challenge.difficulty)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  </div>
+);
+
+const CommunityHelp = () => (
+  <div className="bg-gradient-to-br from-green-900/20 to-blue-900/20 rounded-xl p-6 border border-green-500/30">
+    <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+      <HandHeart className="w-5 h-5" />
+      Pomoc Społeczności
+    </h3>
+    
+    <div className="space-y-3">
+      <div className="p-3 bg-black/30 rounded-lg border-l-4 border-blue-500">
+        <p className="text-sm text-gray-300">Ktoś w okolicy potrzebuje pomocy:</p>
+        <p className="text-white font-medium mt-1">Wymiana gniazdka</p>
+        <button className="text-blue-400 text-sm mt-2 hover:text-blue-300">
+          Mogę pomóc →
+        </button>
+      </div>
+      
+      <div className="p-3 bg-black/30 rounded-lg">
+        <div className="flex justify-between items-center">
+          <span className="text-gray-400 text-sm">Razem w tym tygodniu:</span>
+          <span className="text-green-400 font-bold">47 napraw</span>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+// ==================== MAIN COMPONENT ====================
+const EnhancedDuckTeaching = () => {
+  const [selectedSkill, setSelectedSkill] = useState(null);
+  const [phase, setPhase] = useState('selection');
+  const [messages, setMessages] = useState([]);
+  const [userInput, setUserInput] = useState('');
+  
+  const [emotionEngine] = useState(() => new DuckEmotionEngine());
+  const [responseEngine, setResponseEngine] = useState(null);
+  
+  const [stats, setStats] = useState({
+    level: 1,
+    totalXP: 250,
+    understanding: 0.3,
+    questionsAsked: 5,
+    streak: 0,
+    completedChallenges: []
+  });
+  
+  const creature = EvolutionSystem.getCurrentCreature(stats.level);
+  
+  useEffect(() => {
+    if (selectedSkill) {
+      setResponseEngine(new DuckResponseEngine(selectedSkill));
+      setMessages([{
+        type: 'duck',
+        content: selectedSkill.intro,
+        mentor: selectedSkill.mentor.emoji
+      }]);
+    }
+  }, [selectedSkill]);
+  
+  const handleSendMessage = () => {
+    if (!userInput.trim() || !responseEngine) return;
+    
+    setMessages(prev => [...prev, {
+      type: 'user',
+      content: userInput
+    }]);
+    
+    const analysis = responseEngine.analyzeResponse(userInput);
+    const emotion = emotionEngine.updateEmotion(analysis.score);
+    const response = responseEngine.generateResponse(analysis);
+    
+    setTimeout(() => {
+      const newMessages = [];
+      
+      if (response.egoProtection) {
+        newMessages.push({
+          type: 'system',
+          content: response.egoProtection
+        });
+      }
+      
+      newMessages.push({
+        type: 'duck',
+        content: response.message,
+        mentor: selectedSkill.mentor.emoji,
+        emotion: emotion.emoji
+      });
+      
+      if (analysis.bonusType) {
+        const bonusXP = analysis.bonusType === 'curiosity' ? 15 : 
+                       analysis.bonusType === 'humility' ? 20 : 15;
+        newMessages.push({
+          type: 'reward',
+          content: `+${bonusXP} XP za ${
+            analysis.bonusType === 'curiosity' ? 'ciekawość' :
+            analysis.bonusType === 'humility' ? 'pokorę' : 'współpracę'
+          }!`
+        });
+      }
+      
+      setMessages(prev => [...prev, ...newMessages]);
+      
+      setStats(prev => ({
+        ...prev,
+        totalXP: prev.totalXP + Math.floor(analysis.score * 0.5),
+        understanding: Math.min(1, prev.understanding + analysis.score/500),
+        questionsAsked: analysis.bonusType === 'curiosity' ? prev.questionsAsked + 1 : prev.questionsAsked,
+        streak: response.type === 'excellent' ? prev.streak + 1 : 0
+      }));
+    }, 1000);
+    
+    setUserInput('');
+  };
+  
+  // Skill Selection
+  if (phase === 'selection') {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-900 via-purple-900/10 to-gray-900 p-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-8">
+            <h1 className="text-5xl font-bold text-white mb-3">
+              Wybierz Ścieżkę Rozwoju
+            </h1>
+            <p className="text-gray-300 text-lg">
+              Każdy zawód to nowa przygoda z unikalnym mentorem
+            </p>
+          </div>
+          
+          <div className="grid lg:grid-cols-2 gap-8">
+            {Object.values(SkillModules).map(skill => (
+              <div
+                key={skill.id}
+                onClick={() => {
+                  setSelectedSkill(skill);
+                  setPhase('learning');
+                }}
+                className="group cursor-pointer"
+              >
+                <div className={`relative overflow-hidden rounded-2xl border-2 border-gray-700 hover:border-purple-500 transition-all transform hover:scale-[1.02] ${skill.visualElements.background}`}>
+                  <div className={`absolute inset-0 bg-gradient-to-r ${skill.color} opacity-10 group-hover:opacity-20 transition-opacity`} />
+                  
+                  <div className="relative p-8">
+                    <div className="flex items-start justify-between mb-6">
+                      <div>
+                        <div className="text-6xl mb-3">{skill.icon}</div>
+                        <h2 className="text-3xl font-bold text-white mb-2">{skill.name}</h2>
+                        <p className="text-gray-400">Mentor: {skill.mentor.name}</p>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-5xl mb-2">{skill.mentor.emoji}</div>
+                        <p className="text-xs text-gray-500 italic">"{skill.mentor.personality}"</p>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4 mb-6">
+                      <div className="bg-black/30 rounded-lg p-3">
+                        <p className="text-gray-400 text-sm mb-1">Koncepty</p>
+                        <p className="text-white font-bold">{skill.concepts.length} pojęć</p>
+                      </div>
+                      <div className="bg-black/30 rounded-lg p-3">
+                        <p className="text-gray-400 text-sm mb-1">Wyzwania</p>
+                        <p className="text-white font-bold">{skill.challenges.length} zadań</p>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-green-900/30 rounded-lg p-3 border border-green-500/30">
+                      <p className="text-green-400 text-sm">
+                        <Earth className="w-4 h-4 inline mr-1" />
+                        {skill.realWorldImpact}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  // Learning Phase
+  if (phase === 'learning' && selectedSkill) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-900 via-purple-900/10 to-gray-900 p-6">
+        <div className="max-w-7xl mx-auto">
+          {/* Header */}
+          <div className="flex justify-between items-center mb-6">
+            <button
+              onClick={() => {
+                setPhase('selection');
+                setSelectedSkill(null);
+              }}
+              className="text-gray-400 hover:text-white flex items-center gap-2"
+            >
+              <ChevronLeft className="w-5 h-5" />
+              Zmień ścieżkę
+            </button>
+            
+            <div className="flex items-center gap-4">
+              <span className="text-white font-bold text-xl">{selectedSkill.name}</span>
+              <span className="text-3xl">{selectedSkill.mentor.emoji}</span>
+            </div>
+          </div>
+          
+          <div className="grid lg:grid-cols-3 gap-6">
+            {/* Left Column */}
+            <div className="space-y-6">
+              <VisualDiagram skill={selectedSkill} />
+              <ChallengesList 
+                challenges={selectedSkill.challenges}
+                completedChallenges={stats.completedChallenges}
+                skill={selectedSkill}
+              />
+            </div>
+            
+            {/* Center - Chat */}
+            <div className="lg:col-span-1">
+              <div className="bg-gray-800/50 backdrop-blur rounded-xl h-[600px] flex flex-col">
+                <div className="p-4 border-b border-gray-700">
+                  <h3 className="text-white font-bold">Rozmowa z {selectedSkill.mentor.name}</h3>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                  {messages.map((msg, idx) => (
+                    <div key={idx} className={`${msg.type === 'user' ? 'text-right' : 'text-left'}`}>
+                      {msg.type === 'reward' && (
+                        <div className="inline-block px-4 py-2 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 text-yellow-300 rounded-lg border border-yellow-500/30">
+                          <Zap className="w-4 h-4 inline mr-1" />
+                          {msg.content}
+                        </div>
+                      )}
+                      
+                      {msg.type === 'system' && (
+                        <div className="inline-block px-4 py-2 bg-blue-500/20 text-blue-300 rounded-lg italic">
+                          {msg.content}
+                        </div>
+                      )}
+                      
+                      {msg.type === 'user' && (
+                        <div className="inline-block max-w-sm px-4 py-3 bg-purple-600 text-white rounded-2xl">
+                          {msg.content}
+                        </div>
+                      )}
+                      
+                      {msg.type === 'duck' && (
+                        <div className="inline-block max-w-sm">
+                          <div className="flex gap-2 items-start">
+                            <span className="text-3xl">{msg.mentor}</span>
+                            <div className="px-4 py-3 bg-gray-700 text-white rounded-2xl">
+                              {msg.content}
+                              {msg.emotion && <span className="ml-2">{msg.emotion}</span>}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="p-4 border-t border-gray-700">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
