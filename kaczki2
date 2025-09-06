@@ -1,0 +1,871 @@
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { 
+  MessageCircle, Brain, Heart, Zap, Trophy, Eye, ChevronRight, ChevronLeft,
+  Sparkles, Target, Lock, Unlock, AlertCircle, CheckCircle, XCircle,
+  Clock, HelpCircle, BookOpen, Users, Activity, Award, Star, ArrowRight, 
+  Lightbulb, Shield, Wrench, AlertTriangle, BarChart3, Home, MapPin, 
+  Earth, HandHeart, Droplet, Hammer, Code, ChefHat, Mic, Camera,
+  Calculator, Briefcase, Palette, Cpu, Send, User, TrendingUp
+} from 'lucide-react';
+
+// ==================== PERSONALIZATION ENGINE (CORE) ====================
+class PersonalizationEngine {
+  constructor() {
+    this.userProfile = {
+      learningStyle: null,
+      timeAvailable: null,
+      currentSkillLevel: 'beginner',
+      interests: [],
+      goals: [],
+      currentSituation: null,
+      motivationType: null
+    };
+    
+    this.assessmentQuestions = [
+      {
+        id: 'learning_style',
+        question: 'Jak najlepiej się uczysz?',
+        options: [
+          { value: 'visual', label: '📊 Oglądając diagramy i schematy', icon: Eye },
+          { value: 'kinesthetic', label: '🔨 Praktycznie próbując', icon: Hammer },
+          { value: 'reading', label: '📖 Czytając instrukcje', icon: BookOpen },
+          { value: 'auditory', label: '🎧 Słuchając wyjaśnień', icon: Mic }
+        ]
+      },
+      {
+        id: 'time_available',
+        question: 'Ile czasu możesz poświęcić na naukę?',
+        options: [
+          { value: 1, label: '15 min dziennie', sublabel: 'Dla zapracowanych' },
+          { value: 3, label: '30-45 min dziennie', sublabel: 'Złoty środek' },
+          { value: 5, label: '1-2h dziennie', sublabel: 'Intensywna nauka' },
+          { value: 10, label: '3h+ dziennie', sublabel: 'Pełne zaangażowanie' }
+        ]
+      },
+      {
+        id: 'current_situation',
+        question: 'Jaka jest Twoja obecna sytuacja?',
+        options: [
+          { value: 'student', label: '🎓 Uczę się/Studiuję', details: 'Mam elastyczny grafik' },
+          { value: 'working', label: '💼 Pracuję na etacie', details: 'Uczę się po pracy' },
+          { value: 'unemployed', label: '🔍 Szukam pracy', details: 'Chcę szybko zmienić karierę' },
+          { value: 'parent', label: '👨‍👩‍👧 Rodzic w domu', details: 'Uczę się gdy dzieci śpią' }
+        ]
+      },
+      {
+        id: 'motivation',
+        question: 'Co Cię najbardziej motywuje?',
+        options: [
+          { value: 'achievement', label: '🏆 Zdobywanie odznak i poziomów' },
+          { value: 'social', label: '👥 Rywalizacja ze znajomymi' },
+          { value: 'mastery', label: '🎯 Perfekcyjne opanowanie umiejętności' },
+          { value: 'purpose', label: '💡 Pomaganie innym' }
+        ]
+      }
+    ];
+  }
+  
+  analyzeUserProfile(answers) {
+    this.userProfile = { ...this.userProfile, ...answers };
+    return this.generatePersonalizedPlan();
+  }
+  
+  calculateOptimalPath(answers) {
+    const paths = [];
+    
+    if (answers.time_available <= 3) {
+      paths.push(
+        { career: 'elektryk', reason: 'Szybka nauka, wysokie zapotrzebowanie' },
+        { career: 'hydraulik', reason: 'Elastyczne godziny, dobra stawka' }
+      );
+    }
+    
+    if (answers.current_situation === 'unemployed') {
+      paths.push(
+        { career: 'spawacz', reason: '20,000 wakatów w Polsce' },
+        { career: 'programista', reason: 'Możliwość pracy zdalnej' }
+      );
+    }
+    
+    if (answers.current_situation === 'parent') {
+      paths.push(
+        { career: 'grafik', reason: 'Freelance z domu' },
+        { career: 'copywriter', reason: 'Elastyczne zlecenia' }
+      );
+    }
+    
+    return paths;
+  }
+  
+  generatePersonalizedPlan() {
+    const timePerWeek = this.userProfile.time_available * 7;
+    
+    return {
+      dailyGoal: Math.ceil(this.userProfile.time_available * 60 / 3),
+      weeklyMilestones: this.generateMilestones(timePerWeek),
+      suggestedSchedule: this.createSchedule(),
+      adaptedContent: this.adaptContentToStyle(),
+      recommendedPath: this.calculateOptimalPath(this.userProfile)
+    };
+  }
+  
+  generateMilestones(hoursPerWeek) {
+    const pace = hoursPerWeek <= 7 ? 'slow' : hoursPerWeek <= 20 ? 'moderate' : 'fast';
+    const milestones = [];
+    
+    if (pace === 'fast') {
+      milestones.push(
+        { week: 1, goal: 'Podstawy teorii + 3 praktyczne zadania' },
+        { week: 2, goal: 'Pierwszy projekt samodzielny' },
+        { week: 4, goal: 'Certyfikat podstawowy' }
+      );
+    } else if (pace === 'moderate') {
+      milestones.push(
+        { week: 1, goal: 'Zapoznanie z narzędziami' },
+        { week: 3, goal: 'Pierwsze praktyczne zadanie' },
+        { week: 8, goal: 'Mini projekt' }
+      );
+    } else {
+      milestones.push(
+        { week: 2, goal: 'Podstawowe pojęcia' },
+        { week: 4, goal: 'Pierwsze ćwiczenie' },
+        { week: 12, goal: 'Prosty projekt' }
+      );
+    }
+    
+    return milestones;
+  }
+  
+  createSchedule() {
+    const schedule = { morning: [], afternoon: [], evening: [] };
+    
+    if (this.userProfile.current_situation === 'working') {
+      schedule.evening = ['19:00 - Teoria (15 min)', '19:15 - Praktyka (30 min)'];
+    } else if (this.userProfile.current_situation === 'parent') {
+      schedule.morning = ['6:00 - Szybka lekcja (15 min)'];
+      schedule.afternoon = ['14:00 - Podczas drzemki dziecka (45 min)'];
+    } else {
+      schedule.morning = ['9:00 - Główna sesja nauki (90 min)'];
+      schedule.afternoon = ['15:00 - Praktyczne ćwiczenia (60 min)'];
+    }
+    
+    return schedule;
+  }
+  
+  adaptContentToStyle() {
+    const adaptations = {
+      visual: {
+        priority: 'diagrams',
+        features: ['Interaktywne schematy', 'Animacje 3D', 'Infografiki']
+      },
+      kinesthetic: {
+        priority: 'practice',
+        features: ['Symulatory', 'Zadania hands-on', 'Projekty DIY']
+      },
+      reading: {
+        priority: 'documentation',
+        features: ['Szczegółowe instrukcje', 'Case studies', 'Ebooki']
+      },
+      auditory: {
+        priority: 'podcasts',
+        features: ['Podcasty', 'Narracja audio', 'Dyskusje grupowe']
+      }
+    };
+    
+    return adaptations[this.userProfile.learningStyle] || adaptations.visual;
+  }
+}
+
+// ==================== ADAPTIVE LEARNING SYSTEM (CORE) ====================
+class AdaptiveLearningSystem {
+  constructor(userProfile) {
+    this.userProfile = userProfile;
+    this.performanceHistory = [];
+    this.currentDifficulty = 1;
+  }
+  
+  trackPerformance(taskResult) {
+    this.performanceHistory.push({
+      timestamp: Date.now(),
+      success: taskResult.success,
+      timeSpent: taskResult.timeSpent,
+      hintsUsed: taskResult.hintsUsed,
+      difficulty: this.currentDifficulty
+    });
+    
+    return this.adjustDifficulty();
+  }
+  
+  adjustDifficulty() {
+    const recentResults = this.performanceHistory.slice(-5);
+    if (recentResults.length < 3) return { change: 'none', message: null };
+    
+    const successRate = recentResults.filter(r => r.success).length / recentResults.length;
+    
+    if (successRate > 0.8 && this.currentDifficulty < 5) {
+      this.currentDifficulty++;
+      return { 
+        change: 'increase', 
+        message: '🎯 Świetnie Ci idzie! Zwiększam poziom trudności!' 
+      };
+    } else if (successRate < 0.4 && this.currentDifficulty > 1) {
+      this.currentDifficulty--;
+      return { 
+        change: 'decrease', 
+        message: '💪 Nie poddawaj się! Dostosowuję tempo do Ciebie.' 
+      };
+    }
+    
+    return { change: 'none', message: null };
+  }
+}
+
+// ==================== DUCK ENGINE (IMPROVED) ====================
+class ImprovedDuckEngine {
+  constructor(skillModule) {
+    this.module = skillModule;
+    this.usedHints = new Set();
+    this.emotionState = {
+      mood: 0.7,
+      engagement: 0.8,
+      understanding: 0.3
+    };
+  }
+  
+  generateHint() {
+    const availableHints = Object.entries(this.module.hints)
+      .filter(([key]) => !this.usedHints.has(key));
+    
+    if (availableHints.length === 0) {
+      return { hint: "Pomyśl o tym jak prąd płynie przez przewody...", concept: null };
+    }
+    
+    const [concept, hint] = availableHints[Math.floor(Math.random() * availableHints.length)];
+    this.usedHints.add(concept);
+    
+    return { hint, concept };
+  }
+  
+  analyzeResponse(text) {
+    const lowerText = text.toLowerCase();
+    let score = 0;
+    let foundConcepts = [];
+    
+    this.module.concepts.forEach(concept => {
+      if (lowerText.includes(concept.toLowerCase())) {
+        score += 20;
+        foundConcepts.push(concept);
+      }
+    });
+    
+    // Bonus points for engagement
+    if (text.includes('?')) score += 10;
+    if (/nie wiem|może|chyba/i.test(lowerText)) score += 15;
+    if (/pomóż|pokaż|wyjaśnij/i.test(lowerText)) score += 10;
+    
+    return {
+      score: Math.min(100, score),
+      foundConcepts,
+      engagement: text.length > 50 ? 'high' : text.length > 20 ? 'medium' : 'low'
+    };
+  }
+  
+  updateEmotion(analysis) {
+    this.emotionState.understanding = Math.min(1, this.emotionState.understanding + analysis.score/200);
+    this.emotionState.mood = (this.emotionState.understanding + this.emotionState.engagement) / 2;
+    
+    return {
+      emoji: this.emotionState.mood > 0.7 ? '😊' : this.emotionState.mood > 0.4 ? '🤔' : '😕',
+      animation: this.emotionState.mood > 0.7 ? 'bounce' : 'pulse'
+    };
+  }
+}
+
+// ==================== MICRO REWARDS SYSTEM (FIXED) ====================
+const MicroRewards = ({ rewards, onRemove }) => {
+  const containerRef = useRef(null);
+  
+  useEffect(() => {
+    // Auto-scroll to bottom when new reward appears
+    if (containerRef.current) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight;
+    }
+  }, [rewards]);
+  
+  return (
+    <div 
+      ref={containerRef}
+      className="fixed bottom-20 right-4 space-y-2 max-h-64 overflow-y-auto pointer-events-none z-50"
+    >
+      {rewards.map(reward => (
+        <div
+          key={reward.id}
+          className="animate-slide-in bg-gradient-to-r from-yellow-500/90 to-orange-500/90 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2"
+          style={{
+            animation: 'slideIn 0.3s ease-out, fadeOut 0.5s ease-out 2.5s forwards'
+          }}
+        >
+          <span className="text-2xl">{reward.icon}</span>
+          <span className="font-bold">+{reward.xp} XP</span>
+          <span className="text-sm">{reward.reason}</span>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// ==================== SKILL MODULES ====================
+const SkillModules = {
+  elektryk: {
+    id: 'elektryk',
+    name: 'Elektryka',
+    icon: '⚡',
+    color: 'from-yellow-600 to-orange-600',
+    mentor: { name: 'Sowa Elektra', emoji: '🦉' },
+    concepts: ['bezpiecznik', 'prąd', 'napięcie', 'uziemienie', 'przewód'],
+    hints: {
+      'bezpiecznik': 'Chroni instalację przed przeciążeniem - jak strażnik!',
+      'prąd': 'Płynie jak woda w rurach, tylko że to elektrony',
+      'napięcie': 'Siła która popycha prąd - jak ciśnienie wody',
+      'uziemienie': 'Bezpieczna droga ucieczki dla prądu'
+    },
+    intro: "Cześć! Jestem Sowa Elektra. Opowiesz mi jak działa elektryczność?"
+  },
+  hydraulik: {
+    id: 'hydraulik',
+    name: 'Hydraulika',
+    icon: '💧',
+    color: 'from-blue-600 to-cyan-600',
+    mentor: { name: 'Bóbr Hydrox', emoji: '🦫' },
+    concepts: ['syfon', 'uszczelka', 'zawór', 'ciśnienie', 'odpływ'],
+    hints: {
+      'syfon': 'Blokuje brzydkie zapachy z kanalizacji',
+      'uszczelka': 'Gumka która nie pozwala wodzie uciec',
+      'zawór': 'Jak włącznik, tylko dla wody',
+      'ciśnienie': 'Siła wody w rurach'
+    },
+    intro: "Hej! Jestem Bóbr Hydrox. Wytłumaczysz mi jak naprawić cieknący kran?"
+  }
+};
+
+// ==================== MAIN COMPONENT ====================
+const EnhancedDuckTeaching = () => {
+  // State Management
+  const [phase, setPhase] = useState('assessment');
+  const [assessmentStep, setAssessmentStep] = useState(0);
+  const [assessmentAnswers, setAssessmentAnswers] = useState({});
+  
+  const [personalizationEngine] = useState(() => new PersonalizationEngine());
+  const [adaptiveSystem, setAdaptiveSystem] = useState(null);
+  const [duckEngine, setDuckEngine] = useState(null);
+  const [personalizedPlan, setPersonalizedPlan] = useState(null);
+  
+  const [selectedSkill, setSelectedSkill] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [userInput, setUserInput] = useState('');
+  const [microRewards, setMicroRewards] = useState([]);
+  
+  const [stats, setStats] = useState({
+    level: 1,
+    totalXP: 250,
+    understanding: 0.3,
+    streak: 0
+  });
+  
+  const messagesEndRef = useRef(null);
+  
+  // Auto-scroll to bottom of messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+  
+  // Handle Assessment
+  const handleAssessmentAnswer = (questionId, answer) => {
+    setAssessmentAnswers(prev => ({ ...prev, [questionId]: answer }));
+    
+    if (assessmentStep < personalizationEngine.assessmentQuestions.length - 1) {
+      setAssessmentStep(prev => prev + 1);
+    } else {
+      const plan = personalizationEngine.analyzeUserProfile(assessmentAnswers);
+      setPersonalizedPlan(plan);
+      setAdaptiveSystem(new AdaptiveLearningSystem(personalizationEngine.userProfile));
+      setPhase('personalization');
+    }
+  };
+  
+  // Add Micro Reward
+  const addMicroReward = (xp, reason, icon = '⭐') => {
+    const rewardId = Date.now() + Math.random(); // Unique ID
+    const newReward = { id: rewardId, xp, reason, icon };
+    
+    setMicroRewards(prev => [...prev, newReward]);
+    setStats(prev => ({ ...prev, totalXP: prev.totalXP + xp }));
+    
+    // Remove after 3 seconds
+    setTimeout(() => {
+      setMicroRewards(prev => prev.filter(r => r.id !== rewardId));
+    }, 3000);
+  };
+  
+  // Handle Chat Message
+  const handleSendMessage = () => {
+    if (!userInput.trim() || !duckEngine) return;
+    
+    // Add user message
+    setMessages(prev => [...prev, {
+      type: 'user',
+      content: userInput,
+      timestamp: Date.now()
+    }]);
+    
+    // Analyze response
+    const analysis = duckEngine.analyzeResponse(userInput);
+    const emotion = duckEngine.updateEmotion(analysis);
+    
+    // Generate duck response
+    setTimeout(() => {
+      setMessages(prev => [...prev, {
+        type: 'duck',
+        content: analysis.score > 70 
+          ? "Wow! Świetnie to rozumiesz! 🎉" 
+          : analysis.score > 40
+          ? "Hmm, coś w tym jest... Powiedz mi więcej!"
+          : "Jeszcze nie rozumiem... Może inaczej?",
+        emotion: emotion.emoji,
+        timestamp: Date.now()
+      }]);
+      
+      // Add micro rewards
+      if (analysis.foundConcepts.length > 0) {
+        addMicroReward(10 * analysis.foundConcepts.length, 'za użycie pojęć', '💡');
+      }
+      if (analysis.engagement === 'high') {
+        addMicroReward(15, 'za zaangażowanie', '🔥');
+      }
+    }, 800);
+    
+    setUserInput('');
+  };
+  
+  // Handle Quick Actions
+  const handleQuickAction = (action) => {
+    if (action === 'hint' && duckEngine) {
+      const { hint, concept } = duckEngine.generateHint();
+      setMessages(prev => [...prev, {
+        type: 'system',
+        content: `💡 Podpowiedź: ${hint}`,
+        timestamp: Date.now()
+      }]);
+      
+      if (concept) {
+        addMicroReward(5, 'za użycie podpowiedzi', '🤝');
+      }
+    } else if (action === 'unsure') {
+      setMessages(prev => [...prev, {
+        type: 'duck',
+        content: "To normalne! Każdy się uczy w swoim tempie. Spróbuj opisać co widzisz...",
+        emotion: '🤗',
+        timestamp: Date.now()
+      }]);
+    } else if (action === 'understand') {
+      addMicroReward(20, 'za pewność siebie', '💪');
+      
+      if (adaptiveSystem) {
+        const adjustment = adaptiveSystem.trackPerformance({
+          success: true,
+          timeSpent: 60,
+          hintsUsed: 0
+        });
+        
+        if (adjustment.message) {
+          setMessages(prev => [...prev, {
+            type: 'system',
+            content: adjustment.message,
+            timestamp: Date.now()
+          }]);
+        }
+      }
+    }
+  };
+  
+  // RENDER: Assessment Phase
+  if (phase === 'assessment') {
+    const currentQuestion = personalizationEngine.assessmentQuestions[assessmentStep];
+    
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-900 via-purple-900/10 to-gray-900 p-6">
+        <div className="max-w-3xl mx-auto">
+          <div className="mb-8">
+            <div className="flex justify-between items-center mb-4">
+              <h1 className="text-3xl font-bold text-white">Poznajmy się!</h1>
+              <span className="text-gray-400">
+                Krok {assessmentStep + 1} z {personalizationEngine.assessmentQuestions.length}
+              </span>
+            </div>
+            
+            <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-500"
+                style={{ 
+                  width: `${((assessmentStep + 1) / personalizationEngine.assessmentQuestions.length) * 100}%` 
+                }}
+              />
+            </div>
+          </div>
+          
+          <div className="bg-gray-800/50 backdrop-blur rounded-2xl p-8">
+            <h2 className="text-2xl font-bold text-white mb-6">
+              {currentQuestion.question}
+            </h2>
+            
+            <div className="space-y-3">
+              {currentQuestion.options.map(option => (
+                <button
+                  key={option.value}
+                  onClick={() => handleAssessmentAnswer(currentQuestion.id, option.value)}
+                  className="w-full p-4 bg-gray-700/50 hover:bg-gray-700 rounded-xl text-left transition-all hover:scale-[1.02] group"
+                >
+                  <div className="flex items-center gap-4">
+                    {option.icon && <option.icon className="w-6 h-6 text-purple-400" />}
+                    <div className="flex-1">
+                      <p className="text-white font-medium text-lg">{option.label}</p>
+                      {option.sublabel && (
+                        <p className="text-gray-400 text-sm mt-1">{option.sublabel}</p>
+                      )}
+                      {option.details && (
+                        <p className="text-gray-500 text-xs mt-1">{option.details}</p>
+                      )}
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-gray-600 group-hover:text-white transition-colors" />
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  // RENDER: Personalization Results
+  if (phase === 'personalization' && personalizedPlan) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-900 via-purple-900/10 to-gray-900 p-6">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-8">
+            <h1 className="text-4xl font-bold text-white mb-3">
+              Twój Spersonalizowany Plan Nauki
+            </h1>
+            <p className="text-gray-300">Dostosowany do Twojego stylu życia i celów</p>
+          </div>
+          
+          <div className="grid lg:grid-cols-2 gap-6 mb-8">
+            {/* Schedule */}
+            <div className="bg-gradient-to-br from-blue-900/20 to-purple-900/20 rounded-xl p-6 border border-blue-500/30">
+              <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+                <Clock className="w-5 h-5" />
+                Twój Harmonogram
+              </h3>
+              
+              <div className="space-y-3">
+                {Object.entries(personalizedPlan.suggestedSchedule).map(([time, activities]) => (
+                  activities.length > 0 && (
+                    <div key={time} className="bg-black/30 rounded-lg p-3">
+                      <p className="text-purple-400 font-medium capitalize mb-2">{time}</p>
+                      {activities.map((activity, idx) => (
+                        <p key={idx} className="text-gray-300 text-sm">{activity}</p>
+                      ))}
+                    </div>
+                  )
+                ))}
+              </div>
+            </div>
+            
+            {/* Milestones */}
+            <div className="bg-gradient-to-br from-green-900/20 to-blue-900/20 rounded-xl p-6 border border-green-500/30">
+              <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+                <Target className="w-5 h-5" />
+                Kamienie Milowe
+              </h3>
+              
+              <div className="space-y-3">
+                {personalizedPlan.weeklyMilestones.map((milestone, idx) => (
+                  <div key={idx} className="flex items-start gap-3">
+                    <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                      {milestone.week}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-white">{milestone.goal}</p>
+                      <p className="text-gray-500 text-xs mt-1">Tydzień {milestone.week}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          
+          {/* Career Paths */}
+          <div className="bg-gradient-to-br from-purple-900/20 to-pink-900/20 rounded-xl p-6 border border-purple-500/30 mb-6">
+            <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+              <Briefcase className="w-5 h-5" />
+              Rekomendowane Ścieżki Kariery
+            </h3>
+            
+            <div className="grid md:grid-cols-2 gap-4">
+              {personalizedPlan.recommendedPath?.map((path, idx) => (
+                <div key={idx} className="bg-black/30 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <h2 className="text-2xl font-bold text-white mb-2">{skill.name}</h2>
+                <div className="flex items-center justify-center gap-2 text-gray-300">
+                  <span className="text-3xl">{skill.mentor.emoji}</span>
+                  <span>{skill.mentor.name}</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  // RENDER: Learning Phase
+  if (phase === 'learning' && selectedSkill && duckEngine) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-900 via-purple-900/10 to-gray-900 p-6">
+        <div className="max-w-6xl mx-auto">
+          {/* Header */}
+          <div className="flex justify-between items-center mb-6">
+            <button
+              onClick={() => {
+                setPhase('skills');
+                setSelectedSkill(null);
+                setMessages([]);
+              }}
+              className="text-gray-400 hover:text-white flex items-center gap-2"
+            >
+              <ChevronLeft className="w-5 h-5" />
+              Zmień umiejętność
+            </button>
+            
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <p className="text-gray-400 text-sm">Poziom {stats.level}</p>
+                <p className="text-white font-bold">{stats.totalXP} XP</p>
+              </div>
+              <span className="text-3xl">{selectedSkill.mentor.emoji}</span>
+            </div>
+          </div>
+          
+          <div className="grid lg:grid-cols-3 gap-6">
+            {/* Left Panel - Stats */}
+            <div className="space-y-4">
+              <div className="bg-gray-800/50 rounded-xl p-4">
+                <h3 className="text-white font-bold mb-3">Twój Postęp</h3>
+                <div className="space-y-3">
+                  <div>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-gray-400">XP</span>
+                      <span className="text-yellow-400">{stats.totalXP}</span>
+                    </div>
+                    <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-yellow-400 to-orange-500 transition-all"
+                        style={{ width: `${(stats.totalXP % 500) / 5}%` }}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-gray-400">Zrozumienie</span>
+                      <span className="text-green-400">{Math.round(stats.understanding * 100)}%</span>
+                    </div>
+                    <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-green-400 to-emerald-500 transition-all"
+                        style={{ width: `${stats.understanding * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-gray-800/50 rounded-xl p-4">
+                <h3 className="text-white font-bold mb-3">Koncepty</h3>
+                <div className="flex flex-wrap gap-2">
+                  {selectedSkill.concepts.map(concept => (
+                    <span
+                      key={concept}
+                      className="px-2 py-1 bg-gray-700 text-gray-300 rounded-lg text-sm"
+                    >
+                      {concept}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+            
+            {/* Center - Chat */}
+            <div className="lg:col-span-2">
+              <div className="bg-gray-800/50 backdrop-blur rounded-xl h-[600px] flex flex-col">
+                <div className="p-4 border-b border-gray-700">
+                  <h3 className="text-white font-bold">Rozmowa z {selectedSkill.mentor.name}</h3>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                  {messages.map((msg, idx) => (
+                    <div key={idx} className={`${msg.type === 'user' ? 'text-right' : 'text-left'}`}>
+                      {msg.type === 'system' && (
+                        <div className="inline-block px-4 py-2 bg-blue-500/20 text-blue-300 rounded-lg italic max-w-md">
+                          {msg.content}
+                        </div>
+                      )}
+                      
+                      {msg.type === 'user' && (
+                        <div className="inline-block px-4 py-3 bg-purple-600 text-white rounded-2xl max-w-md">
+                          {msg.content}
+                        </div>
+                      )}
+                      
+                      {msg.type === 'duck' && (
+                        <div className="inline-block max-w-md">
+                          <div className="flex gap-2 items-start">
+                            <span className="text-3xl">{selectedSkill.mentor.emoji}</span>
+                            <div className="px-4 py-3 bg-gray-700 text-white rounded-2xl">
+                              {msg.content}
+                              {msg.emotion && <span className="ml-2">{msg.emotion}</span>}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  <div ref={messagesEndRef} />
+                </div>
+                
+                <div className="p-4 border-t border-gray-700">
+                  <div className="flex gap-2 mb-3">
+                    <button
+                      onClick={() => handleQuickAction('unsure')}
+                      className="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm"
+                    >
+                      Nie jestem pewien 🤔
+                    </button>
+                    <button
+                      onClick={() => handleQuickAction('hint')}
+                      className="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm"
+                    >
+                      Pomóż mi 💡
+                    </button>
+                    <button
+                      onClick={() => handleQuickAction('understand')}
+                      className="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm"
+                    >
+                      Chyba rozumiem ✅
+                    </button>
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={userInput}
+                      onChange={(e) => setUserInput(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                      placeholder="Napisz swoją odpowiedź..."
+                      className="flex-1 px-4 py-2 bg-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    />
+                    <button
+                      onClick={handleSendMessage}
+                      className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg"
+                    >
+                      <Send className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Micro Rewards */}
+        <MicroRewards rewards={microRewards} onRemove={() => {}} />
+        
+        {/* CSS for animations */}
+        <style jsx>{`
+          @keyframes slideIn {
+            from {
+              transform: translateX(100%);
+              opacity: 0;
+            }
+            to {
+              transform: translateX(0);
+              opacity: 1;
+            }
+          }
+          
+          @keyframes fadeOut {
+            to {
+              opacity: 0;
+              transform: translateY(-10px);
+            }
+          }
+        `}</style>
+      </div>
+    );
+  }
+  
+  // Default return
+  return null;
+};
+
+export default EnhancedDuckTeaching;4 className="text-white font-medium capitalize">{path.career}</h4>
+                    <span className="text-green-400 text-sm">Polecane</span>
+                  </div>
+                  <p className="text-gray-400 text-sm">{path.reason}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          <div className="text-center">
+            <button
+              onClick={() => setPhase('skills')}
+              className="px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-xl hover:scale-105 transition-transform"
+            >
+              Rozpocznij Naukę →
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  // RENDER: Skill Selection
+  if (phase === 'skills') {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-900 via-purple-900/10 to-gray-900 p-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-8">
+            <h1 className="text-4xl font-bold text-white mb-3">Wybierz Umiejętność</h1>
+            <p className="text-gray-300">Każda ścieżka ma swojego mentora</p>
+          </div>
+          
+          <div className="grid md:grid-cols-2 gap-6">
+            {Object.values(SkillModules).map(skill => (
+              <button
+                key={skill.id}
+                onClick={() => {
+                  setSelectedSkill(skill);
+                  setDuckEngine(new ImprovedDuckEngine(skill));
+                  setMessages([{
+                    type: 'duck',
+                    content: skill.intro,
+                    emotion: '😊',
+                    timestamp: Date.now()
+                  }]);
+                  setPhase('learning');
+                }}
+                className={`p-6 rounded-2xl bg-gradient-to-br ${skill.color} bg-opacity-20 border border-white/20 hover:scale-105 transition-all`}
+              >
+                <div className="text-6xl mb-4">{skill.icon}</div>
+                <h
