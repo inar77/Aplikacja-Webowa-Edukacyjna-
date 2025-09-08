@@ -1,0 +1,543 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  Home, Trophy, BookOpen, Users, ShoppingBag, Settings, TrendingUp, 
+  Target, Calendar, Award, Zap, Flame, Star, ChevronRight, Bell,
+  User, Menu, X, Clock, DollarSign, Brain, CheckCircle, Lock
+} from 'lucide-react';
+
+const PathFinderApp = () => {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [activeSection, setActiveSection] = useState('dashboard');
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  useEffect(() => {
+    // Symulacja ładowania danych użytkownika
+    setTimeout(() => {
+      setUser({
+        id: 1,
+        username: 'PathFinder',
+        email: 'user@pathfinder.pl',
+        level: 12,
+        xp: 2450,
+        totalXp: 24500,
+        xpToNext: 3000,
+        streak: 7,
+        coins: 7200,
+        hearts: 5,
+        achievements: ['first_lesson', 'week_streak', 'helper'],
+        currentPath: 'Elektryk',
+        completedLessons: 45,
+        skills: {
+          programming: 78,
+          design: 45,
+          communication: 62,
+          problemSolving: 85
+        }
+      });
+      setLoading(false);
+    }, 1000);
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gradient-to-br from-purple-50 to-pink-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-purple-600 mx-auto mb-4"></div>
+          <div className="text-2xl font-bold text-purple-600">Ładowanie PathFinder...</div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* TOP BAR */}
+      <header className="bg-white shadow-sm border-b sticky top-0 z-50">
+        <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="p-2 hover:bg-gray-100 rounded-lg lg:hidden"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-sm">P</span>
+              </div>
+              <h1 className="text-xl font-bold text-gray-900">PathFinder</h1>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className="hidden md:flex items-center gap-3">
+              <div className="flex items-center gap-1 bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full">
+                <Flame className="w-4 h-4" />
+                <span className="font-bold">{user.streak}</span>
+              </div>
+              <div className="flex items-center gap-1 bg-purple-100 text-purple-800 px-3 py-1 rounded-full">
+                <Star className="w-4 h-4" />
+                <span className="font-bold">{user.xp}</span>
+              </div>
+              <div className="flex items-center gap-1 bg-green-100 text-green-800 px-3 py-1 rounded-full">
+                <DollarSign className="w-4 h-4" />
+                <span className="font-bold">{user.coins}</span>
+              </div>
+            </div>
+
+            <button className="relative p-2 hover:bg-gray-100 rounded-lg">
+              <Bell className="w-5 h-5" />
+              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+            </button>
+
+            <div className="flex items-center gap-2">
+              <div className="text-right hidden sm:block">
+                <div className="text-sm font-semibold">{user.username}</div>
+                <div className="text-xs text-gray-500">Poziom {user.level}</div>
+              </div>
+              <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-bold">
+                {user.username[0]}
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div className="flex">
+        {/* LEFT SIDEBAR */}
+        <aside className={`${sidebarOpen ? 'w-64' : 'w-0'} transition-all duration-300 bg-white shadow-lg h-[calc(100vh-64px)] sticky top-16 overflow-hidden`}>
+          <div className="p-4">
+            <div className="mb-6">
+              <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-4 rounded-xl">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-sm text-gray-600">Postęp XP</span>
+                  <span className="text-sm font-bold">{user.xp}/{user.xpToNext}</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full transition-all"
+                    style={{ width: `${(user.xp / user.xpToNext) * 100}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <nav className="space-y-1">
+              {[
+                { id: 'dashboard', label: 'Dashboard', icon: Home },
+                { id: 'career', label: 'Ścieżka Kariery', icon: TrendingUp, badge: 'NEW' },
+                { id: 'lessons', label: 'Lekcje', icon: BookOpen, badge: '3' },
+                { id: 'challenges', label: 'Wyzwania', icon: Target },
+                { id: 'achievements', label: 'Osiągnięcia', icon: Trophy },
+                { id: 'friends', label: 'Znajomi', icon: Users, badge: '5' },
+                { id: 'shop', label: 'Sklep', icon: ShoppingBag },
+                { id: 'settings', label: 'Ustawienia', icon: Settings }
+              ].map(item => {
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveSection(item.id)}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all ${
+                      activeSection === item.id
+                        ? 'bg-purple-600 text-white'
+                        : 'hover:bg-gray-100 text-gray-700'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Icon className="w-5 h-5" />
+                      <span className="font-medium">{item.label}</span>
+                    </div>
+                    {item.badge && (
+                      <span className={`px-2 py-0.5 text-xs rounded-full ${
+                        activeSection === item.id
+                          ? 'bg-white text-purple-600'
+                          : 'bg-purple-100 text-purple-600'
+                      }`}>
+                        {item.badge}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+        </aside>
+
+        {/* MAIN CONTENT */}
+        <main className="flex-1 p-6">
+          {activeSection === 'dashboard' && (
+            <div className="space-y-6">
+              {/* Daily Challenge */}
+              <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-2xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-2xl font-bold">🎯 Twoje wyzwanie na dziś</h2>
+                  <span className="bg-white/20 px-3 py-1 rounded-full text-sm">
+                    Kończy się za 14h 32m
+                  </span>
+                </div>
+                <p className="text-lg mb-4">Podłącz gniazdko 230V - krok 3 z 4</p>
+                <div className="grid grid-cols-3 gap-4 mb-6">
+                  <div className="text-center">
+                    <div className="text-3xl font-bold">87%</div>
+                    <div className="text-sm opacity-80">sukcesu wśród uczniów</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-3xl font-bold">234</div>
+                    <div className="text-sm opacity-80">osób ukończyło dziś</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-3xl font-bold">2x XP</div>
+                    <div className="text-sm opacity-80">bonus aktywny</div>
+                  </div>
+                </div>
+                <button className="w-full bg-white text-purple-600 py-3 rounded-xl font-bold hover:bg-gray-100 transition">
+                  ROZPOCZNIJ TERAZ →
+                </button>
+              </div>
+
+              {/* Career Path */}
+              <div className="bg-white rounded-xl shadow-sm p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-bold">Twoja droga: {user.currentPath}</h2>
+                  <button className="text-purple-600 hover:underline text-sm">
+                    Zobacz całą mapę →
+                  </button>
+                </div>
+                <div className="flex gap-4 overflow-x-auto pb-2">
+                  {[
+                    { name: 'Bezpieczeństwo', status: 'completed', stars: 3 },
+                    { name: 'Narzędzia', status: 'completed', stars: 3 },
+                    { name: 'Instalacje', status: 'current', stars: 2 },
+                    { name: 'Szafy', status: 'locked' },
+                    { name: 'Pomiary', status: 'locked' },
+                    { name: 'Smart Home', status: 'locked' }
+                  ].map((module, i) => (
+                    <div
+                      key={i}
+                      className={`min-w-[140px] p-4 rounded-xl text-center cursor-pointer transition-all ${
+                        module.status === 'completed' ? 'bg-green-100 hover:bg-green-200' :
+                        module.status === 'current' ? 'bg-yellow-100 hover:bg-yellow-200 ring-2 ring-yellow-400' :
+                        'bg-gray-100 opacity-60'
+                      }`}
+                    >
+                      <div className="text-3xl mb-2">
+                        {module.status === 'completed' ? '✅' :
+                         module.status === 'current' ? '⚡' : '🔒'}
+                      </div>
+                      <div className="font-semibold text-sm">{module.name}</div>
+                      {module.stars && (
+                        <div className="mt-2">
+                          {'⭐'.repeat(module.stars)}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Tasks Grid */}
+              <div className="grid md:grid-cols-2 gap-6">
+                <div className="bg-white rounded-xl shadow-sm p-6">
+                  <h3 className="font-bold mb-4">📚 Praktyczne zadania</h3>
+                  <div className="space-y-3">
+                    {[
+                      { title: 'Pierwsza instalacja', xp: 150, time: '20 min', difficulty: 'Średnie' },
+                      { title: 'Test bezpieczeństwa', xp: 100, time: '15 min', difficulty: 'Łatwe' },
+                      { title: 'Projekt szafy', xp: 300, time: '45 min', difficulty: 'Trudne' }
+                    ].map((task, i) => (
+                      <div key={i} className="border rounded-lg p-3 hover:shadow-md transition cursor-pointer">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h4 className="font-semibold">{task.title}</h4>
+                            <div className="flex gap-2 mt-1 text-xs">
+                              <span className={`px-2 py-1 rounded ${
+                                task.difficulty === 'Łatwe' ? 'bg-green-100 text-green-700' :
+                                task.difficulty === 'Średnie' ? 'bg-yellow-100 text-yellow-700' :
+                                'bg-red-100 text-red-700'
+                              }`}>
+                                {task.difficulty}
+                              </span>
+                              <span className="text-gray-500">⏱️ {task.time}</span>
+                            </div>
+                          </div>
+                          <span className="text-purple-600 font-bold">+{task.xp} XP</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-xl shadow-sm p-6">
+                  <h3 className="font-bold mb-4">🏆 Ranking tygodnia</h3>
+                  <div className="space-y-3">
+                    {[
+                      { name: 'ElektrykPro', xp: 3250, rank: 1, trend: 'up' },
+                      { name: 'TechMaster', xp: 2890, rank: 2, trend: 'up' },
+                      { name: 'PathFinder', xp: 2450, rank: 3, trend: 'same', isUser: true },
+                      { name: 'CodeNinja', xp: 2340, rank: 4, trend: 'down' }
+                    ].map((player) => (
+                      <div
+                        key={player.rank}
+                        className={`flex items-center justify-between p-3 rounded-lg ${
+                          player.isUser ? 'bg-purple-50 border border-purple-200' : 'hover:bg-gray-50'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className={`font-bold text-lg ${
+                            player.rank === 1 ? 'text-yellow-500' :
+                            player.rank === 2 ? 'text-gray-400' :
+                            player.rank === 3 ? 'text-orange-600' :
+                            'text-gray-600'
+                          }`}>
+                            #{player.rank}
+                          </span>
+                          <span className={player.isUser ? 'font-bold' : ''}>
+                            {player.name} {player.isUser && '(Ty)'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold">{player.xp} XP</span>
+                          <span className={`text-sm ${
+                            player.trend === 'up' ? 'text-green-500' :
+                            player.trend === 'down' ? 'text-red-500' :
+                            'text-gray-400'
+                          }`}>
+                            {player.trend === 'up' ? '↑' :
+                             player.trend === 'down' ? '↓' : '−'}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeSection === 'career' && (
+            <div className="space-y-6">
+              <h2 className="text-2xl font-bold">Ścieżki Kariery</h2>
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[
+                  { 
+                    name: 'Frontend Developer', 
+                    match: 92, 
+                    time: '6 miesięcy', 
+                    salary: '8-18k PLN',
+                    skills: ['HTML', 'CSS', 'JavaScript', 'React']
+                  },
+                  { 
+                    name: 'UX Designer', 
+                    match: 87, 
+                    time: '4 miesiące', 
+                    salary: '7-15k PLN',
+                    skills: ['Figma', 'Research', 'Prototyping']
+                  },
+                  { 
+                    name: 'Data Analyst', 
+                    match: 78, 
+                    time: '8 miesięcy', 
+                    salary: '10-20k PLN',
+                    skills: ['Python', 'SQL', 'Excel', 'Tableau']
+                  },
+                  { 
+                    name: 'DevOps Engineer', 
+                    match: 65, 
+                    time: '10 miesięcy', 
+                    salary: '12-25k PLN',
+                    skills: ['Docker', 'Kubernetes', 'AWS', 'CI/CD']
+                  },
+                  { 
+                    name: 'Elektryk', 
+                    match: 95, 
+                    time: '12 miesięcy', 
+                    salary: '4-8k PLN',
+                    skills: ['SEP', 'Instalacje', 'Pomiary', 'Normy'],
+                    current: true
+                  },
+                  { 
+                    name: 'Project Manager', 
+                    match: 70, 
+                    time: '6 miesięcy', 
+                    salary: '10-18k PLN',
+                    skills: ['Scrum', 'Jira', 'Leadership', 'Planning']
+                  }
+                ].map((career, i) => (
+                  <div 
+                    key={i} 
+                    className={`bg-white rounded-xl shadow-sm p-6 hover:shadow-lg transition cursor-pointer ${
+                      career.current ? 'ring-2 ring-purple-500' : ''
+                    }`}
+                  >
+                    {career.current && (
+                      <div className="bg-purple-600 text-white text-xs px-2 py-1 rounded-full inline-block mb-3">
+                        OBECNA ŚCIEŻKA
+                      </div>
+                    )}
+                    <h3 className="font-bold text-lg mb-2">{career.name}</h3>
+                    <div className="mb-4">
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-gray-600">Dopasowanie</span>
+                        <span className="font-bold text-green-600">{career.match}%</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div
+                          className={`h-2 rounded-full ${
+                            career.match >= 90 ? 'bg-green-500' :
+                            career.match >= 75 ? 'bg-yellow-500' :
+                            'bg-orange-500'
+                          }`}
+                          style={{ width: `${career.match}%` }}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2 text-sm mb-4">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">⏱️ Czas nauki:</span>
+                        <span className="font-medium">{career.time}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">💰 Zarobki:</span>
+                        <span className="font-medium">{career.salary}</span>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-1 mb-4">
+                      {career.skills.map((skill, idx) => (
+                        <span key={idx} className="bg-gray-100 text-xs px-2 py-1 rounded">
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
+                    <button className={`w-full py-2 rounded-lg font-medium transition ${
+                      career.current 
+                        ? 'bg-purple-600 text-white hover:bg-purple-700'
+                        : 'bg-purple-100 text-purple-600 hover:bg-purple-200'
+                    }`}>
+                      {career.current ? 'Kontynuuj' : 'Zobacz szczegóły'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeSection === 'shop' && (
+            <div className="space-y-6">
+              <h2 className="text-2xl font-bold">Sklep</h2>
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-center justify-between">
+                <span className="text-yellow-800">Twoje monety:</span>
+                <span className="text-2xl font-bold text-yellow-600">💰 {user.coins}</span>
+              </div>
+              <div className="grid md:grid-cols-3 gap-6">
+                {[
+                  { name: 'Zamrożenie serii', icon: '❄️', cost: 200, desc: 'Zachowaj streak nawet jeśli przegapisz dzień' },
+                  { name: 'XP Boost', icon: '⚡', cost: 150, desc: '2x XP przez następną godzinę' },
+                  { name: 'Dodatkowe życie', icon: '❤️', cost: 100, desc: 'Otrzymaj dodatkowe serce' },
+                  { name: 'Podpowiedź', icon: '💡', cost: 50, desc: 'Użyj podczas trudnego zadania' },
+                  { name: 'Energia', icon: '🔋', cost: 75, desc: 'Natychmiast odnów energię' },
+                  { name: 'Premium na tydzień', icon: '👑', cost: 500, desc: 'Wszystkie bonusy przez 7 dni' }
+                ].map((item, i) => (
+                  <div key={i} className="bg-white rounded-xl shadow-sm p-6 text-center">
+                    <div className="text-5xl mb-3">{item.icon}</div>
+                    <h3 className="font-bold mb-2">{item.name}</h3>
+                    <p className="text-sm text-gray-600 mb-4">{item.desc}</p>
+                    <button className={`w-full py-2 rounded-lg font-medium transition ${
+                      user.coins >= item.cost
+                        ? 'bg-green-500 text-white hover:bg-green-600'
+                        : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    }`}>
+                      💰 {item.cost} monet
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!['dashboard', 'career', 'shop'].includes(activeSection) && (
+            <div className="bg-white rounded-xl shadow-sm p-12 text-center">
+              <div className="text-6xl mb-4">🚧</div>
+              <h2 className="text-2xl font-bold mb-2">Sekcja w budowie</h2>
+              <p className="text-gray-600">Ta część aplikacji będzie dostępna wkrótce!</p>
+            </div>
+          )}
+        </main>
+
+        {/* RIGHT SIDEBAR - tylko na większych ekranach */}
+        <aside className="hidden xl:block w-80 p-6">
+          <div className="space-y-6">
+            {/* Znajomi online */}
+            <div className="bg-white rounded-xl shadow-sm p-4">
+              <h3 className="font-bold mb-3">👥 Znajomi online (3)</h3>
+              <div className="space-y-2">
+                {['Anna K.', 'Tomek W.', 'Marta S.'].map((friend, i) => (
+                  <div key={i} className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded-lg cursor-pointer">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <span className="text-sm">{friend}</span>
+                    <span className="ml-auto text-xs text-gray-500">Elektryk</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Najnowsze osiągnięcia */}
+            <div className="bg-white rounded-xl shadow-sm p-4">
+              <h3 className="font-bold mb-3">🏅 Ostatnie osiągnięcia</h3>
+              <div className="space-y-3">
+                {[
+                  { name: 'Pierwszy tydzień', icon: '🔥', desc: '7 dni z rzędu' },
+                  { name: 'Pomocnik', icon: '🤝', desc: 'Pomóż 5 osobom' },
+                  { name: 'Perfekcjonista', icon: '💯', desc: '100% w teście' }
+                ].map((achievement, i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <div className="text-2xl">{achievement.icon}</div>
+                    <div>
+                      <div className="text-sm font-medium">{achievement.name}</div>
+                      <div className="text-xs text-gray-500">{achievement.desc}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Wyzwanie grupowe */}
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4">
+              <h3 className="font-bold mb-2">🎯 Wyzwanie grupowe</h3>
+              <p className="text-sm text-gray-600 mb-3">
+                Ukończcie razem 1000 lekcji w tym tygodniu!
+              </p>
+              <div className="mb-2">
+                <div className="flex justify-between text-xs mb-1">
+                  <span>Postęp</span>
+                  <span className="font-bold">673/1000</span>
+                </div>
+                <div className="w-full bg-white rounded-full h-2">
+                  <div className="bg-blue-500 h-2 rounded-full" style={{ width: '67.3%' }}></div>
+                </div>
+              </div>
+              <div className="text-xs text-gray-600">
+                Nagroda: 500 XP dla każdego!
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      {/* News Ticker */}
+      <div className="fixed bottom-0 left-0 right-0 bg-gray-900 text-white p-2 overflow-hidden">
+        <div className="animate-marquee whitespace-nowrap">
+          📰 <strong>Elektryk</strong> - najczęściej poszukiwany zawód w 2025 | 
+          💼 Średnie zarobki w IT wzrosły o 15% | 
+          🎓 Nowe kursy z AI i Machine Learning już dostępne | 
+          🏆 Użytkownik <strong>TechMaster</strong> ukończył 100 lekcji! | 
+          ⚡ Za 30 min Quiz Elektryczny - nagroda 1000 monet! |
+          🌟 Dołącz do PathFinder i zmień swoją karierę już dziś!
+        </div>
+      </div>
+
+      <style jsx>{`
+        @keyframes marquee {
+          0% { transform: translateX(100%); }
+          100% { transform: translateX
