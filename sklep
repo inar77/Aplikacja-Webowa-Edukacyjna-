@@ -1,0 +1,753 @@
+// Dodaj ten kod w sekcji gdzie masz {activeSection === 'shop' && (...)}
+// Zastąp istniejący prosty sklep tym rozbudowanym
+
+{
+  activeSection === "shop" && <ShopSection user={user} setUser={setUser} />;
+}
+
+// Komponent Sklepu - dodaj go przed export default Home()
+function ShopSection({ user, setUser }) {
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [purchaseModal, setPurchaseModal] = useState(null);
+  const [ownedItems, setOwnedItems] = useState(
+    JSON.parse(localStorage.getItem("ownedItems") || "[]")
+  );
+
+  const categories = [
+    { id: "all", name: "Wszystko", icon: "🛍️" },
+    { id: "boosters", name: "Boostery", icon: "⚡" },
+    { id: "cosmetics", name: "Wygląd", icon: "🎨" },
+    { id: "helpers", name: "Pomocnicy", icon: "🤝" },
+    { id: "special", name: "Specjalne", icon: "✨" },
+  ];
+
+  const shopItems = [
+    // Boostery
+    {
+      id: "freeze_streak",
+      category: "boosters",
+      name: "Zamrożenie serii",
+      icon: "❄️",
+      cost: 200,
+      desc: "Zachowaj swój streak przez 1 dzień",
+      effect:
+        "Twoja seria nie zostanie przerwana nawet jeśli nie wykonasz zadania",
+      duration: "24h",
+      owned: ownedItems.includes("freeze_streak"),
+      limited: false,
+    },
+    {
+      id: "xp_boost_2x",
+      category: "boosters",
+      name: "XP Boost 2x",
+      icon: "⚡",
+      cost: 150,
+      desc: "Podwój zdobywane XP",
+      effect: "200% XP ze wszystkich aktywności",
+      duration: "1h",
+      owned: ownedItems.includes("xp_boost_2x"),
+    },
+    {
+      id: "xp_boost_3x",
+      category: "boosters",
+      name: "MEGA XP Boost",
+      icon: "💎",
+      cost: 400,
+      desc: "Potrój zdobywane XP",
+      effect: "300% XP ze wszystkich aktywności",
+      duration: "30 min",
+      owned: ownedItems.includes("xp_boost_3x"),
+      premium: true,
+    },
+    {
+      id: "extra_life",
+      category: "boosters",
+      name: "Dodatkowe życie",
+      icon: "❤️",
+      cost: 100,
+      desc: "Otrzymaj +1 serce",
+      effect: "Możesz popełnić dodatkowy błąd w lekcji",
+      owned: ownedItems.includes("extra_life"),
+    },
+    {
+      id: "time_freeze",
+      category: "boosters",
+      name: "Zatrzymanie czasu",
+      icon: "⏰",
+      cost: 250,
+      desc: "Zatrzymaj timer w testach",
+      effect: "Czas nie będzie upływał przez 5 minut",
+      duration: "5 min",
+      owned: ownedItems.includes("time_freeze"),
+    },
+
+    // Pomocnicy
+    {
+      id: "hint_pack",
+      category: "helpers",
+      name: "Pakiet podpowiedzi",
+      icon: "💡",
+      cost: 50,
+      desc: "3 podpowiedzi do zadań",
+      effect: "Użyj gdy utkniesz na zadaniu",
+      quantity: 3,
+      owned: ownedItems.includes("hint_pack"),
+    },
+    {
+      id: "ai_mentor",
+      category: "helpers",
+      name: "AI Mentor PRO",
+      icon: "🤖",
+      cost: 500,
+      desc: "Nielimitowany dostęp do AI",
+      effect: "Zadawaj pytania bez ograniczeń",
+      duration: "7 dni",
+      owned: ownedItems.includes("ai_mentor"),
+      premium: true,
+    },
+    {
+      id: "solution_reveal",
+      category: "helpers",
+      name: "Pokaż rozwiązanie",
+      icon: "🔓",
+      cost: 75,
+      desc: "Odkryj poprawną odpowiedź",
+      effect: "Natychmiast zobacz rozwiązanie zadania",
+      owned: ownedItems.includes("solution_reveal"),
+    },
+
+    // Wygląd
+    {
+      id: "avatar_robot",
+      category: "cosmetics",
+      name: "Avatar: Robot",
+      icon: "🤖",
+      cost: 300,
+      desc: "Zmień swój avatar",
+      effect: "Wyróżnij się w rankingu",
+      permanent: true,
+      owned: ownedItems.includes("avatar_robot"),
+    },
+    {
+      id: "avatar_wizard",
+      category: "cosmetics",
+      name: "Avatar: Czarodziej",
+      icon: "🧙‍♂️",
+      cost: 300,
+      desc: "Magiczny avatar",
+      effect: "Pokaż swoją moc",
+      permanent: true,
+      owned: ownedItems.includes("avatar_wizard"),
+    },
+    {
+      id: "golden_frame",
+      category: "cosmetics",
+      name: "Złota ramka",
+      icon: "🏆",
+      cost: 450,
+      desc: "Prestiżowa ramka profilu",
+      effect: "Złota ramka wokół Twojego avatara",
+      permanent: true,
+      owned: ownedItems.includes("golden_frame"),
+      premium: true,
+    },
+    {
+      id: "fire_effect",
+      category: "cosmetics",
+      name: "Efekt ognia",
+      icon: "🔥",
+      cost: 350,
+      desc: "Animowany efekt streaka",
+      effect: "Płomienie wokół licznika serii",
+      permanent: true,
+      owned: ownedItems.includes("fire_effect"),
+    },
+
+    // Specjalne
+    {
+      id: "weekend_warrior",
+      category: "special",
+      name: "Weekendowy Wojownik",
+      icon: "⚔️",
+      cost: 600,
+      desc: "Pakiet weekendowy",
+      effect: "2x XP + 5 serc + 10 podpowiedzi",
+      duration: "Weekend",
+      owned: ownedItems.includes("weekend_warrior"),
+      limited: true,
+      badge: "LIMITOWANE",
+    },
+    {
+      id: "starter_pack",
+      category: "special",
+      name: "Pakiet Startowy",
+      icon: "🎁",
+      cost: 99,
+      desc: "Idealny dla początkujących",
+      effect: "3 serca + 5 podpowiedzi + XP Boost",
+      owned: ownedItems.includes("starter_pack"),
+      discount: true,
+      originalPrice: 200,
+    },
+    {
+      id: "mystery_box",
+      category: "special",
+      name: "Tajemnicza Skrzynia",
+      icon: "📦",
+      cost: 250,
+      desc: "Losowy przedmiot premium",
+      effect: "???",
+      owned: false,
+      mystery: true,
+    },
+  ];
+
+  const filteredItems =
+    selectedCategory === "all"
+      ? shopItems
+      : shopItems.filter((item) => item.category === selectedCategory);
+
+  const handlePurchase = (item) => {
+    if (user.coins >= item.cost && !item.owned) {
+      // Odejmij monety
+      setUser((prev) => ({
+        ...prev,
+        coins: prev.coins - item.cost,
+      }));
+
+      // Dodaj przedmiot do posiadanych
+      const newOwned = [...ownedItems, item.id];
+      setOwnedItems(newOwned);
+      localStorage.setItem("ownedItems", JSON.stringify(newOwned));
+
+      // Zastosuj efekt (przykładowo)
+      applyItemEffect(item);
+
+      // Zamknij modal
+      setPurchaseModal(null);
+    }
+  };
+
+  const applyItemEffect = (item) => {
+    switch (item.id) {
+      case "extra_life":
+        setUser((prev) => ({ ...prev, hearts: prev.hearts + 1 }));
+        break;
+      case "xp_boost_2x":
+        // Tutaj dodałbyś logikę boosta XP
+        localStorage.setItem(
+          "xp_boost",
+          JSON.stringify({
+            multiplier: 2,
+            endTime: Date.now() + 3600000, // 1h
+          })
+        );
+        break;
+      // Dodaj więcej efektów
+    }
+  };
+
+  return (
+    <div style={shopStyles.container}>
+      <div style={shopStyles.header}>
+        <h1 style={shopStyles.title}>🛍️ Sklep</h1>
+        <div style={shopStyles.balance}>
+          <span style={shopStyles.coinIcon}>💰</span>
+          <span style={shopStyles.coinAmount}>{user.coins}</span>
+          <button style={shopStyles.addCoinsBtn}>+</button>
+        </div>
+      </div>
+
+      {/* Kategorie */}
+      <div style={shopStyles.categories}>
+        {categories.map((cat) => (
+          <button
+            key={cat.id}
+            onClick={() => setSelectedCategory(cat.id)}
+            style={{
+              ...shopStyles.categoryBtn,
+              ...(selectedCategory === cat.id
+                ? shopStyles.categoryBtnActive
+                : {}),
+            }}
+          >
+            <span style={shopStyles.categoryIcon}>{cat.icon}</span>
+            <span>{cat.name}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Oferty specjalne */}
+      <div style={shopStyles.specialOffer}>
+        <div style={shopStyles.offerContent}>
+          <span style={shopStyles.offerBadge}>OFERTA DNIA</span>
+          <h3>Pakiet Mistrza 🏆</h3>
+          <p>3x XP Boost + 10 Serc + Avatar Premium</p>
+          <div style={shopStyles.offerPrice}>
+            <span style={shopStyles.oldPrice}>1200</span>
+            <span style={shopStyles.newPrice}>799 💰</span>
+            <span style={shopStyles.discount}>-33%</span>
+          </div>
+        </div>
+        <div style={shopStyles.offerTimer}>
+          <span>Kończy się za: 23:45:12</span>
+        </div>
+      </div>
+
+      {/* Siatka przedmiotów */}
+      <div style={shopStyles.itemsGrid}>
+        {filteredItems.map((item) => (
+          <div
+            key={item.id}
+            style={{
+              ...shopStyles.itemCard,
+              ...(item.owned ? shopStyles.itemOwned : {}),
+              ...(item.premium ? shopStyles.itemPremium : {}),
+            }}
+          >
+            {item.badge && (
+              <span style={shopStyles.itemBadge}>{item.badge}</span>
+            )}
+            {item.owned && <span style={shopStyles.ownedBadge}>POSIADANE</span>}
+
+            <div style={shopStyles.itemIcon}>{item.icon}</div>
+            <h4 style={shopStyles.itemName}>{item.name}</h4>
+            <p style={shopStyles.itemDesc}>{item.desc}</p>
+
+            {item.effect && (
+              <div style={shopStyles.itemEffect}>
+                <span style={shopStyles.effectIcon}>✨</span>
+                <span>{item.effect}</span>
+              </div>
+            )}
+
+            {item.duration && (
+              <div style={shopStyles.itemDuration}>
+                <span style={shopStyles.durationIcon}>⏱️</span>
+                <span>{item.duration}</span>
+              </div>
+            )}
+
+            <div style={shopStyles.itemFooter}>
+              {item.discount && (
+                <span style={shopStyles.originalPrice}>
+                  {item.originalPrice}
+                </span>
+              )}
+              <button
+                onClick={() => (item.owned ? null : setPurchaseModal(item))}
+                style={{
+                  ...shopStyles.buyButton,
+                  ...(user.coins < item.cost
+                    ? shopStyles.buyButtonDisabled
+                    : {}),
+                  ...(item.owned ? shopStyles.buyButtonOwned : {}),
+                }}
+                disabled={item.owned || user.coins < item.cost}
+              >
+                {item.owned ? (
+                  "Posiadane"
+                ) : (
+                  <>
+                    <span>💰</span>
+                    <span>{item.cost}</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Modal zakupu */}
+      {purchaseModal && (
+        <div style={shopStyles.modal}>
+          <div style={shopStyles.modalContent}>
+            <button
+              onClick={() => setPurchaseModal(null)}
+              style={shopStyles.closeBtn}
+            >
+              ✕
+            </button>
+
+            <div style={shopStyles.modalIcon}>{purchaseModal.icon}</div>
+            <h2>{purchaseModal.name}</h2>
+            <p style={shopStyles.modalDesc}>{purchaseModal.desc}</p>
+
+            {purchaseModal.effect && (
+              <div style={shopStyles.modalEffect}>
+                <strong>Efekt:</strong> {purchaseModal.effect}
+              </div>
+            )}
+
+            <div style={shopStyles.modalPrice}>
+              <span>Cena: </span>
+              <span style={shopStyles.priceAmount}>
+                💰 {purchaseModal.cost}
+              </span>
+            </div>
+
+            <div style={shopStyles.modalBalance}>
+              <span>Twoje monety: {user.coins}</span>
+              <span>Po zakupie: {user.coins - purchaseModal.cost}</span>
+            </div>
+
+            <div style={shopStyles.modalButtons}>
+              <button
+                onClick={() => setPurchaseModal(null)}
+                style={shopStyles.cancelBtn}
+              >
+                Anuluj
+              </button>
+              <button
+                onClick={() => handlePurchase(purchaseModal)}
+                style={{
+                  ...shopStyles.confirmBtn,
+                  ...(user.coins < purchaseModal.cost
+                    ? shopStyles.confirmBtnDisabled
+                    : {}),
+                }}
+                disabled={user.coins < purchaseModal.cost}
+              >
+                {user.coins < purchaseModal.cost ? "Brak monet" : "Kup teraz"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Style dla sklepu
+const shopStyles = {
+  container: {
+    maxWidth: "1200px",
+    margin: "0 auto",
+  },
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "24px",
+  },
+  title: {
+    fontSize: "32px",
+    fontWeight: "bold",
+    margin: 0,
+  },
+  balance: {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    backgroundColor: "#fef3c7",
+    padding: "8px 16px",
+    borderRadius: "20px",
+  },
+  coinIcon: {
+    fontSize: "24px",
+  },
+  coinAmount: {
+    fontSize: "20px",
+    fontWeight: "bold",
+    color: "#92400e",
+  },
+  addCoinsBtn: {
+    width: "24px",
+    height: "24px",
+    borderRadius: "50%",
+    border: "none",
+    backgroundColor: "#fbbf24",
+    color: "white",
+    cursor: "pointer",
+    fontSize: "16px",
+    fontWeight: "bold",
+  },
+  categories: {
+    display: "flex",
+    gap: "12px",
+    marginBottom: "24px",
+    overflowX: "auto",
+  },
+  categoryBtn: {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    padding: "10px 20px",
+    border: "2px solid #e5e7eb",
+    borderRadius: "20px",
+    backgroundColor: "white",
+    cursor: "pointer",
+    transition: "all 0.2s",
+    fontSize: "16px",
+  },
+  categoryBtnActive: {
+    backgroundColor: "#7c3aed",
+    color: "white",
+    borderColor: "#7c3aed",
+  },
+  categoryIcon: {
+    fontSize: "20px",
+  },
+  specialOffer: {
+    background: "linear-gradient(135deg, #7c3aed 0%, #ec4899 100%)",
+    borderRadius: "16px",
+    padding: "24px",
+    marginBottom: "32px",
+    color: "white",
+    position: "relative",
+    overflow: "hidden",
+  },
+  offerContent: {
+    position: "relative",
+    zIndex: 1,
+  },
+  offerBadge: {
+    backgroundColor: "#fbbf24",
+    color: "#78350f",
+    padding: "4px 12px",
+    borderRadius: "12px",
+    fontSize: "12px",
+    fontWeight: "bold",
+    display: "inline-block",
+    marginBottom: "8px",
+  },
+  offerPrice: {
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+    marginTop: "16px",
+  },
+  oldPrice: {
+    textDecoration: "line-through",
+    opacity: 0.7,
+  },
+  newPrice: {
+    fontSize: "28px",
+    fontWeight: "bold",
+  },
+  discount: {
+    backgroundColor: "#dc2626",
+    padding: "4px 8px",
+    borderRadius: "8px",
+    fontSize: "14px",
+  },
+  offerTimer: {
+    marginTop: "16px",
+    fontSize: "14px",
+    opacity: 0.9,
+  },
+  itemsGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))",
+    gap: "20px",
+  },
+  itemCard: {
+    backgroundColor: "white",
+    borderRadius: "12px",
+    padding: "20px",
+    border: "2px solid #e5e7eb",
+    position: "relative",
+    transition: "all 0.2s",
+    cursor: "pointer",
+    ":hover": {
+      transform: "translateY(-4px)",
+      boxShadow: "0 8px 20px rgba(0,0,0,0.1)",
+    },
+  },
+  itemOwned: {
+    opacity: 0.7,
+    backgroundColor: "#f9fafb",
+  },
+  itemPremium: {
+    border: "2px solid #fbbf24",
+    background: "linear-gradient(135deg, #fef3c7 0%, #fce7f3 100%)",
+  },
+  itemBadge: {
+    position: "absolute",
+    top: "10px",
+    right: "10px",
+    backgroundColor: "#dc2626",
+    color: "white",
+    padding: "2px 8px",
+    borderRadius: "8px",
+    fontSize: "10px",
+    fontWeight: "bold",
+  },
+  ownedBadge: {
+    position: "absolute",
+    top: "10px",
+    right: "10px",
+    backgroundColor: "#16a34a",
+    color: "white",
+    padding: "2px 8px",
+    borderRadius: "8px",
+    fontSize: "10px",
+    fontWeight: "bold",
+  },
+  itemIcon: {
+    fontSize: "48px",
+    marginBottom: "12px",
+  },
+  itemName: {
+    fontSize: "18px",
+    fontWeight: "bold",
+    marginBottom: "8px",
+  },
+  itemDesc: {
+    fontSize: "14px",
+    color: "#6b7280",
+    marginBottom: "12px",
+  },
+  itemEffect: {
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    fontSize: "12px",
+    color: "#7c3aed",
+    backgroundColor: "#f3f4f6",
+    padding: "6px 10px",
+    borderRadius: "8px",
+    marginBottom: "8px",
+  },
+  effectIcon: {
+    fontSize: "14px",
+  },
+  itemDuration: {
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    fontSize: "12px",
+    color: "#6b7280",
+    marginBottom: "12px",
+  },
+  durationIcon: {
+    fontSize: "14px",
+  },
+  itemFooter: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: "16px",
+  },
+  originalPrice: {
+    textDecoration: "line-through",
+    color: "#9ca3af",
+    fontSize: "14px",
+  },
+  buyButton: {
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    padding: "8px 16px",
+    backgroundColor: "#7c3aed",
+    color: "white",
+    border: "none",
+    borderRadius: "8px",
+    fontWeight: "bold",
+    cursor: "pointer",
+    transition: "all 0.2s",
+  },
+  buyButtonDisabled: {
+    backgroundColor: "#e5e7eb",
+    color: "#9ca3af",
+    cursor: "not-allowed",
+  },
+  buyButtonOwned: {
+    backgroundColor: "#16a34a",
+    cursor: "default",
+  },
+  modal: {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1000,
+  },
+  modalContent: {
+    backgroundColor: "white",
+    borderRadius: "16px",
+    padding: "32px",
+    maxWidth: "400px",
+    width: "90%",
+    position: "relative",
+  },
+  closeBtn: {
+    position: "absolute",
+    top: "16px",
+    right: "16px",
+    background: "none",
+    border: "none",
+    fontSize: "24px",
+    cursor: "pointer",
+    color: "#6b7280",
+  },
+  modalIcon: {
+    fontSize: "64px",
+    textAlign: "center",
+    marginBottom: "16px",
+  },
+  modalDesc: {
+    color: "#6b7280",
+    marginBottom: "16px",
+    textAlign: "center",
+  },
+  modalEffect: {
+    backgroundColor: "#f3f4f6",
+    padding: "12px",
+    borderRadius: "8px",
+    marginBottom: "16px",
+    fontSize: "14px",
+  },
+  modalPrice: {
+    fontSize: "20px",
+    fontWeight: "bold",
+    textAlign: "center",
+    marginBottom: "12px",
+  },
+  priceAmount: {
+    color: "#7c3aed",
+  },
+  modalBalance: {
+    display: "flex",
+    justifyContent: "space-between",
+    fontSize: "14px",
+    color: "#6b7280",
+    marginBottom: "24px",
+    paddingTop: "12px",
+    borderTop: "1px solid #e5e7eb",
+  },
+  modalButtons: {
+    display: "flex",
+    gap: "12px",
+  },
+  cancelBtn: {
+    flex: 1,
+    padding: "12px",
+    border: "2px solid #e5e7eb",
+    backgroundColor: "white",
+    borderRadius: "8px",
+    fontWeight: "bold",
+    cursor: "pointer",
+  },
+  confirmBtn: {
+    flex: 1,
+    padding: "12px",
+    backgroundColor: "#7c3aed",
+    color: "white",
+    border: "none",
+    borderRadius: "8px",
+    fontWeight: "bold",
+    cursor: "pointer",
+  },
+  confirmBtnDisabled: {
+    backgroundColor: "#e5e7eb",
+    color: "#9ca3af",
+    cursor: "not-allowed",
+  },
+};
