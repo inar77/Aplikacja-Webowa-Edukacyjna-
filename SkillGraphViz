@@ -1,0 +1,129 @@
+'use client';
+
+import React from 'react';
+import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+
+interface SkillGraphVizProps {
+  userSkills: Record<string, number>;
+  requiredSkills: Record<string, number>;
+}
+
+/**
+ * SkillGraphViz - SSR-safe skill comparison
+ * 
+ * Shows max 6 skills sorted by gap (required - user)
+ * Uses simple horizontal bars instead of recharts for SSR safety
+ * 
+ * Gap interpretation:
+ * - Positive gap: need to improve (red)
+ * - Zero/negative: already proficient (green)
+ */
+export function SkillGraphViz({ userSkills = {}, requiredSkills = {} }: SkillGraphVizProps) {
+  // Calculate gaps
+  const gaps = Object.keys(requiredSkills).map(skill => {
+    const required = requiredSkills[skill] || 0;
+    const user = userSkills[skill] || 0;
+    const gap = required - user;
+    
+    return { skill, required, user, gap };
+  });
+
+  // Sort by gap descending (biggest gaps first)
+  const sortedGaps = gaps.sort((a, b) => b.gap - a.gap).slice(0, 6);
+
+  if (sortedGaps.length === 0) {
+    return (
+      <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6">
+        <h3 className="text-lg font-bold mb-4">Porównanie umiejętności</h3>
+        <p className="text-slate-400 text-center py-8">Brak danych o umiejętnościach</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6">
+      {/* Header */}
+      <h3 className="text-lg font-bold mb-4">Porównanie umiejętności</h3>
+      
+      {/* Legend */}
+      <div className="flex gap-4 mb-6 text-xs">
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-violet-500" />
+          <span className="text-slate-400">Wymagane</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-cyan-500" />
+          <span className="text-slate-400">Twój poziom</span>
+        </div>
+      </div>
+
+      {/* Skill bars */}
+      <div className="space-y-4">
+        {sortedGaps.map(({ skill, required, user, gap }) => {
+          const requiredPct = Math.min(100, required);
+          const userPct = Math.min(100, user);
+          const gapStatus = gap > 10 ? 'large' : gap > 0 ? 'small' : 'ok';
+
+          return (
+            <div key={skill} className="space-y-2">
+              {/* Skill name + gap indicator */}
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-white">{skill}</span>
+                {gapStatus === 'ok' ? (
+                  <div className="flex items-center gap-1 text-emerald-400 text-xs">
+                    <TrendingUp className="w-3 h-3" />
+                    <span>Gotowe</span>
+                  </div>
+                ) : gapStatus === 'large' ? (
+                  <div className="flex items-center gap-1 text-red-400 text-xs">
+                    <TrendingDown className="w-3 h-3" />
+                    <span>Do nauki</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1 text-amber-400 text-xs">
+                    <Minus className="w-3 h-3" />
+                    <span>Blisko</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Bars container */}
+              <div className="space-y-1">
+                {/* Required level */}
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-slate-500 w-16">Wymagane</span>
+                  <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-violet-500 to-violet-400 rounded-full transition-all duration-500"
+                      style={{ width: `${requiredPct}%` }}
+                    />
+                  </div>
+                  <span className="text-xs text-violet-400 w-8 text-right">{Math.round(required)}</span>
+                </div>
+
+                {/* User level */}
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-slate-500 w-16">Twój</span>
+                  <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-cyan-500 to-cyan-400 rounded-full transition-all duration-500"
+                      style={{ width: `${userPct}%` }}
+                    />
+                  </div>
+                  <span className="text-xs text-cyan-400 w-8 text-right">{Math.round(user)}</span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Footer note */}
+      <div className="mt-6 pt-4 border-t border-white/10">
+        <p className="text-xs text-slate-500">
+          Wartości pokazują stopień zaawansowania (0-100). Luki można domknąć w ramach ścieżki nauki.
+        </p>
+      </div>
+    </div>
+  );
+}
