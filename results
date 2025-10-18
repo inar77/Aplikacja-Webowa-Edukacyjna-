@@ -1,0 +1,428 @@
+'use client';
+import React, { useState } from 'react';
+import CareerPathCard from './CareerPathCard';
+
+export default function RecommendationResults({ profile }) {
+  const [selectedPath, setSelectedPath] = useState(null);
+
+  const careerPaths = generateRecommendations(profile);
+
+  if (selectedPath) {
+    return (
+      <div style={{ maxWidth: '900px', margin: '0 auto', padding: '40px 20px' }}>
+        <button
+          onClick={() => setSelectedPath(null)}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: '#7c3aed',
+            cursor: 'pointer',
+            fontSize: '14px',
+            marginBottom: '20px'
+          }}
+        >
+          ← Wróć do rekomendacji
+        </button>
+
+        <DetailedPathView path={selectedPath} profile={profile} />
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px 20px' }}>
+      <div style={{
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        color: 'white',
+        padding: '40px',
+        borderRadius: '16px',
+        marginBottom: '40px',
+        textAlign: 'center'
+      }}>
+        <div style={{ fontSize: '64px', marginBottom: '16px' }}>🎯</div>
+        <h1 style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '12px' }}>
+          Twoje spersonalizowane ścieżki kariery
+        </h1>
+        <p style={{ fontSize: '18px', opacity: 0.95 }}>
+          Na podstawie Twojego profilu wybraliśmy {careerPaths.length} najlepsze dopasowania
+        </p>
+      </div>
+
+      <div style={{
+        backgroundColor: 'white',
+        padding: '24px',
+        borderRadius: '12px',
+        marginBottom: '32px',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+      }}>
+        <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '16px' }}>
+          📊 Twój profil
+        </h2>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: '16px'
+        }}>
+          {Object.entries(profile.traits || {})
+            .filter(([_, value]) => value > 0.5)
+            .sort(([_, a], [__, b]) => b - a)
+            .slice(0, 4)
+            .map(([trait, value]) => (
+              <div key={trait} style={{ padding: '12px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
+                <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px', textTransform: 'capitalize' }}>
+                  {trait}
+                </div>
+                <div style={{
+                  width: '100%',
+                  height: '6px',
+                  backgroundColor: '#e5e7eb',
+                  borderRadius: '3px',
+                  overflow: 'hidden'
+                }}>
+                  <div style={{
+                    width: `${value * 100}%`,
+                    height: '100%',
+                    background: 'linear-gradient(90deg, #7c3aed 0%, #ec4899 100%)',
+                    borderRadius: '3px'
+                  }} />
+                </div>
+                <div style={{ fontSize: '14px', fontWeight: 'bold', marginTop: '4px' }}>
+                  {Math.round(value * 100)}%
+                </div>
+              </div>
+            ))}
+        </div>
+      </div>
+
+      <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '24px' }}>
+        🚀 Rekomendowane ścieżki kariery
+      </h2>
+
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))',
+        gap: '24px'
+      }}>
+        {careerPaths.map((path, index) => (
+          <CareerPathCard
+            key={index}
+            path={path}
+            rank={index + 1}
+            onClick={() => setSelectedPath(path)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function generateRecommendations(profile) {
+  if (profile.skipped) {
+    return getDefaultPaths();
+  }
+
+  const { traits = {} } = profile;
+
+  const allPaths = [
+    {
+      id: 'frontend_dev',
+      title: 'Frontend Developer',
+      icon: '💻',
+      description: 'Twórz interfejsy użytkownika i aplikacje webowe',
+      salary: '8.000 - 18.000 PLN',
+      demand: 'Bardzo wysoki',
+      matchScore: calculateMatch(traits, { creative: 0.7, analytical: 0.8, practical: 0.9 }),
+      skills: ['HTML/CSS', 'JavaScript', 'React', 'TypeScript'],
+      timeToJob: '6-12 miesięcy',
+      difficulty: 'Średni',
+      companies: ['Google', 'Meta', 'Allegro', 'Booksy'],
+      pros: ['Kreatywna praca', 'Wysokie zarobki', 'Praca zdalna', 'Dużo ofert'],
+      cons: ['Szybkie zmiany technologii', 'Wymaga ciągłej nauki'],
+      learningPath: [
+        { week: '1-4', topic: 'HTML & CSS Basics', hours: 20 },
+        { week: '5-8', topic: 'JavaScript Fundamentals', hours: 30 },
+        { week: '9-12', topic: 'React & Modern Tools', hours: 40 }
+      ]
+    },
+    {
+      id: 'data_analyst',
+      title: 'Data Analyst',
+      icon: '📊',
+      description: 'Analizuj dane i wspieraj decyzje biznesowe',
+      salary: '7.000 - 15.000 PLN',
+      demand: 'Wysoki',
+      matchScore: calculateMatch(traits, { analytical: 0.9, systematic: 0.8, creative: 0.4 }),
+      skills: ['SQL', 'Python', 'Excel', 'Power BI'],
+      timeToJob: '4-8 miesięcy',
+      difficulty: 'Średni',
+      companies: ['Deloitte', 'PwC', 'mBank', 'Revolut'],
+      pros: ['Stabilna kariera', 'Duży wpływ na biznes', 'Logiczna praca'],
+      cons: ['Może być powtarzalna', 'Wymaga precyzji'],
+      learningPath: [
+        { week: '1-3', topic: 'Excel & SQL', hours: 15 },
+        { week: '4-7', topic: 'Python for Data', hours: 25 },
+        { week: '8-12', topic: 'Visualization & BI', hours: 20 }
+      ]
+    },
+    {
+      id: 'ux_designer',
+      title: 'UX/UI Designer',
+      icon: '🎨',
+      description: 'Projektuj doświadczenia użytkowników',
+      salary: '6.000 - 14.000 PLN',
+      demand: 'Wysoki',
+      matchScore: calculateMatch(traits, { creative: 0.9, empathy: 0.8, analytical: 0.5 }),
+      skills: ['Figma', 'Adobe XD', 'User Research', 'Prototyping'],
+      timeToJob: '5-10 miesięcy',
+      difficulty: 'Średni',
+      companies: ['Samsung', 'Allegro', 'OLX', 'Netguru'],
+      pros: ['Kreatywna praca', 'Widoczny efekt', 'Praca z ludźmi'],
+      cons: ['Subiektywne opinie', 'Konkurencja w portfolio'],
+      learningPath: [
+        { week: '1-4', topic: 'Design Thinking & UX Basics', hours: 20 },
+        { week: '5-8', topic: 'Figma & UI Design', hours: 25 },
+        { week: '9-12', topic: 'Portfolio & Case Studies', hours: 30 }
+      ]
+    },
+    {
+      id: 'backend_dev',
+      title: 'Backend Developer',
+      icon: '🔧',
+      description: 'Buduj serwery i API',
+      salary: '9.000 - 20.000 PLN',
+      demand: 'Bardzo wysoki',
+      matchScore: calculateMatch(traits, { analytical: 0.9, systematic: 0.8, practical: 0.7 }),
+      skills: ['Node.js', 'Databases', 'APIs', 'Cloud'],
+      timeToJob: '7-14 miesięcy',
+      difficulty: 'Wysoki',
+      companies: ['Amazon', 'Google', 'Revolut', 'Allegro'],
+      pros: ['Wysokie zarobki', 'Stabilne systemy', 'Praca zdalna'],
+      cons: ['Mniej widoczny efekt', 'Złożone debugowanie'],
+      learningPath: [
+        { week: '1-5', topic: 'Node.js & Express', hours: 25 },
+        { week: '6-9', topic: 'Databases & SQL', hours: 20 },
+        { week: '10-14', topic: 'APIs & Cloud Deploy', hours: 30 }
+      ]
+    }
+  ];
+
+  return allPaths
+    .sort((a, b) => b.matchScore - a.matchScore)
+    .slice(0, 3);
+}
+
+function getDefaultPaths() {
+  return [
+    {
+      id: 'frontend_dev',
+      title: 'Frontend Developer',
+      icon: '💻',
+      matchScore: 75,
+      salary: '8.000 - 18.000 PLN',
+      // ... (reszta danych jak wyżej)
+    }
+  ];
+}
+
+function calculateMatch(userTraits, requiredTraits) {
+  let score = 0;
+  let totalWeight = 0;
+
+  Object.entries(requiredTraits).forEach(([trait, weight]) => {
+    const userValue = userTraits[trait] || 0;
+    score += userValue * weight;
+    totalWeight += weight;
+  });
+
+  return totalWeight > 0 ? Math.min(Math.round((score / totalWeight) * 100), 99) : 50;
+}
+
+function DetailedPathView({ path }) {
+  return (
+    <div>
+      <div style={{
+        background: 'linear-gradient(135deg, #7c3aed 0%, #ec4899 100%)',
+        color: 'white',
+        padding: '40px',
+        borderRadius: '16px',
+        marginBottom: '32px'
+      }}>
+        <div style={{ fontSize: '64px', marginBottom: '16px' }}>{path.icon}</div>
+        <h1 style={{ fontSize: '36px', fontWeight: 'bold', marginBottom: '12px' }}>
+          {path.title}
+        </h1>
+        <p style={{ fontSize: '18px', marginBottom: '24px', opacity: 0.95 }}>
+          {path.description}
+        </p>
+        <div style={{
+          display: 'inline-block',
+          backgroundColor: 'rgba(255,255,255,0.2)',
+          padding: '12px 24px',
+          borderRadius: '24px',
+          fontSize: '20px',
+          fontWeight: 'bold'
+        }}>
+          {path.matchScore}% dopasowania
+        </div>
+      </div>
+
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+        gap: '16px',
+        marginBottom: '32px'
+      }}>
+        <QuickStat icon="💰" label="Zarobki" value={path.salary} />
+        <QuickStat icon="📈" label="Popyt" value={path.demand} />
+        <QuickStat icon="⏱️" label="Czas do pracy" value={path.timeToJob} />
+        <QuickStat icon="🎯" label="Trudność" value={path.difficulty} />
+      </div>
+
+      <div style={{
+        backgroundColor: 'white',
+        padding: '32px',
+        borderRadius: '12px',
+        marginBottom: '24px',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+      }}>
+        <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '24px' }}>
+          📚 12-tygodniowy plan nauki
+        </h2>
+        {path.learningPath.map((phase, idx) => (
+          <div key={idx} style={{
+            padding: '16px',
+            backgroundColor: '#f9fafb',
+            borderRadius: '8px',
+            marginBottom: '12px',
+            borderLeft: '4px solid #7c3aed'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <span style={{ fontWeight: 'bold' }}>Tygodnie {phase.week}</span>
+              <span style={{ color: '#6b7280' }}>{phase.hours}h</span>
+            </div>
+            <div style={{ color: '#374151' }}>{phase.topic}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{
+        backgroundColor: 'white',
+        padding: '32px',
+        borderRadius: '12px',
+        marginBottom: '24px',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+      }}>
+        <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>
+          🛠️ Kluczowe umiejętności
+        </h2>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+          {path.skills.map((skill, idx) => (
+            <span key={idx} style={{
+              padding: '8px 16px',
+              backgroundColor: '#ede9fe',
+              color: '#7c3aed',
+              borderRadius: '20px',
+              fontSize: '14px',
+              fontWeight: '500'
+            }}>
+              {skill}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: '24px',
+        marginBottom: '24px'
+      }}>
+        <div style={{
+          backgroundColor: 'white',
+          padding: '24px',
+          borderRadius: '12px',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+        }}>
+          <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '16px', color: '#10b981' }}>
+            ✅ Zalety
+          </h3>
+          {path.pros.map((pro, idx) => (
+            <div key={idx} style={{ marginBottom: '8px', color: '#374151' }}>
+              • {pro}
+            </div>
+          ))}
+        </div>
+
+        <div style={{
+          backgroundColor: 'white',
+          padding: '24px',
+          borderRadius: '12px',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+        }}>
+          <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '16px', color: '#ef4444' }}>
+            ⚠️ Wyzwania
+          </h3>
+          {path.cons.map((con, idx) => (
+            <div key={idx} style={{ marginBottom: '8px', color: '#374151' }}>
+              • {con}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{
+        backgroundColor: 'white',
+        padding: '24px',
+        borderRadius: '12px',
+        marginBottom: '32px',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+      }}>
+        <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '16px' }}>
+          🏢 Przykładowi pracodawcy
+        </h3>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+          {path.companies.map((company, idx) => (
+            <span key={idx} style={{
+              padding: '6px 12px',
+              backgroundColor: '#f3f4f6',
+              borderRadius: '8px',
+              fontSize: '14px'
+            }}>
+              {company}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <button style={{
+        width: '100%',
+        padding: '18px',
+        background: 'linear-gradient(135deg, #7c3aed 0%, #ec4899 100%)',
+        color: 'white',
+        border: 'none',
+        borderRadius: '12px',
+        fontSize: '18px',
+        fontWeight: 'bold',
+        cursor: 'pointer'
+      }}>
+        Rozpocznij tę ścieżkę →
+      </button>
+    </div>
+  );
+}
+
+function QuickStat({ icon, label, value }) {
+  return (
+    <div style={{
+      backgroundColor: 'white',
+      padding: '20px',
+      borderRadius: '12px',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+      textAlign: 'center'
+    }}>
+      <div style={{ fontSize: '32px', marginBottom: '8px' }}>{icon}</div>
+      <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>{label}</div>
+      <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#1f2937' }}>{value}</div>
+    </div>
+  );
+}
