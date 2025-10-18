@@ -1,0 +1,298 @@
+"use client";
+import React, { useMemo, useState } from 'react';
+import dynamic from 'next/dynamic';
+import RecommendationsRedesign, { type RecCard } from './RecommendationsRedesign';
+import { useCareerMatching } from '@/hooks/useCareerMatching';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import type { UserProfile, CareerMatchBase } from '@/utils/careerMatcher';
+
+// Lazy load legacy list only when user switches to it (keeps initial payload leaner)
+const LegacyList = dynamic(() => import('./RecommendationsTab'), { ssr: false });
+const SwipeLazy = dynamic(() => import('./RecommendationSection').then(m => m.default), { ssr: false });
+
+// Minimal demo dataset (can be replaced by real career database integration)
+const careerDataset: CareerMatchBase[] = [
+  {
+    id: 'data_analyst',
+    name: 'Data Analyst',
+    requiredSkills: { SQL: 0.7, Excel: 0.6, Python: 0.5 },
+    idealPersonality: ['analityczny', 'dokładny', 'ciekawy'],
+    relatedInterests: ['dane', 'biznes', 'insighty'],
+    salaryK: [6, 15],
+    market: {
+      trend: 0.35,
+      volatility: 0.3,
+      remoteAvailability: 0.8,
+      regions: ['PL', 'remote'],
+      medianSalaryK: 11,
+      values: ['wpływ', 'rozwój']
+    }
+  },
+  {
+    id: 'ux_designer',
+    name: 'UX Designer',
+    requiredSkills: { Research: 0.6, Figma: 0.55, Prototyping: 0.5 },
+    idealPersonality: ['kreatywny', 'empatyczny'],
+    relatedInterests: ['design', 'psychologia', 'produkt'],
+    salaryK: [5, 13],
+    market: {
+      trend: 0.25,
+      volatility: 0.45,
+      remoteAvailability: 0.7,
+      regions: ['PL', 'EU', 'remote'],
+      medianSalaryK: 9,
+      values: ['użytkownik', 'doświadczenie']
+    }
+  },
+  {
+    id: 'project_manager',
+    name: 'Project Manager',
+    requiredSkills: { Communication: 0.7, Planning: 0.65, Jira: 0.5 },
+    idealPersonality: ['zespołowy', 'zorganizowany'],
+    relatedInterests: ['koordynacja', 'zespoły'],
+    salaryK: [7, 16],
+    market: {
+      trend: 0.2,
+      volatility: 0.35,
+      remoteAvailability: 0.6,
+      regions: ['PL', 'remote'],
+      medianSalaryK: 12,
+      values: ['odpowiedzialność', 'wynik']
+    }
+  },
+  {
+    id: 'frontend_dev',
+    name: 'Frontend Developer',
+    requiredSkills: { JS: 0.65, React: 0.6, CSS: 0.5 },
+    idealPersonality: ['techniczny', 'kreatywny'],
+    relatedInterests: ['web', 'ui'],
+    salaryK: [7, 18],
+    market: {
+      trend: 0.4,
+      volatility: 0.4,
+      remoteAvailability: 0.9,
+      regions: ['PL', 'remote'],
+      medianSalaryK: 13,
+      values: ['innowacja', 'tworzenie']
+    }
+  }
+];
+
+type Modes = 'hero' | 'dashboard' | 'swipe' | 'list'; // future: 'story' | 'chart'
+
+interface Props {
+  profile: any; // legacy shape from page (strengths/preferences/style/skills)
+  onGoToCareerPath?: (id?: string) => void;
+}
+
+export default function RecommendationModesController({ profile, onGoToCareerPath }: Props) {
+  // Map legacy profile → new matcher UserProfile structure (best-effort)
+  const matcherProfile: UserProfile = useMemo(() => ({
+    skills: profile?.skills || {},
+    personality: profile?.strengths || [],
+    interests: profile?.preferences || [],
+    values: profile?.values || [],
+    location: profile?.location || 'PL',
+    preferences: {
+      remote: true,
+      stabilityImportance: 0.6,
+      salaryImportance: 0.5
+    }
+  }), [profile]);
+
+  const matches = useCareerMatching(matcherProfile, careerDataset, { explain: true });
+  const [mode, setMode] = useState<Modes>('hero');
+
+  // Prepare data for redesign hero
+  const topOne = matches[0];
+  const topThree = matches.slice(0, 3);
+
+  const recTopOne: RecCard | undefined = topOne && {
+    id: topOne.career.id,
+    name: topOne.career.name,
+    matchPct: Math.round(topOne.score * 100),
+    salaryK: topOne.career.salaryK,
+    timeMonths: deriveTime(topOne.career.id),
+    demandScore: Math.round((topOne.factors.market || 0.5) * 100),
+    reasons: buildReasons(topOne.explanation)
+  };
+  const recTopThree: RecCard[] = topThree.map(r => ({
+    id: r.career.id,
+    name: r.career.name,
+    matchPct: Math.round(r.score * 100),
+    salaryK: r.career.salaryK,
+    timeMonths: deriveTime(r.career.id),
+    demandScore: Math.round((r.factors.market || 0.5) * 100)
+  }));
+
+  return (
+    <div className="space-y-6">
+      <ModeSwitcher current={mode} onChange={setMode} />
+      {mode === 'hero' && recTopOne && (
+        <RecommendationsRedesign
+          topOne={recTopOne}
+          topThree={recTopThree}
+          onStartPath={(id) => onGoToCareerPath?.(id)}
+          onSeeDetails={(id) => setMode('dashboard')}
+          testimonial={{
+            quote: 'Po 5 miesiącach mam pierwszą ofertę — struktura małych kroków działa.',
+            author: 'Kasia',
+            role: 'Junior Frontend',
+            result: '+1 oferta'
+          }}
+        />
+      )}
+
+      {mode === 'dashboard' && (
+        <DashboardView matches={matches.slice(0, 8)} onSelect={(id) => setMode('hero')} />
+      )}
+
+      {mode === 'swipe' && (
+        <div className="mt-2">
+          {/* Using simplified dataset (topThree) for now; could map all matches */}
+          <SwipeLazy />
+        </div>
+      )}
+
+      {mode === 'list' && (
+        <div className="mt-4">
+          <LegacyList userProfile={profile} onGoToCareerPath={() => onGoToCareerPath?.()} />
+        </div>
+      )}
+
+      {/* Light explanation / debug panel for now */}
+      {mode !== 'list' && matches.length > 0 && (
+        <ExplanationPanel match={topOne} />
+      )}
+    </div>
+  );
+}
+
+function ModeSwitcher({ current, onChange }: { current: Modes; onChange: (m: Modes) => void }) {
+  const modes: { key: Modes; label: string }[] = [
+    { key: 'hero', label: 'Hero' },
+    { key: 'dashboard', label: 'Dashboard' },
+    { key: 'swipe', label: 'Swipe' },
+    { key: 'list', label: 'Lista (legacy)' }
+  ];
+  return (
+    <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden bg-white">
+      {modes.map(m => (
+        <button
+          key={m.key}
+            onClick={() => onChange(m.key)}
+            className={`px-4 py-2 text-sm font-medium transition ${current === m.key ? 'bg-[#7C3AED] text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+          >{m.label}</button>
+      ))}
+    </div>
+  );
+}
+
+function DashboardView({ matches, onSelect }: { matches: any[]; onSelect: (id: string) => void }) {
+  return (
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      {matches.map(m => (
+        <Card key={m.career.id} className="border-gray-200 hover:shadow-sm transition">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-gray-50 text-sm">{emojiFor(m.career.id)}</span>
+              <span className="truncate" title={m.career.name}>{m.career.name}</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0 space-y-3 text-sm">
+            <ProgressBar label="Dopasowanie" value={Math.round(m.score * 100)} color="#7C3AED" />
+            <FactorBars factors={m.factors} />
+            <div className="flex items-center justify-between pt-1">
+              <Badge variant="outline" className="text-xs">{Math.round(m.score*100)}%</Badge>
+              <Button size="sm" onClick={() => onSelect(m.career.id)}>Szczegóły</Button>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+function ProgressBar({ label, value, color = '#7C3AED' }: { label: string; value: number; color?: string }) {
+  return (
+    <div>
+      <div className="flex items-center justify-between text-xs text-gray-600">
+        <span>{label}</span><span className="font-medium text-gray-800 tabular-nums">{value}%</span>
+      </div>
+      <div className="mt-1 h-2 w-full rounded-full bg-gray-100 overflow-hidden">
+        <div className="h-full rounded-full" style={{ width: value + '%', background: color }} />
+      </div>
+    </div>
+  );
+}
+
+function FactorBars({ factors }: { factors: Record<string, number> }) {
+  const order: (keyof typeof factors)[] = ['skills','personality','interests','market'];
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      {order.map(k => factors[k] !== undefined && (
+        <div key={k} className="space-y-1">
+          <div className="text-[11px] uppercase tracking-wide text-gray-500">{labelShort(k)}</div>
+          <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+            <div className="h-full rounded-full" style={{ width: Math.round(factors[k]*100) + '%', background:'#7C3AED' }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ExplanationPanel({ match }: { match: any }) {
+  if (!match) return null;
+  return (
+    <Card className="border-gray-200">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm">Dlaczego: {match.career.name}</CardTitle>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <p className="text-xs text-gray-700 leading-relaxed">{match.explanation}</p>
+        <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {Object.entries(match.factors).map(([k,v]) => (
+            <div key={k} className="flex flex-col rounded-md border border-gray-100 bg-white p-2">
+              <span className="text-[10px] uppercase tracking-wide text-gray-500">{labelShort(k)}</span>
+              <span className="text-xs font-medium text-gray-800 tabular-nums">{Math.round(Number(v)*100)}%</span>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ------------- helpers ------------- //
+function labelShort(k: string) {
+  const map: Record<string,string> = {
+    skills: 'Skills', personality: 'Styl', interests: 'Zainteres.', salary: 'Zarobki', values: 'Wartości', market: 'Rynek', location: 'Lokal.'
+  }; return map[k] || k;
+}
+
+function emojiFor(id: string) {
+  if (id === 'data_analyst') return '📊';
+  if (id === 'ux_designer') return '🎨';
+  if (id === 'project_manager') return '📅';
+  if (id === 'frontend_dev') return '💻';
+  return '🎯';
+}
+
+function deriveTime(id: string): number {
+  switch(id) {
+    case 'data_analyst': return 8;
+    case 'ux_designer': return 6;
+    case 'project_manager': return 5;
+    case 'frontend_dev': return 9;
+    default: return 6;
+  }
+}
+
+function buildReasons(explanation: string | undefined) {
+  if (!explanation) return undefined;
+  // Split by '.' and trim – keep first 2-3 fragments
+  return explanation.split('.').map(s => s.trim()).filter(Boolean).slice(0,3).map(text => ({ text }));
+}
