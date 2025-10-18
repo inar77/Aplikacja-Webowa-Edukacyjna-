@@ -1,0 +1,240 @@
+"use client";
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { motion, AnimatePresence, PanInfo } from 'framer-motion';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import Progress from '@/components/ui/progress';
+import { Check, X, Star, Bookmark, Wand2, ArrowLeft, ArrowRight } from 'lucide-react';
+
+type CareerCard = {
+  id: string;
+  title: string;
+  icon: React.ReactNode;
+  match: number; // 0..100
+  summary: string;
+  paths: string[]; // krótkie potencjalne dalsze ścieżki
+  tags: string[];
+  color?: string; // optional accent
+};
+
+interface RecommendationSectionProps {
+  items?: CareerCard[];
+  onAccept?: (id: string) => void;
+  onReject?: (id: string) => void;
+  onSave?: (id: string) => void;
+}
+
+const sample: CareerCard[] = [
+  {
+    id: 'frontend_dev',
+    title: 'Frontend Developer',
+    icon: <Wand2 className="w-6 h-6" />,
+    match: 89,
+    summary: 'Budujesz interaktywne aplikacje webowe – łączysz logikę z UI.',
+    paths: ['Full‑Stack', 'Tech Lead', 'Product Engineer'],
+    tags: ['React', 'UI', 'Web'],
+    color: 'from-violet-500 via-fuchsia-500 to-cyan-400'
+  },
+  {
+    id: 'data_analyst',
+    title: 'Data Analyst',
+    icon: <Star className="w-6 h-6" />,
+    match: 83,
+    summary: 'Analizujesz dane i dostarczasz insighty biznesowe wpływające na decyzje.',
+    paths: ['Data Science', 'Analytics Engineer', 'BI Lead'],
+    tags: ['SQL', 'BI', 'Insights'],
+    color: 'from-emerald-500 via-teal-500 to-lime-400'
+  },
+  {
+    id: 'ux_designer',
+    title: 'UX Designer',
+    icon: <Bookmark className="w-6 h-6" />,
+    match: 78,
+    summary: 'Projektujesz doświadczenia użytkownika, prototypujesz i testujesz rozwiązania.',
+    paths: ['Product Designer', 'UX Research', 'Design Lead'],
+    tags: ['Research', 'Figma', 'Prototype'],
+    color: 'from-sky-500 via-indigo-500 to-purple-500'
+  }
+];
+
+export default function RecommendationSection({ items = sample, onAccept, onReject, onSave }: RecommendationSectionProps) {
+  const [deck, setDeck] = useState<CareerCard[]>(items);
+  const [accepted, setAccepted] = useState<string[]>([]);
+  const [saved, setSaved] = useState<string[]>([]);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  const current = deck[0];
+  const remaining = deck.length;
+
+  const handleDecision = useCallback((id: string, action: 'accept' | 'reject' | 'save') => {
+    setDeck(d => d.filter(c => c.id !== id));
+    if (action === 'accept') { setAccepted(a => [...a, id]); onAccept?.(id); }
+    if (action === 'save') { setSaved(s => [...s, id]); onSave?.(id); }
+    if (action === 'reject') { onReject?.(id); }
+  }, [onAccept, onReject, onSave]);
+
+  const progress = useMemo(() => {
+    const total = items.length;
+    const done = total - remaining;
+    return Math.round((done / total) * 100);
+  }, [items.length, remaining]);
+
+  const onDragEnd = (_: any, info: PanInfo) => {
+    if (!current) return;
+    const threshold = 120; // px
+    if (info.offset.x > threshold) {
+      handleDecision(current.id, 'accept');
+    } else if (info.offset.x < -threshold) {
+      handleDecision(current.id, 'reject');
+    }
+  };
+
+  const cycle = (dir: 1 | -1) => {
+    setDeck(d => {
+      if (d.length <= 1) return d;
+      const copy = [...d];
+      if (dir === 1) copy.push(copy.shift()!); else copy.unshift(copy.pop()!);
+      return copy;
+    });
+  };
+
+  return (
+    <div ref={containerRef} className="relative mx-auto max-w-4xl w-full min-h-[620px] flex flex-col gap-6 text-slate-100">
+      <HeaderBar progress={progress} total={items.length} accepted={accepted.length} saved={saved.length} />
+      <div className="flex-1 relative">
+        <AnimatePresence initial={false} mode="popLayout">
+          {current ? (
+            <motion.div
+              key={current.id}
+              className="absolute inset-0 flex items-center justify-center"
+              initial={{ opacity: 0, y: 40, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -40, scale: 0.9 }}
+              transition={{ type: 'spring', stiffness: 120, damping: 18 }}
+            >
+              <DraggableCard
+                card={current}
+                onAccept={() => handleDecision(current.id, 'accept')}
+                onReject={() => handleDecision(current.id, 'reject')}
+                onSave={() => handleDecision(current.id, 'save')}
+                onDragEnd={onDragEnd}
+              />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="finished"
+              className="absolute inset-0 flex flex-col items-center justify-center gap-6"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+            >
+              <div className="text-3xl font-bold bg-gradient-to-r from-emerald-400 via-violet-400 to-cyan-400 bg-clip-text text-transparent">Gotowe!</div>
+              <p className="text-sm text-slate-400">Przejrzałeś wszystkie propozycje. Zapisane lub zaakceptowane znajdziesz w swoim panelu.</p>
+              <Button variant="outline" onClick={() => { setDeck(items); setAccepted([]); setSaved([]); }}>Odśwież pulę</Button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+      {current && (
+        <motion.div
+          className="flex items-center justify-center gap-3"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <Button variant="outline" onClick={() => cycle(-1)} size="sm" className="gap-1"><ArrowLeft className="w-4 h-4" />Wstecz</Button>
+          <Button variant="outline" onClick={() => handleDecision(current.id, 'reject')} className="gap-2 border-red-500/40 text-red-300 hover:bg-red-500/10"><X className="w-4 h-4" />Odrzuć</Button>
+          <Button onClick={() => handleDecision(current.id, 'accept')} className="gap-2 bg-emerald-600 hover:bg-emerald-500"><Check className="w-4 h-4" />Akceptuj</Button>
+          <Button variant="outline" onClick={() => handleDecision(current.id, 'save')} className="gap-2 border-violet-500/40 text-violet-300 hover:bg-violet-500/10"><Bookmark className="w-4 h-4" />Zapisz</Button>
+          <Button variant="outline" onClick={() => cycle(1)} size="sm" className="gap-1">Dalej<ArrowRight className="w-4 h-4" /></Button>
+        </motion.div>
+      )}
+    </div>
+  );
+}
+
+function HeaderBar({ progress, total, accepted, saved }: { progress: number; total: number; accepted: number; saved: number }) {
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-emerald-400 via-violet-400 to-cyan-400 bg-clip-text text-transparent">Rekomendacje AI</h2>
+        <div className="flex items-center gap-2 text-xs text-slate-400">
+          <span className="px-2 py-1 rounded-full bg-slate-800/70">Akceptowane: {accepted}</span>
+          <span className="px-2 py-1 rounded-full bg-slate-800/70">Zapisane: {saved}</span>
+          <span className="px-2 py-1 rounded-full bg-slate-800/70">Pozostało: {total - accepted - saved}</span>
+        </div>
+      </div>
+      <Progress value={progress} />
+    </div>
+  );
+}
+
+interface DraggableCardProps {
+  card: CareerCard;
+  onAccept: () => void;
+  onReject: () => void;
+  onSave: () => void;
+  onDragEnd: (e: any, info: PanInfo) => void;
+}
+
+function DraggableCard({ card, onAccept, onReject, onSave, onDragEnd }: DraggableCardProps) {
+  const [dragging, setDragging] = useState(false);
+  const gradient = card.color || 'from-violet-500 via-fuchsia-500 to-cyan-400';
+
+  return (
+    <motion.div
+      drag="x"
+      dragElastic={0.5}
+      dragConstraints={{ left: 0, right: 0 }}
+      onDragStart={() => setDragging(true)}
+      onDragEnd={(e, info) => { setDragging(false); onDragEnd(e, info); }}
+      whileTap={{ cursor: 'grabbing' }}
+      className="w-full max-w-lg"
+    >
+      <Card className="relative overflow-hidden border border-slate-700/60 bg-slate-900/70 backdrop-blur-xl shadow-xl shadow-slate-950/40">
+        <CardHeader className="pb-4">
+          <CardTitle className="flex items-center gap-3 text-slate-100">
+            <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-700 to-slate-800 ring-2 ring-slate-600/40">{card.icon}</span>
+            <span className="text-xl font-semibold tracking-tight">{card.title}</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="relative p-4 rounded-xl bg-slate-800/70 border border-slate-700/60">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-slate-400">Dopasowanie</span>
+              <span className="text-2xl font-bold text-emerald-400 tabular-nums">{card.match}%</span>
+            </div>
+            <Progress value={card.match} />
+            <div className="mt-4 text-sm text-slate-300 leading-relaxed">{card.summary}</div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {card.tags.map(t => (
+                <Badge key={t} variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-700/60">{t}</Badge>
+              ))}
+            </div>
+          </div>
+          <div>
+            <div className="text-xs uppercase tracking-wide text-slate-500 mb-2">Potencjalne ścieżki</div>
+            <div className="flex flex-wrap gap-2">
+              {card.paths.map(p => (
+                <span key={p} className="px-2 py-1 text-[11px] rounded-md bg-slate-800/70 border border-slate-700/60 text-slate-300">{p}</span>
+              ))}
+            </div>
+          </div>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <Button onClick={onAccept} className="flex-1 bg-emerald-600 hover:bg-emerald-500">Akceptuj</Button>
+            <Button variant="outline" onClick={onSave} className="flex-1 border-violet-500/40 text-violet-300 hover:bg-violet-500/10">Zapisz</Button>
+            <Button variant="outline" onClick={onReject} className="flex-1 border-red-500/40 text-red-300 hover:bg-red-500/10">Odrzuć</Button>
+          </div>
+          <motion.div
+            className="pointer-events-none absolute inset-0 opacity-30"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: dragging ? 0.4 : 0.15 }}
+          >
+            <div className={`absolute -inset-32 bg-gradient-to-br ${gradient} blur-3xl`} />
+          </motion.div>
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+}
+
+// ⚙️ Uwaga: Zwróć pełny kod JSX w jednym bloku, nie tylko fragmenty, bez skracania.
