@@ -1,0 +1,344 @@
+'use client';
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import {
+  Sparkles,
+  TrendingUp,
+  Users,
+  Rocket,
+  ArrowRight,
+  RefreshCw,
+  Filter,
+  X
+} from 'lucide-react';
+import { QuickStartWizard, WizardAnswer } from './QuickStartWizard';
+import { RecommendationCard } from './RecommendationCard';
+import { generateRecommendations, UserProfile } from '@/utils/recommendationEngine';
+import { careerPaths } from '@/data/careerPaths';
+
+interface RecommendationDashboardProps {
+  user: any;
+  onPathSelect: (pathId: string) => void;
+}
+
+export function RecommendationDashboard({ user, onPathSelect }: RecommendationDashboardProps) {
+  const [showWizard, setShowWizard] = useState(true);
+  const [wizardAnswers, setWizardAnswers] = useState<WizardAnswer | null>(null);
+  const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [filter, setFilter] = useState<'all' | 'high_match' | 'fast_entry'>('all');
+
+  // Check if user has completed wizard before
+  useEffect(() => {
+    const saved = localStorage.getItem('wizardAnswers');
+    if (saved) {
+      try {
+        const answers = JSON.parse(saved);
+        setWizardAnswers(answers);
+        setShowWizard(false);
+        generateRecommendationsFromAnswers(answers);
+      } catch (e) {
+        console.error('Failed to parse saved answers', e);
+      }
+    }
+  }, []);
+
+  const generateRecommendationsFromAnswers = (answers: WizardAnswer) => {
+    setLoading(true);
+
+    // Build user profile from wizard answers and existing user data
+    const userProfile: UserProfile = {
+      skills: user.skills || {},
+      interests: user.interests || [],
+      goals: user.goals || [],
+      workStyle: (answers.workStyle as any) || 'structured',
+      learningStyle: (answers.learningStyle as any) || 'practice',
+      motivation: (answers.motivation as any) || 'growth',
+      availableHours: user.availableHours || 15,
+      location: user.location || 'PL',
+      experience: user.experience || 0
+    };
+
+    // Generate recommendations
+    const recs = generateRecommendations(userProfile, careerPaths);
+    setRecommendations(recs);
+    setLoading(false);
+  };
+
+  const handleWizardComplete = (answers: WizardAnswer) => {
+    setWizardAnswers(answers);
+    localStorage.setItem('wizardAnswers', JSON.stringify(answers));
+    setShowWizard(false);
+    generateRecommendationsFromAnswers(answers);
+
+    // Award XP
+    if (typeof user.addXP === 'function') {
+      user.addXP(250);
+    }
+  };
+
+  const handleWizardSkip = () => {
+    setShowWizard(false);
+    // Generate basic recommendations without personalization
+    const basicProfile: UserProfile = {
+      skills: user.skills || {},
+      interests: [],
+      goals: [],
+      workStyle: 'structured',
+      learningStyle: 'practice',
+      motivation: 'growth',
+      availableHours: 15,
+      location: 'PL'
+    };
+    const recs = generateRecommendations(basicProfile, careerPaths);
+    setRecommendations(recs);
+  };
+
+  const handleRetakeWizard = () => {
+    localStorage.removeItem('wizardAnswers');
+    setWizardAnswers(null);
+    setShowWizard(true);
+  };
+
+  const filteredRecommendations = recommendations.filter(rec => {
+    if (filter === 'high_match') return rec.score.total >= 70;
+    if (filter === 'fast_entry') return rec.timeToReady <= 6;
+    return true;
+  });
+
+  if (showWizard) {
+    return (
+      <QuickStartWizard
+        onComplete={handleWizardComplete}
+        onSkip={handleWizardSkip}
+      />
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4 md:p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Grid 12 kolumn */}
+        <div className="grid grid-cols-12 gap-6">
+
+          {/* Lewa kolumna - główna treść (col-span-12 lg:col-span-8) */}
+          <div className="col-span-12 lg:col-span-8 space-y-6">
+            
+            {/* Header Card */}
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6"
+            >
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div>
+                  <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">
+                    Twoje dopasowane ścieżki
+                  </h1>
+                  <p className="text-sm sm:text-base text-gray-300">
+                    Na podstawie Twojego profilu i preferencji
+                  </p>
+                </div>
+
+                <Button
+                  variant="outline"
+                  onClick={handleRetakeWizard}
+                  className="gap-2 bg-white/10 border-white/20 text-white hover:bg-white/20 whitespace-nowrap"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Zmień
+                </Button>
+              </div>
+
+              {/* Stats Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
+                <div className="bg-white/10 backdrop-blur rounded-xl p-3">
+                  <div className="text-2xl font-bold text-white">{recommendations.length}</div>
+                  <div className="text-xs text-gray-300">Ścieżki</div>
+                </div>
+                <div className="bg-white/10 backdrop-blur rounded-xl p-3">
+                  <div className="text-2xl font-bold text-green-400">
+                    {recommendations.filter(r => r.score.total >= 70).length}
+                  </div>
+                  <div className="text-xs text-gray-300">Wysokie</div>
+                </div>
+                <div className="bg-white/10 backdrop-blur rounded-xl p-3">
+                  <div className="text-2xl font-bold text-blue-400">
+                    {recommendations.filter(r => r.timeToReady <= 6).length}
+                  </div>
+                  <div className="text-xs text-gray-300">Szybkie</div>
+                </div>
+                <div className="bg-white/10 backdrop-blur rounded-xl p-3">
+                  <div className="text-2xl font-bold text-orange-400">2,847</div>
+                  <div className="text-xs text-gray-300">Dzisiaj</div>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Filters */}
+            <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <Filter className="w-5 h-5 text-gray-400" />
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant={filter === 'all' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setFilter('all')}
+                    className={filter === 'all' ? 'bg-violet-600 text-white' : 'bg-white/10 border-white/20 text-white hover:bg-white/20'}
+                  >
+                    Wszystkie
+                  </Button>
+                  <Button
+                    variant={filter === 'high_match' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setFilter('high_match')}
+                    className={filter === 'high_match' ? 'bg-violet-600 text-white' : 'bg-white/10 border-white/20 text-white hover:bg-white/20'}
+                  >
+                    Wysokie (70%+)
+                  </Button>
+                  <Button
+                    variant={filter === 'fast_entry' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setFilter('fast_entry')}
+                    className={filter === 'fast_entry' ? 'bg-violet-600 text-white' : 'bg-white/10 border-white/20 text-white hover:bg-white/20'}
+                  >
+                    Szybkie (≤6m)
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+        {/* Loading State */}
+        {loading && (
+          <div className="flex items-center justify-center py-20">
+            <div className="text-center">
+              <RefreshCw className="w-12 h-12 text-violet-600 animate-spin mx-auto mb-4" />
+              <p className="text-gray-600">Analizuję Twój profil...</p>
+            </div>
+          </div>
+        )}
+
+        {/* Recommendations Grid */}
+        {!loading && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {filteredRecommendations.map((rec, index) => (
+              <RecommendationCard
+                key={rec.career.id}
+                recommendation={rec}
+                rank={index + 1}
+                onSelect={(id) => console.log('Selected:', id)}
+                onStartPath={onPathSelect}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!loading && filteredRecommendations.length === 0 && (
+          <Card className="p-12 text-center">
+            <X className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              Brak wyników dla wybranych filtrów
+            </h3>
+            <p className="text-gray-600 mb-6">
+              Spróbuj zmienić filtry lub uzupełnić swój profil
+            </p>
+            <Button onClick={() => setFilter('all')}>
+              Pokaż wszystkie ścieżki
+            </Button>
+          </Card>
+        )}
+
+          </div>
+          {/* Koniec lewej kolumny */}
+
+          {/* Prawa kolumna - sticky sidebar (col-span-12 lg:col-span-4) */}
+          <div className="col-span-12 lg:col-span-4 space-y-6">
+
+            {/* Mocne strony */}
+            <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 lg:sticky lg:top-6">
+              <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-green-400" />
+                Twoje mocne strony
+              </h3>
+              <div className="space-y-3">
+                {Object.entries(user.skills || {}).slice(0, 5).map(([skill, value]) => (
+                  <div key={skill} className="space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-300 capitalize">{skill.replace(/_/g, ' ')}</span>
+                      <span className="text-white font-semibold">{Math.round((value as number) * 100)}%</span>
+                    </div>
+                    <Progress value={(value as number) * 100} className="h-2 bg-white/10" />
+                  </div>
+                ))}
+                {(!user.skills || Object.keys(user.skills).length === 0) && (
+                  <div className="text-center py-4">
+                    <p className="text-gray-400 text-sm mb-3">Brak danych o umiejętnościach</p>
+                    <Button size="sm" variant="outline" className="bg-white/10 border-white/20 text-white hover:bg-white/20">
+                      Uzupełnij profil
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Trendy lokalne */}
+            <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6">
+              <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                <Rocket className="w-5 h-5 text-blue-400" />
+                Trendy w Polsce
+              </h3>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+                  <div>
+                    <div className="text-sm font-medium text-white">Technik klimatyzacji</div>
+                    <div className="text-xs text-gray-400">+40% wzrost</div>
+                  </div>
+                  <div className="text-green-400 text-sm font-bold">🔥</div>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+                  <div>
+                    <div className="text-sm font-medium text-white">Spawacz</div>
+                    <div className="text-xs text-gray-400">+35% wzrost</div>
+                  </div>
+                  <div className="text-orange-400 text-sm font-bold">📈</div>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+                  <div>
+                    <div className="text-sm font-medium text-white">Elektryk</div>
+                    <div className="text-xs text-gray-400">+25% wzrost</div>
+                  </div>
+                  <div className="text-yellow-400 text-sm font-bold">⚡</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Szybkie akcje */}
+            <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6">
+              <h3 className="text-lg font-bold text-white mb-4">Szybkie akcje</h3>
+              <div className="space-y-2">
+                <Button className="w-full bg-violet-600 hover:bg-violet-700 text-white justify-start">
+                  <Users className="w-4 h-4 mr-2" />
+                  Dołącz do społeczności
+                </Button>
+                <Button variant="outline" className="w-full bg-white/10 border-white/20 text-white hover:bg-white/20 justify-start">
+                  <ArrowRight className="w-4 h-4 mr-2" />
+                  Zobacz kursy
+                </Button>
+              </div>
+            </div>
+
+           </div>
+          {/* Koniec prawej kolumny */}
+
+        </div>
+        {/* Koniec grid 12 kolumn */}
+      </div>
+      {/* Koniec max-w-7xl */}
+    </div>
+    
+              )}
