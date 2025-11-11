@@ -6,13 +6,14 @@ import { usePersonalization } from 'app/contexts/PersonalizationContext';
 import { Lock, CheckCircle, Clock, Award, AlertTriangle, Filter, Search, Star, TrendingUp, Zap, Target, BarChart3, Settings } from 'lucide-react';
 import TaskModal from '@/components/Tasks/taskModal';
 import { TaskPersonalizerCore } from '@/utils/TaskPersonalizer';
-
+import 'app/styles/electrician-theme.css';
 import { CAREER_PATHS, calculateProgress } from './CareerPaths';
 /* Import sub-styles */
 import './career-header.css';
 import './empty-state.css';
 import './filters-bar.css';
 
+import LoadingSpinner from 'components/Tasks/LoadingSpinner';
 
 
 
@@ -533,6 +534,12 @@ const dispatch = personalizationContext?.trackSession ?? null;
           showAnalytics={showAnalytics}
           setShowAnalytics={setShowAnalytics}
         />
+          <CareerPathMap
+          career={career}
+          completedTasks={completedTasks}
+          allTasks={allTasks}
+          onTaskClick={handleTaskClick}
+        />
 
         {/* Recommended Tasks Section */}
         {recommendedTasks.length > 0 && (
@@ -780,6 +787,211 @@ function StandardProgressBar({ progress, tasksRemaining }) {
 }
 // ==================== SUB-COMPONENTS ====================
 
+// Electric Background Component - Immersive wiring effect for electrician
+function ElectricBackground() {
+  return (
+    <div className="electric-background">
+      {/* Animated circuit lines */}
+      <svg
+        className="circuit-svg"
+        xmlns="http://www.w3.org/2000/svg"
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          zIndex: 0,
+          opacity: 0.03,
+          pointerEvents: 'none'
+        }}
+      >
+        <defs>
+          {/* Glow filter */}
+          <filter id="glow">
+            <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+            <feMerge>
+              <feMergeNode in="coloredBlur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+
+          {/* Animated gradient for current flow */}
+          <linearGradient id="current-flow" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#fbbf24" stopOpacity="0">
+              <animate attributeName="offset" values="0;1;0" dur="3s" repeatCount="indefinite"/>
+            </stop>
+            <stop offset="50%" stopColor="#f59e0b" stopOpacity="1">
+              <animate attributeName="offset" values="0.5;1.5;0.5" dur="3s" repeatCount="indefinite"/>
+            </stop>
+            <stop offset="100%" stopColor="#fbbf24" stopOpacity="0">
+              <animate attributeName="offset" values="1;2;1" dur="3s" repeatCount="indefinite"/>
+            </stop>
+          </linearGradient>
+        </defs>
+
+        {/* Horizontal wiring */}
+        <path
+          d="M -100 150 L 300 150 L 300 200 L 600 200 L 600 150 L 1000 150"
+          stroke="url(#current-flow)"
+          strokeWidth="2"
+          fill="none"
+          filter="url(#glow)"
+        />
+        <path
+          d="M 200 300 L 500 300 L 500 350 L 800 350"
+          stroke="url(#current-flow)"
+          strokeWidth="2"
+          fill="none"
+          filter="url(#glow)"
+          style={{ animationDelay: '1s' }}
+        />
+        <path
+          d="M -100 450 L 250 450 L 250 500 L 550 500 L 550 450 L 900 450"
+          stroke="url(#current-flow)"
+          strokeWidth="2"
+          fill="none"
+          filter="url(#glow)"
+          style={{ animationDelay: '2s' }}
+        />
+
+        {/* Vertical wiring */}
+        <path
+          d="M 150 -50 L 150 250 L 200 250 L 200 550"
+          stroke="url(#current-flow)"
+          strokeWidth="2"
+          fill="none"
+          filter="url(#glow)"
+          style={{ animationDelay: '0.5s' }}
+        />
+        <path
+          d="M 450 -50 L 450 350 L 500 350 L 500 650"
+          stroke="url(#current-flow)"
+          strokeWidth="2"
+          fill="none"
+          filter="url(#glow)"
+          style={{ animationDelay: '1.5s' }}
+        />
+        <path
+          d="M 750 -50 L 750 450 L 800 450 L 800 750"
+          stroke="url(#current-flow)"
+          strokeWidth="2"
+          fill="none"
+          filter="url(#glow)"
+          style={{ animationDelay: '2.5s' }}
+        />
+
+        {/* Circuit nodes (connection points) */}
+        <circle cx="300" cy="150" r="4" fill="#fbbf24" opacity="0.4">
+          <animate attributeName="opacity" values="0.2;0.8;0.2" dur="2s" repeatCount="indefinite"/>
+        </circle>
+        <circle cx="600" cy="200" r="4" fill="#f59e0b" opacity="0.4">
+          <animate attributeName="opacity" values="0.2;0.8;0.2" dur="2s" repeatCount="indefinite" begin="0.5s"/>
+        </circle>
+        <circle cx="500" cy="300" r="4" fill="#fbbf24" opacity="0.4">
+          <animate attributeName="opacity" values="0.2;0.8;0.2" dur="2s" repeatCount="indefinite" begin="1s"/>
+        </circle>
+        <circle cx="250" cy="450" r="4" fill="#f59e0b" opacity="0.4">
+          <animate attributeName="opacity" values="0.2;0.8;0.2" dur="2s" repeatCount="indefinite" begin="1.5s"/>
+        </circle>
+        <circle cx="550" cy="500" r="4" fill="#fbbf24" opacity="0.4">
+          <animate attributeName="opacity" values="0.2;0.8;0.2" dur="2s" repeatCount="indefinite" begin="2s"/>
+        </circle>
+
+        {/* Small sparks */}
+        <circle cx="150" cy="250" r="3" fill="#fbbf24" opacity="0">
+          <animate attributeName="opacity" values="0;1;0" dur="0.3s" repeatCount="indefinite" begin="3s"/>
+          <animate attributeName="r" values="2;5;2" dur="0.3s" repeatCount="indefinite" begin="3s"/>
+        </circle>
+        <circle cx="450" cy="350" r="3" fill="#f59e0b" opacity="0">
+          <animate attributeName="opacity" values="0;1;0" dur="0.3s" repeatCount="indefinite" begin="4s"/>
+          <animate attributeName="r" values="2;5;2" dur="0.3s" repeatCount="indefinite" begin="4s"/>
+        </circle>
+        <circle cx="750" cy="450" r="3" fill="#fbbf24" opacity="0">
+          <animate attributeName="opacity" values="0;1;0" dur="0.3s" repeatCount="indefinite" begin="5s"/>
+          <animate attributeName="r" values="2;5;2" dur="0.3s" repeatCount="indefinite" begin="5s"/>
+        </circle>
+      </svg>
+
+      {/* Subtle grid overlay */}
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: '100%',
+        zIndex: 0,
+        pointerEvents: 'none',
+        background: `
+          linear-gradient(90deg, rgba(251, 191, 36, 0.02) 1px, transparent 1px),
+          linear-gradient(rgba(251, 191, 36, 0.02) 1px, transparent 1px)
+        `,
+        backgroundSize: '50px 50px',
+        opacity: 0.5
+      }} />
+
+      {/* Corner decorations - electrical symbols */}
+      <div style={{
+        position: 'fixed',
+        top: '20px',
+        right: '20px',
+        fontSize: '120px',
+        opacity: 0.02,
+        zIndex: 0,
+        pointerEvents: 'none',
+        transform: 'rotate(15deg)'
+      }}>
+        ⚡
+      </div>
+      <div style={{
+        position: 'fixed',
+        bottom: '20px',
+        left: '20px',
+        fontSize: '100px',
+        opacity: 0.02,
+        zIndex: 0,
+        pointerEvents: 'none',
+        transform: 'rotate(-25deg)'
+      }}>
+        🔌
+      </div>
+
+      <style>{`
+        @keyframes pulse-glow {
+          0%, 100% {
+            filter: drop-shadow(0 0 2px #fbbf24) drop-shadow(0 0 4px #f59e0b);
+          }
+          50% {
+            filter: drop-shadow(0 0 4px #fbbf24) drop-shadow(0 0 8px #f59e0b);
+          }
+        }
+
+        .circuit-svg path {
+          animation: pulse-glow 4s ease-in-out infinite;
+        }
+
+        /* Floating particles effect */
+        @keyframes float-particle {
+          0%, 100% {
+            transform: translateY(0) translateX(0);
+            opacity: 0;
+          }
+          10% {
+            opacity: 0.3;
+          }
+          50% {
+            transform: translateY(-100px) translateX(20px);
+            opacity: 0.6;
+          }
+          90% {
+            opacity: 0.3;
+          }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 // Career Header Component
 function CareerHeader({ career, progress, analytics, showAnalytics, setShowAnalytics }) {
   return (
@@ -850,7 +1062,482 @@ function CareerHeader({ career, progress, analytics, showAnalytics, setShowAnaly
     </div>
   );
 }
+// Career Path Map Component - Visual learning journey
+function CareerPathMap({ career, completedTasks, allTasks, onTaskClick }) {
+  const [selectedLevel, setSelectedLevel] = useState(null);
 
+  // Group tasks by modules/levels
+  const levels = useMemo(() => {
+    if (!career?.modules) return [];
+    
+    return career.modules.map(module => {
+      const moduleTasks = allTasks.filter(t => t.moduleId === module.id);
+      const completed = moduleTasks.filter(t => completedTasks.includes(t.id)).length;
+      const total = moduleTasks.length;
+      const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+      
+      // Determine level status
+      let status = 'locked';
+      if (percentage === 100) status = 'completed';
+      else if (percentage > 0) status = 'in-progress';
+      else if (completed === 0 && moduleTasks.some(t => 
+        !t.prerequisites || t.prerequisites.every(id => completedTasks.includes(id))
+      )) status = 'available';
+
+      return {
+        ...module,
+        tasks: moduleTasks,
+        completed,
+        total,
+        percentage,
+        status
+      };
+    });
+  }, [career, allTasks, completedTasks]);
+
+  const getLevelIcon = (index) => {
+    const icons = ['🌱', '🔥', '⚡', '💎', '👑', '🏆'];
+    return icons[index % icons.length];
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'completed': return '#10b981';
+      case 'in-progress': return '#f59e0b';
+      case 'available': return '#3b82f6';
+      case 'locked': return '#9ca3af';
+      default: return '#6b7280';
+    }
+  };
+
+  const getStatusLabel = (status) => {
+    switch (status) {
+      case 'completed': return '✓ Ukończono';
+      case 'in-progress': return '⏳ W trakcie';
+      case 'available': return '🎯 Dostępny';
+      case 'locked': return '🔒 Zablokowany';
+      default: return '';
+    }
+  };
+
+  return (
+    <div 
+      className="card"
+      style={{
+        marginBottom: 'var(--spacing-xl)',
+        background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+        border: '2px solid #e2e8f0',
+        overflow: 'hidden'
+      }}
+    >
+      {/* Header */}
+      <div style={{
+        padding: 'var(--spacing-xl)',
+        borderBottom: '2px solid #e2e8f0',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        color: 'white'
+      }}>
+        <h2 style={{
+          margin: 0,
+          fontSize: '24px',
+          fontWeight: '800',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px'
+        }}>
+          🗺️ Ścieżka Rozwoju
+        </h2>
+        <p style={{
+          margin: '8px 0 0 0',
+          fontSize: '14px',
+          opacity: 0.9
+        }}>
+          Przejdź przez wszystkie poziomy, aby zostać ekspertem
+        </p>
+      </div>
+
+      {/* Journey Path */}
+      <div style={{
+        padding: 'var(--spacing-xl)',
+        position: 'relative'
+      }}>
+        {/* Vertical connecting line */}
+        <div style={{
+          position: 'absolute',
+          left: '54px',
+          top: '80px',
+          bottom: '80px',
+          width: '4px',
+          background: 'linear-gradient(180deg, #e2e8f0 0%, #cbd5e1 100%)',
+          borderRadius: '2px'
+        }} />
+
+        {/* Levels */}
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 'var(--spacing-lg)'
+        }}>
+          {levels.map((level, index) => (
+            <div
+              key={level.id}
+              style={{
+                position: 'relative',
+                display: 'flex',
+                gap: 'var(--spacing-lg)',
+                alignItems: 'flex-start',
+                animation: `slideInRight ${0.3 + index * 0.1}s ease`
+              }}
+            >
+              {/* Level Icon */}
+              <div style={{
+                position: 'relative',
+                zIndex: 2,
+                width: '80px',
+                height: '80px',
+                flexShrink: 0,
+                background: level.status === 'completed' 
+                  ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                  : level.status === 'in-progress'
+                    ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
+                    : level.status === 'available'
+                      ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
+                      : 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '36px',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+                cursor: level.status !== 'locked' ? 'pointer' : 'default',
+                transition: 'all 0.3s ease',
+                border: '4px solid white'
+              }}
+              onMouseEnter={(e) => {
+                if (level.status !== 'locked') {
+                  e.currentTarget.style.transform = 'scale(1.1) rotate(5deg)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'scale(1) rotate(0deg)';
+              }}
+              onClick={() => level.status !== 'locked' && setSelectedLevel(selectedLevel === index ? null : index)}
+            >
+              {getLevelIcon(index)}
+            </div>
+
+            {/* Level Info Card */}
+            <div style={{
+              flex: 1,
+              padding: 'var(--spacing-lg)',
+              background: 'white',
+              borderRadius: 'var(--radius-xl)',
+              border: `3px solid ${getStatusColor(level.status)}`,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+              cursor: level.status !== 'locked' ? 'pointer' : 'default',
+              transition: 'all 0.3s ease'
+            }}
+            onMouseEnter={(e) => {
+              if (level.status !== 'locked') {
+                e.currentTarget.style.transform = 'translateX(8px)';
+                e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.12)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateX(0)';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)';
+            }}
+            onClick={() => level.status !== 'locked' && setSelectedLevel(selectedLevel === index ? null : index)}
+            >
+              {/* Header */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                marginBottom: 'var(--spacing-md)',
+                gap: 'var(--spacing-md)'
+              }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{
+                    fontSize: '12px',
+                    fontWeight: '800',
+                    color: getStatusColor(level.status),
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    marginBottom: '4px'
+                  }}>
+                    Poziom {index + 1} • {getStatusLabel(level.status)}
+                  </div>
+                  <h3 style={{
+                    margin: 0,
+                    fontSize: '20px',
+                    fontWeight: '800',
+                    color: '#111827',
+                    marginBottom: '8px'
+                  }}>
+                    {level.title}
+                  </h3>
+                  <p style={{
+                    margin: 0,
+                    fontSize: '14px',
+                    color: '#6b7280',
+                    lineHeight: 1.5
+                  }}>
+                    {level.description}
+                  </p>
+                </div>
+
+                {/* Stats Badge */}
+                <div style={{
+                  padding: '12px 16px',
+                  background: `${getStatusColor(level.status)}15`,
+                  borderRadius: 'var(--radius-lg)',
+                  border: `2px solid ${getStatusColor(level.status)}`,
+                  textAlign: 'center',
+                  minWidth: '100px'
+                }}>
+                  <div style={{
+                    fontSize: '24px',
+                    fontWeight: '900',
+                    color: getStatusColor(level.status),
+                    marginBottom: '4px'
+                  }}>
+                    {level.completed}/{level.total}
+                  </div>
+                  <div style={{
+                    fontSize: '11px',
+                    fontWeight: '700',
+                    color: getStatusColor(level.status),
+                    textTransform: 'uppercase'
+                  }}>
+                    Zadań
+                  </div>
+                </div>
+              </div>
+
+              {/* Progress Bar */}
+              <div style={{
+                marginBottom: 'var(--spacing-md)'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  marginBottom: '8px',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  color: '#6b7280'
+                }}>
+                  <span>Postęp</span>
+                  <span>{level.percentage}%</span>
+                </div>
+                <div style={{
+                  height: '12px',
+                  background: '#f3f4f6',
+                  borderRadius: '6px',
+                  overflow: 'hidden'
+                }}>
+                  <div style={{
+                    height: '100%',
+                    width: `${level.percentage}%`,
+                    background: `linear-gradient(90deg, ${getStatusColor(level.status)} 0%, ${getStatusColor(level.status)}dd 100%)`,
+                    borderRadius: '6px',
+                    transition: 'width 1s cubic-bezier(0.4, 0, 0.2, 1)',
+                    boxShadow: `0 0 10px ${getStatusColor(level.status)}40`
+                  }} />
+                </div>
+              </div>
+
+              {/* Meta info */}
+              <div style={{
+                display: 'flex',
+                gap: 'var(--spacing-md)',
+                flexWrap: 'wrap'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '13px',
+                  color: '#6b7280',
+                  fontWeight: '600'
+                }}>
+                  <Clock size={16} />
+                  {level.duration}
+                </div>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '13px',
+                  color: '#6b7280',
+                  fontWeight: '600'
+                }}>
+                  <Target size={16} />
+                  {level.total} zadań
+                </div>
+                {level.status !== 'locked' && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedLevel(selectedLevel === index ? null : index);
+                    }}
+                    style={{
+                      marginLeft: 'auto',
+                      padding: '6px 16px',
+                      background: getStatusColor(level.status),
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: 'var(--radius-md)',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'scale(1.05)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'scale(1)';
+                    }}
+                  >
+                    {selectedLevel === index ? 'Zwiń ▲' : 'Rozwiń ▼'}
+                  </button>
+                )}
+              </div>
+
+              {/* Expanded Tasks List */}
+              {selectedLevel === index && level.status !== 'locked' && (
+                <div style={{
+                  marginTop: 'var(--spacing-lg)',
+                  paddingTop: 'var(--spacing-lg)',
+                  borderTop: '2px solid #f3f4f6',
+                  animation: 'fadeInUp 0.3s ease'
+                }}>
+                  <h4 style={{
+                    margin: '0 0 var(--spacing-md) 0',
+                    fontSize: '14px',
+                    fontWeight: '800',
+                    color: '#374151',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    📋 Zadania w tym poziomie
+                  </h4>
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 'var(--spacing-sm)'
+                  }}>
+                    {level.tasks.slice(0, 5).map((task, taskIdx) => {
+                      const isCompleted = completedTasks.includes(task.id);
+                      const isLocked = task.prerequisites?.some(id => !completedTasks.includes(id));
+                      
+                      return (
+                        <div
+                          key={task.id}
+                          onClick={() => !isLocked && onTaskClick(task)}
+                          style={{
+                            padding: 'var(--spacing-md)',
+                            background: isCompleted ? '#f0fdf4' : isLocked ? '#f9fafb' : '#fafafa',
+                            borderRadius: 'var(--radius-md)',
+                            border: `2px solid ${isCompleted ? '#10b981' : isLocked ? '#e5e7eb' : '#e2e8f0'}`,
+                            cursor: isLocked ? 'not-allowed' : 'pointer',
+                            opacity: isLocked ? 0.6 : 1,
+                            transition: 'all 0.2s ease',
+                            animation: `slideInUp ${0.2 + taskIdx * 0.05}s ease`
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!isLocked) {
+                              e.currentTarget.style.transform = 'translateX(4px)';
+                              e.currentTarget.style.borderColor = getStatusColor(level.status);
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'translateX(0)';
+                            e.currentTarget.style.borderColor = isCompleted ? '#10b981' : '#e2e8f0';
+                          }}
+                        >
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: 'var(--spacing-md)'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
+                              <div style={{ fontSize: '20px' }}>
+                                {isCompleted ? '✅' : isLocked ? '🔒' : '📝'}
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <div style={{
+                                  fontSize: '14px',
+                                  fontWeight: '700',
+                                  color: isCompleted ? '#059669' : isLocked ? '#9ca3af' : '#111827',
+                                  marginBottom: '4px'
+                                }}>
+                                  {task.title}
+                                </div>
+                                <div style={{
+                                  fontSize: '12px',
+                                  color: '#6b7280'
+                                }}>
+                                  <Clock size={12} style={{ display: 'inline', marginRight: '4px' }} />
+                                  {task.estimatedTime}
+                                  {' • '}
+                                  <Award size={12} style={{ display: 'inline', marginRight: '4px' }} />
+                                  +{task.xpReward} XP
+                                </div>
+                              </div>
+                            </div>
+                            {!isLocked && !isCompleted && (
+                              <button
+                                style={{
+                                  padding: '6px 12px',
+                                  background: getStatusColor(level.status),
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: 'var(--radius-sm)',
+                                  fontSize: '11px',
+                                  fontWeight: '700',
+                                  cursor: 'pointer',
+                                  whiteSpace: 'nowrap'
+                                }}
+                              >
+                                Rozpocznij →
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {level.tasks.length > 5 && (
+                      <div style={{
+                        padding: 'var(--spacing-sm)',
+                        textAlign: 'center',
+                        fontSize: '12px',
+                        color: '#6b7280',
+                        fontWeight: '600'
+                      }}>
+                        + {level.tasks.length - 5} więcej zadań
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+          ))}
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes slideInRight {
+          from { opacity: 0; transform: translateX(-30px); }
+          to { opacity: 1; transform: translateX(0); }
+        }
+      `}</style>
+    </div>
+  );
+}
 // Recommended Tasks Section
 function RecommendedTasksSection({ tasks, onTaskClick, completedTasks, favoriteTasks, onToggleFavorite }) {
   return (
@@ -1318,6 +2005,9 @@ function AnalyticsDashboard({ analytics }) {
     </div>
   );
 }
+
+
+
 // Filters Bar Component
 function FiltersBar({
   searchQuery,
