@@ -1,0 +1,2222 @@
+'use client';
+import ErrorBoundary from 'components/Tasks/ErrorBoundary';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useApp } from 'app/contexts/AppContext';
+import { usePersonalization } from 'app/contexts/PersonalizationContext';
+import { Lock, CheckCircle, Clock, Award, AlertTriangle, Filter, Search, Star, TrendingUp, Zap, Target, BarChart3, Settings } from 'lucide-react';
+import TaskModal from '@/components/Tasks/taskModal';
+import { TaskPersonalizerCore } from '@/utils/TaskPersonalizer';
+
+import { CAREER_PATHS, calculateProgress } from './CareerPaths';
+/* Import sub-styles */
+import './career-header.css';
+import './empty-state.css';
+import './filters-bar.css';
+
+
+
+
+// ==================== CONSTANTS ====================
+const STORAGE_KEYS = {
+  COMPLETED_TASKS: (career) => `completed_tasks_${career}`,
+  TASK_RATINGS: (career) => `task_ratings_${career}`,
+  FAVORITE_TASKS: (career) => `favorite_tasks_${career}`,
+  TASK_ATTEMPTS: (career) => `task_attempts_${career}`,
+  LAST_SESSION: (career) => `last_session_${career}`
+};
+
+const FILTER_OPTIONS = {
+  ALL: 'all',
+  AVAILABLE: 'available',
+  LOCKED: 'locked',
+  COMPLETED: 'completed',
+  RECOMMENDED: 'recommended',
+  FAVORITES: 'favorites'
+};
+
+const SORT_OPTIONS = {
+  DEFAULT: 'default',
+  TITLE: 'title',
+  DIFFICULTY: 'difficulty',
+  XP: 'xp',
+  TIME: 'time',
+  RECOMMENDED: 'recommended'
+};
+
+// ==================== CUSTOM HOOKS ====================
+
+/**
+ * Hook for managing task completion state with persistence
+ */
+const useTaskCompletion = (selectedCareer) => {
+  const [completedTasks, setCompletedTasks] = useState([]);
+  const [taskAttempts, setTaskAttempts] = useState({});
+  const [loading, setLoading] = useState(true);
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    try {
+      const savedCompleted = localStorage.getItem(STORAGE_KEYS.COMPLETED_TASKS(selectedCareer));
+      const savedAttempts = localStorage.getItem(STORAGE_KEYS.TASK_ATTEMPTS(selectedCareer));
+
+      if (savedCompleted) {
+        setCompletedTasks(JSON.parse(savedCompleted));
+      }
+      if (savedAttempts) {
+        setTaskAttempts(JSON.parse(savedAttempts));
+      }
+    } catch (error) {
+      console.error('Error loading task data:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedCareer]);
+
+  // Save to localStorage whenever data changes
+  useEffect(() => {
+    if (!loading) {
+      try {
+        localStorage.setItem(
+          STORAGE_KEYS.COMPLETED_TASKS(selectedCareer),
+          JSON.stringify(completedTasks)
+        );
+        localStorage.setItem(
+          STORAGE_KEYS.TASK_ATTEMPTS(selectedCareer),
+          JSON.stringify(taskAttempts)
+        );
+      } catch (error) {
+        console.error('Error saving task data:', error);
+      }
+    }
+  }, [completedTasks, taskAttempts, selectedCareer, loading]);
+
+  const completeTask = useCallback((taskId) => {
+    setCompletedTasks(prev => {
+      if (prev.includes(taskId)) return prev;
+      return [...prev, taskId];
+    });
+  }, []);
+
+  const incrementAttempts = useCallback((taskId) => {
+    setTaskAttempts(prev => ({
+      ...prev,
+      [taskId]: (prev[taskId] || 0) + 1
+    }));
+  }, []);
+
+  const isTaskCompleted = useCallback((taskId) => {
+    return completedTasks.includes(taskId);
+  }, [completedTasks]);
+
+  return {
+    completedTasks,
+    taskAttempts,
+    completeTask,
+    incrementAttempts,
+    isTaskCompleted,
+    loading
+  };
+};
+
+/**
+ * Hook for filtering and sorting tasks
+ */
+const useTaskFiltering = (tasks, completedTasks, recommendedTasks, favoriteTasks) => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeFilter, setActiveFilter] = useState(FILTER_OPTIONS.ALL);
+  const [sortBy, setSortBy] = useState(SORT_OPTIONS.DEFAULT);
+
+  const filteredAndSortedTasks = useMemo(() => {
+    let filtered = [...tasks];
+
+    // Apply search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(task =>
+        task.title.toLowerCase().includes(query) ||
+        task.description.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply category filter
+    switch (activeFilter) {
+      case FILTER_OPTIONS.AVAILABLE:
+        filtered = filtered.filter(task => {
+          const isCompleted = completedTasks.includes(task.id);
+          const isLocked = task.prerequisites?.some(prereqId => 
+            !completedTasks.includes(prereqId)
+          );
+          return !isCompleted && !isLocked;
+        });
+        break;
+      case FILTER_OPTIONS.LOCKED:
+        filtered = filtered.filter(task => 
+          task.prerequisites?.some(prereqId => 
+            !completedTasks.includes(prereqId)
+          )
+        );
+        break;
+      case FILTER_OPTIONS.COMPLETED:
+        filtered = filtered.filter(task => completedTasks.includes(task.id));
+        break;
+      case FILTER_OPTIONS.RECOMMENDED:
+        filtered = filtered.filter(task => 
+          recommendedTasks.some(r => r.id === task.id)
+        );
+        break;
+      case FILTER_OPTIONS.FAVORITES:
+        filtered = filtered.filter(task => favoriteTasks.includes(task.id));
+        break;
+    }
+
+    // Apply sorting
+    switch (sortBy) {
+      case SORT_OPTIONS.TITLE:
+        filtered.sort((a, b) => a.title.localeCompare(b.title));
+        break;
+      case SORT_OPTIONS.DIFFICULTY:
+        const difficultyOrder = { beginner: 1, intermediate: 2, advanced: 3, expert: 4 };
+        filtered.sort((a, b) => 
+          (difficultyOrder[a.difficulty] || 0) - (difficultyOrder[b.difficulty] || 0)
+        );
+        break;
+      case SORT_OPTIONS.XP:
+        filtered.sort((a, b) => b.xpReward - a.xpReward);
+        break;
+      case SORT_OPTIONS.TIME:
+        filtered.sort((a, b) => 
+          parseInt(a.estimatedTime) - parseInt(b.estimatedTime)
+        );
+        break;
+      case SORT_OPTIONS.RECOMMENDED:
+        filtered.sort((a, b) => {
+          const aRecommended = recommendedTasks.some(r => r.id === a.id);
+          const bRecommended = recommendedTasks.some(r => r.id === b.id);
+          if (aRecommended && !bRecommended) return -1;
+          if (!aRecommended && bRecommended) return 1;
+          return (b.personalityScore || 0) - (a.personalityScore || 0);
+        });
+        break;
+    }
+
+    return filtered;
+  }, [tasks, searchQuery, activeFilter, sortBy, completedTasks, recommendedTasks, favoriteTasks]);
+
+  return {
+    searchQuery,
+    setSearchQuery,
+    activeFilter,
+    setActiveFilter,
+    sortBy,
+    setSortBy,
+    filteredAndSortedTasks
+  };
+};
+
+/**
+ * Hook for task analytics
+ */
+
+const useTaskAnalytics = (tasks, completedTasks, taskAttempts) => {
+  return useMemo(() => {
+    const totalTasks = tasks.length;
+    const completed = completedTasks.length;
+    const percentage = totalTasks > 0 ? Math.round((completed / totalTasks) * 100) : 0;
+
+    // Calculate by difficulty
+    const byDifficulty = {
+      beginner: { total: 0, completed: 0 },
+      intermediate: { total: 0, completed: 0 },
+      advanced: { total: 0, completed: 0 },
+      expert: { total: 0, completed: 0 }
+    };
+
+    tasks.forEach(task => {
+      if (byDifficulty[task.difficulty]) {
+        byDifficulty[task.difficulty].total++;
+        if (completedTasks.includes(task.id)) {
+          byDifficulty[task.difficulty].completed++;
+        }
+      }
+    });
+
+    // Calculate by type
+    const byType = {};
+    tasks.forEach(task => {
+      if (!byType[task.type]) {
+        byType[task.type] = { total: 0, completed: 0 };
+      }
+      byType[task.type].total++;
+      if (completedTasks.includes(task.id)) {
+        byType[task.type].completed++;
+      }
+    });
+
+    // Calculate average attempts
+    const attemptsArray = Object.values(taskAttempts);
+    const avgAttempts = attemptsArray.length > 0
+      ? attemptsArray.reduce((sum, attempts) => sum + attempts, 0) / attemptsArray.length
+      : 0;
+
+    // Calculate total XP earned
+    const totalXPEarned = tasks
+      .filter(task => completedTasks.includes(task.id))
+      .reduce((sum, task) => sum + (task.xpReward || 0), 0);
+
+    // Next recommended task
+    const nextTask = tasks.find(task => 
+      !completedTasks.includes(task.id) &&
+      (!task.prerequisites || task.prerequisites.every(id => completedTasks.includes(id)))
+    );
+
+    return {
+      totalTasks,
+      completed,
+      percentage,
+      byDifficulty,
+      byType,
+      avgAttempts,
+      totalXPEarned,
+      nextTask
+    };
+  }, [tasks, completedTasks, taskAttempts]);
+};
+
+// ==================== MAIN COMPONENT ====================
+
+const TasksSystem = ({ selectedCareer = 'electrician' }) => {
+  const { user, completeLesson, addXP } = useApp();
+const personalizationContext = usePersonalization();
+const currentProfile = personalizationContext?.currentProfile ?? null;
+const behaviorData = personalizationContext?.behaviorData ?? {};
+const dispatch = personalizationContext?.trackSession ?? null;
+  
+  // State management
+  const [activeTask, setActiveTask] = useState(null);
+  const [favoriteTasks, setFavoriteTasks] = useState([]);
+  const [showFilters, setShowFilters] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(false);
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
+  
+  // Custom hooks
+  const {
+    completedTasks,
+    taskAttempts,
+    completeTask,
+    incrementAttempts,
+    isTaskCompleted,
+    loading: tasksLoading
+  } = useTaskCompletion(selectedCareer);
+
+  // Get career data
+  const career = CAREER_PATHS[selectedCareer];
+  const progress = calculateProgress(selectedCareer, completedTasks);
+
+  // Flatten all tasks from modules
+  const allTasks = useMemo(() => {
+    if (!career?.modules) return [];
+    return career.modules.flatMap(module => 
+      module.tasks.map(task => ({
+        ...task,
+        moduleId: module.id,
+        moduleTitle: module.title
+      }))
+    );
+  }, [career]);
+
+  // Get personalized tasks using TaskPersonalizerCore
+  const personalizedTasks = useMemo(() => {
+    if (allTasks.length === 0) return [];
+     if (!currentProfile) {
+    console.log('No profile detected, returning unpersonalized tasks');
+    return allTasks;
+  }
+
+    try {
+      const preferences = {
+        taskDuration: behaviorData?.preferredDuration || 'medium',
+        challengeType: behaviorData?.preferredChallenge || 'balanced',
+        feedback: behaviorData?.preferredFeedback || 'periodic',
+        learningVelocity: 'steady',
+        difficultyPreference: 'balanced'
+      };
+
+      return TaskPersonalizerCore.batchPersonalizeTasks(
+        allTasks,
+        preferences,
+        {
+          sessions: behaviorData?.sessions || [],
+          completionDates: completedTasks.reduce((acc, taskId, idx) => {
+            acc[taskId] = Date.now() - (idx * 24 * 60 * 60 * 1000);
+            return acc;
+          }, {}),
+          retries: taskAttempts,
+          recentTasks: []
+        }
+      );
+    } catch (error) {
+      console.error('Error personalizing tasks:', error);
+      return allTasks;
+    }
+  }, [allTasks, currentProfile, behaviorData, completedTasks, taskAttempts]);
+
+  // Get recommended tasks (top 3 by personality score)
+  const recommendedTasks = useMemo(() => {
+    return personalizedTasks
+      .filter(task => !completedTasks.includes(task.id))
+      .filter(task => !task.prerequisites || 
+        task.prerequisites.every(id => completedTasks.includes(id))
+      )
+      .sort((a, b) => (b.personalityScore || 0) - (a.personalityScore || 0))
+      .slice(0, 3);
+  }, [personalizedTasks, completedTasks]);
+
+  // Filtering and sorting
+  const {
+    searchQuery,
+    setSearchQuery,
+    activeFilter,
+    setActiveFilter,
+    sortBy,
+    setSortBy,
+    filteredAndSortedTasks
+  } = useTaskFiltering(personalizedTasks, completedTasks, recommendedTasks, favoriteTasks);
+
+  // Analytics
+  const analytics = useTaskAnalytics(allTasks, completedTasks, taskAttempts);
+
+  // Load favorites from localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.FAVORITE_TASKS(selectedCareer));
+      if (saved) {
+        setFavoriteTasks(JSON.parse(saved));
+      }
+    } catch (error) {
+      console.error('Error loading favorites:', error);
+    }
+  }, [selectedCareer]);
+
+  // Save favorites to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        STORAGE_KEYS.FAVORITE_TASKS(selectedCareer),
+        JSON.stringify(favoriteTasks)
+      );
+    } catch (error) {
+      console.error('Error saving favorites:', error);
+    }
+  }, [favoriteTasks, selectedCareer]);
+
+  // Handle task completion
+  const handleTaskComplete = useCallback(async (taskId, score) => {
+    try {
+      // Mark as completed
+      completeTask(taskId);
+
+      // Find task for XP reward
+      const task = allTasks.find(t => t.id === taskId);
+      if (!task) return;
+
+      // Calculate personalized XP
+      const personalizedXP = task.personalizedXP || task.xpReward;
+
+      // Award XP
+      await addXP(personalizedXP, `Ukończenie: ${task.title}`);
+
+      // Track completion in personalization context
+      if (dispatch) {
+        dispatch({
+          type: 'TRACK_SESSION',
+          payload: {
+            taskId,
+            action: 'complete',
+            score,
+            timestamp: Date.now(),
+            taskType: task.type,
+            difficulty: task.difficulty,
+            xpEarned: personalizedXP
+          }
+        });
+      }
+
+      // Close modal
+      setActiveTask(null);
+
+      // Show success notification (could be a toast)
+      console.log(`✅ Task completed: ${task.title} (+${personalizedXP} XP)`);
+    } catch (error) {
+      console.error('Error completing task:', error);
+    }
+  }, [completeTask, allTasks, addXP, dispatch]);
+
+  // Handle task click
+  const handleTaskClick = useCallback((task) => {
+    // Check if locked
+    const isLocked = task.prerequisites?.some(prereqId => 
+      !completedTasks.includes(prereqId)
+    );
+
+    if (isLocked) {
+      console.log('Task is locked');
+      return;
+    }
+
+    // Increment attempts
+    incrementAttempts(task.id);
+
+    // Track interaction
+    if (dispatch) {
+      dispatch({
+        type: 'TRACK_SESSION',
+        payload: {
+          taskId: task.id,
+          action: 'click',
+          timestamp: Date.now(),
+          taskType: task.type,
+          difficulty: task.difficulty
+        }
+      });
+    }
+
+    // Open task modal
+    setActiveTask(task);
+  }, [completedTasks, incrementAttempts, dispatch]);
+
+  // Toggle favorite
+  const toggleFavorite = useCallback((taskId, e) => {
+    e.stopPropagation();
+    setFavoriteTasks(prev => 
+      prev.includes(taskId)
+        ? prev.filter(id => id !== taskId)
+        : [...prev, taskId]
+    );
+  }, []);
+
+  // Render task modal
+  const renderTaskModal = () => {
+    if (!activeTask) return null;
+
+    return (
+      <TaskModal
+        task={activeTask}
+        onComplete={handleTaskComplete}
+        onClose={() => setActiveTask(null)}
+      />
+    );
+  };
+
+  // Loading state
+  if (tasksLoading || !career) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        minHeight: '400px' 
+      }}>
+        <div className="spinner" />
+        <span style={{ marginLeft: '12px' }}>Ładowanie zadań...</span>
+      </div>
+    );
+  }
+
+  return (
+    
+      <div style={{ maxWidth: '1400px', margin: '0 auto', padding: 'var(--spacing-xl)' }}>
+        {/* Header with Career Info */}
+        <CareerHeader 
+          career={career}
+          progress={progress}
+          analytics={analytics}
+          showAnalytics={showAnalytics}
+          setShowAnalytics={setShowAnalytics}
+        />
+
+        {/* Recommended Tasks Section */}
+        {recommendedTasks.length > 0 && (
+          <RecommendedTasksSection
+            tasks={recommendedTasks}
+            onTaskClick={handleTaskClick}
+            completedTasks={completedTasks}
+            favoriteTasks={favoriteTasks}
+            onToggleFavorite={toggleFavorite}
+          />
+        )}
+
+        {/* Analytics Dashboard (collapsible) */}
+        {showAnalytics && (
+          <AnalyticsDashboard analytics={analytics} />
+        )}
+
+        {/* Filters and Search */}
+        <FiltersBar
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          activeFilter={activeFilter}
+          setActiveFilter={setActiveFilter}
+          sortBy={sortBy}
+          setSortBy={setSortBy}
+          viewMode={viewMode}
+          setViewMode={setViewMode}
+          showFilters={showFilters}
+          setShowFilters={setShowFilters}
+          taskCounts={{
+            all: allTasks.length,
+            available: allTasks.filter(t => 
+              !completedTasks.includes(t.id) &&
+              (!t.prerequisites || t.prerequisites.every(id => completedTasks.includes(id)))
+            ).length,
+            locked: allTasks.filter(t =>
+              t.prerequisites?.some(id => !completedTasks.includes(id))
+            ).length,
+            completed: completedTasks.length,
+            recommended: recommendedTasks.length,
+            favorites: favoriteTasks.length
+          }}
+        />
+
+        {/* Tasks Grid/List by Module */}
+          {career?.modules?.map((module, moduleIdx) => {        
+          const moduleTasks = filteredAndSortedTasks.filter(
+            task => task.moduleId === module.id
+          );
+
+          if (moduleTasks.length === 0) return null;
+
+          return (
+            <ModuleSection
+              key={module.id}
+              module={module}
+              tasks={moduleTasks}
+              completedTasks={completedTasks}
+              favoriteTasks={favoriteTasks}
+              viewMode={viewMode}
+              onTaskClick={handleTaskClick}
+              onToggleFavorite={toggleFavorite}
+            />
+          );
+        })}
+
+        {/* Empty State */}
+        {filteredAndSortedTasks.length === 0 && (
+          <EmptyState
+            activeFilter={activeFilter}
+            searchQuery={searchQuery}
+            onClearFilters={() => {
+              setActiveFilter(FILTER_OPTIONS.ALL);
+              setSearchQuery('');
+            }}
+          />
+        )}
+
+        {/* Task Modal */}
+        {renderTaskModal()}
+      </div>
+    
+  )};
+
+// Electric Wire Progress Component - Visual metaphor for electrician career
+function ElectricWireProgress({ progress, tasksRemaining }) {
+  return (
+    <div style={{ position: 'relative' }}>
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 'var(--spacing-sm)'
+      }}>
+        <div>
+          <span style={{ 
+            fontWeight: '700', 
+            fontSize: '16px',
+            textShadow: '0 1px 3px rgba(0,0,0,0.2)'
+          }}>
+            🔌 Przepływ Energii
+          </span>
+          {tasksRemaining && (
+            <div style={{ 
+              fontSize: '12px', 
+              opacity: 0.9, 
+              marginTop: '4px',
+              fontWeight: '600'
+            }}>
+              ⚡ {tasksRemaining}
+            </div>
+          )}
+        </div>
+        <span style={{ 
+          fontSize: '28px', 
+          fontWeight: '900',
+          textShadow: '0 2px 10px rgba(255,255,255,0.3)'
+        }}>
+          {progress.percentage}%
+        </span>
+      </div>
+
+      {/* Wire container */}
+      <div style={{
+        position: 'relative',
+        height: '40px',
+        background: 'rgba(0,0,0,0.2)',
+        borderRadius: '20px',
+        overflow: 'hidden',
+        border: '2px solid rgba(255,255,255,0.3)',
+        boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.3)'
+      }}>
+        {/* Electric current flowing */}
+        <div 
+          style={{ 
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            height: '100%',
+            width: `${progress.percentage}%`,
+            background: 'linear-gradient(90deg, #fbbf24 0%, #f59e0b 50%, #fbbf24 100%)',
+            backgroundSize: '200% 100%',
+            animation: 'electricFlow 2s linear infinite',
+            borderRadius: '20px',
+            boxShadow: '0 0 20px rgba(251, 191, 36, 0.8), inset 0 0 20px rgba(255,255,255,0.5)',
+            transition: 'width 0.8s cubic-bezier(0.4, 0, 0.2, 1)'
+          }} 
+        />
+
+        {/* Sparks effect at the end */}
+        {progress.percentage > 0 && progress.percentage < 100 && (
+          <div style={{
+            position: 'absolute',
+            left: `${progress.percentage}%`,
+            top: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: '20px',
+            height: '20px',
+            background: 'radial-gradient(circle, #fff 0%, #fbbf24 50%, transparent 70%)',
+            borderRadius: '50%',
+            animation: 'spark 1.5s ease-in-out infinite',
+            filter: 'blur(2px)'
+          }} />
+        )}
+
+        {/* Light bulb at the end */}
+        <div style={{
+          position: 'absolute',
+          right: '10px',
+          top: '50%',
+          transform: 'translateY(-50%)',
+          fontSize: '24px',
+          filter: progress.percentage === 100 
+            ? 'drop-shadow(0 0 10px #fbbf24)' 
+            : 'grayscale(100%) opacity(0.5)',
+          transition: 'all 0.5s ease'
+        }}>
+          💡
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes electricFlow {
+          0% { background-position: 0% 0%; }
+          100% { background-position: 200% 0%; }
+        }
+        @keyframes spark {
+          0%, 100% { 
+            opacity: 1; 
+            transform: translate(-50%, -50%) scale(1); 
+          }
+          50% { 
+            opacity: 0.5; 
+            transform: translate(-50%, -50%) scale(1.5); 
+          }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// Standard Progress Bar for other careers
+function StandardProgressBar({ progress, tasksRemaining }) {
+  return (
+    <div>
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 'var(--spacing-sm)'
+      }}>
+        <div>
+          <span style={{ fontWeight: '700', fontSize: '16px' }}>
+            Ogólny postęp
+          </span>
+          {tasksRemaining && (
+            <div style={{ fontSize: '12px', opacity: 0.9, marginTop: '4px' }}>
+              {tasksRemaining}
+            </div>
+          )}
+        </div>
+        <span style={{ fontSize: '24px', fontWeight: '900' }}>
+          {progress.percentage}%
+        </span>
+      </div>
+      <div style={{
+        height: '16px',
+        background: 'rgba(255,255,255,0.2)',
+        borderRadius: '10px',
+        overflow: 'hidden',
+        border: '1px solid rgba(255,255,255,0.3)'
+      }}>
+        <div 
+          style={{ 
+            height: '100%',
+            width: `${progress.percentage}%`,
+            background: 'linear-gradient(90deg, #10b981 0%, #059669 100%)',
+            transition: 'width 0.8s cubic-bezier(0.4, 0, 0.2, 1)',
+            boxShadow: '0 0 10px rgba(16, 185, 129, 0.5)'
+          }} 
+        />
+      </div>
+    </div>
+  );
+}
+// ==================== SUB-COMPONENTS ====================
+
+// Career Header Component
+function CareerHeader({ career, progress, analytics, showAnalytics, setShowAnalytics }) {
+  return (
+    <div className="card" style={{ marginBottom: 'var(--spacing-xl)' }}>
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'flex-start', 
+        gap: 'var(--spacing-lg)', 
+        marginBottom: 'var(--spacing-lg)',
+        flexWrap: 'wrap'
+      }}>
+        <div style={{ fontSize: '56px' }}>{career.icon}</div>
+        
+        <div style={{ flex: 1, minWidth: '300px' }}>
+          <h1 style={{ margin: 0, marginBottom: 'var(--spacing-xs)', fontSize: '32px' }}>
+            {career.name}
+          </h1>
+          <p style={{ 
+            margin: 0, 
+            color: 'var(--color-text-secondary)',
+            fontSize: '16px',
+            lineHeight: 1.6
+          }}>
+            {career.description}
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', gap: 'var(--spacing-md)', flexWrap: 'wrap' }}>
+          <div className="badge badge-primary" style={{ padding: '12px 20px', fontSize: '16px' }}>
+            <Target size={18} style={{ marginRight: '8px' }} />
+            {progress.completed}/{progress.total} zadań
+          </div>
+          
+          <div className="badge badge-success" style={{ padding: '12px 20px', fontSize: '16px' }}>
+            <Zap size={18} style={{ marginRight: '8px' }} />
+            {analytics.totalXPEarned} XP
+          </div>
+
+          <button
+            onClick={() => setShowAnalytics(!showAnalytics)}
+            className="btn btn-outline"
+            style={{ padding: '12px 20px' }}
+          >
+            <BarChart3 size={18} />
+            {showAnalytics ? 'Ukryj' : 'Pokaż'} statystyki
+          </button>
+        </div>
+      </div>
+
+      {/* Progress Bar */}
+      <div className="progress-container">
+        <div className="progress-label">
+          <span style={{ fontWeight: '600' }}>Ogólny postęp</span>
+          <span className="text-mono" style={{ fontSize: '18px', fontWeight: '700' }}>
+            {progress.percentage}%
+          </span>
+        </div>
+        <div className="progress-bar" style={{ height: '12px' }}>
+          <div 
+            className="progress-fill success" 
+            style={{ 
+              width: `${progress.percentage}%`,
+              transition: 'width 0.5s ease'
+            }} 
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Recommended Tasks Section
+function RecommendedTasksSection({ tasks, onTaskClick, completedTasks, favoriteTasks, onToggleFavorite }) {
+  return (
+    <div 
+      className="card" 
+      style={{ 
+        marginBottom: 'var(--spacing-xl)',
+        background: 'linear-gradient(135deg, #fef3c7 0%, #fed7aa 100%)',
+        border: '2px solid #fbbf24'
+      }}
+    >
+      <div style={{ marginBottom: 'var(--spacing-lg)' }}>
+        <h2 style={{ 
+          margin: 0, 
+          fontSize: '24px', 
+          color: '#92400e',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px'
+        }}>
+          <TrendingUp size={28} />
+          💎 Polecane dla Ciebie
+        </h2>
+        <p style={{ 
+          margin: '8px 0 0 0', 
+          color: '#92400e',
+          opacity: 0.8,
+          fontSize: '14px'
+        }}>
+          Zadania dostosowane do Twojego stylu nauki
+        </p>
+      </div>
+
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', 
+        gap: 'var(--spacing-md)' 
+      }}>
+        {tasks.map(task => (
+          <TaskCard
+            key={task.id}
+            task={task}
+            isCompleted={completedTasks.includes(task.id)}
+            isLocked={false}
+            isFavorite={favoriteTasks.includes(task.id)}
+            isRecommended={true}
+            onClick={() => onTaskClick(task)}
+            onToggleFavorite={onToggleFavorite}
+            variant="recommended"
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Analytics Dashboard with personality insights
+function AnalyticsDashboard({ analytics }) {
+  // Calculate personality traits based on completion patterns
+  const getPersonalityTraits = () => {
+    const traits = [];
+    
+    // Praktyk - high practical completion
+    if (analytics.byType.practical?.completed > analytics.byType.theory?.completed) {
+      traits.push({ name: '🔧 Praktyk', score: 85, color: '#10b981' });
+    }
+    
+    // Perfekcjonista - low average attempts
+    if (analytics.avgAttempts < 1.5) {
+      traits.push({ name: '💎 Perfekcjonista', score: 90, color: '#8b5cf6' });
+    }
+    
+    // Eksperymentator - high attempts on advanced
+    if (analytics.byDifficulty.advanced?.completed > 0) {
+      traits.push({ name: '⚡ Eksperymentator', score: 75, color: '#f59e0b' });
+    }
+
+    // Teoretyk - high theory completion
+    if (analytics.byType.theory?.completed > analytics.byType.practical?.completed) {
+      traits.push({ name: '📚 Teoretyk', score: 80, color: '#3b82f6' });
+    }
+
+    return traits.length > 0 ? traits : [{ name: '🌱 Początkujący', score: 50, color: '#6b7280' }];
+  };
+
+  const traits = getPersonalityTraits();
+
+  return (
+    <div 
+      style={{ 
+        marginBottom: 'var(--spacing-xl)',
+        background: 'linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%)',
+        borderRadius: 'var(--radius-xl)',
+        padding: 'var(--spacing-xl)',
+        border: '2px solid #e5e7eb',
+        boxShadow: '0 10px 40px rgba(0,0,0,0.06)'
+      }}
+    >
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 'var(--spacing-xl)',
+        paddingBottom: 'var(--spacing-lg)',
+        borderBottom: '2px solid #e5e7eb'
+      }}>
+        <h3 style={{ 
+          margin: 0,
+          fontSize: '24px', 
+          fontWeight: '800',
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px'
+        }}>
+          <BarChart3 size={28} style={{ color: '#667eea' }} />
+          Dashboard Wydajności
+        </h3>
+
+        {/* Weekly trend indicator */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          padding: '10px 16px',
+          background: 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)',
+          borderRadius: 'var(--radius-lg)',
+          border: '2px solid #10b981'
+        }}>
+          <TrendingUp size={20} color="#059669" />
+          <span style={{ 
+            fontSize: '14px', 
+            fontWeight: '800', 
+            color: '#065f46' 
+          }}>
+            +{Math.round(analytics.percentage * 0.12)}% ten tydzień
+          </span>
+        </div>
+      </div>
+
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', 
+        gap: 'var(--spacing-xl)' 
+      }}>
+        {/* Personality Traits */}
+        <div>
+          <h4 style={{ 
+            fontSize: '14px', 
+            fontWeight: '800', 
+            marginBottom: 'var(--spacing-lg)', 
+            color: '#374151',
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <Star size={18} color="#f59e0b" fill="#f59e0b" />
+            Twój Profil Uczenia
+          </h4>
+          
+          <div style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: 'var(--spacing-md)' 
+          }}>
+            {traits.map((trait, idx) => (
+              <div 
+                key={idx}
+                style={{
+                  padding: 'var(--spacing-md)',
+                  background: 'white',
+                  borderRadius: 'var(--radius-lg)',
+                  border: `2px solid ${trait.color}20`,
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                  animation: `slideInLeft ${0.3 + idx * 0.1}s ease`
+                }}
+              >
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  marginBottom: 'var(--spacing-sm)' 
+                }}>
+                  <span style={{ 
+                    fontWeight: '700', 
+                    fontSize: '14px',
+                    color: '#111827'
+                  }}>
+                    {trait.name}
+                  </span>
+                  <span style={{ 
+                    fontWeight: '900', 
+                    fontSize: '16px',
+                    color: trait.color
+                  }}>
+                    {trait.score}%
+                  </span>
+                </div>
+                <div style={{
+                  height: '8px',
+                  background: '#f3f4f6',
+                  borderRadius: '4px',
+                  overflow: 'hidden'
+                }}>
+                  <div 
+                    style={{ 
+                      height: '100%',
+                      width: `${trait.score}%`,
+                      background: `linear-gradient(90deg, ${trait.color} 0%, ${trait.color}dd 100%)`,
+                      borderRadius: '4px',
+                      transition: 'width 1s ease',
+                      boxShadow: `0 0 10px ${trait.color}40`
+                    }} 
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* By Difficulty */}
+        <div>
+          <h4 style={{ 
+            fontSize: '14px', 
+            fontWeight: '800', 
+            marginBottom: 'var(--spacing-lg)', 
+            color: '#374151',
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <Target size={18} color="#667eea" />
+            Według Trudności
+          </h4>
+          
+          {Object.entries(analytics.byDifficulty).map(([level, data], idx) => {
+            const percentage = data.total > 0 ? Math.round((data.completed / data.total) * 100) : 0;
+            return (
+              <div 
+                key={level} 
+                style={{ 
+                  marginBottom: 'var(--spacing-md)',
+                  padding: 'var(--spacing-md)',
+                  background: 'white',
+                  borderRadius: 'var(--radius-lg)',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                  animation: `slideInRight ${0.3 + idx * 0.1}s ease`
+                }}
+              >
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  marginBottom: 'var(--spacing-sm)' 
+                }}>
+                  <span style={{ 
+                    textTransform: 'capitalize', 
+                    fontWeight: '700',
+                    fontSize: '13px',
+                    color: '#111827'
+                  }}>
+                    {level === 'beginner' && '🌱 Początkujący'}
+                    {level === 'intermediate' && '🔥 Średniozaawansowany'}
+                    {level === 'advanced' && '⚡ Zaawansowany'}
+                    {level === 'expert' && '💎 Ekspert'}
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ 
+                      fontSize: '12px', 
+                      fontWeight: '700',
+                      color: '#6b7280'
+                    }}>
+                      {data.completed}/{data.total}
+                    </span>
+                    <span style={{ 
+                      fontSize: '14px', 
+                      fontWeight: '900',
+                      color: getDifficultyColor(level)
+                    }}>
+                      {percentage}%
+                    </span>
+                  </div>
+                </div>
+                <div style={{
+                  height: '8px',
+                  background: '#f3f4f6',
+                  borderRadius: '4px',
+                  overflow: 'hidden'
+                }}>
+                  <div 
+                    style={{ 
+                      height: '100%',
+                      width: `${percentage}%`,
+                      background: getDifficultyColor(level),
+                      borderRadius: '4px',
+                      transition: 'width 1s ease',
+                      boxShadow: `0 0 10px ${getDifficultyColor(level)}40`
+                    }} 
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* By Type */}
+        <div>
+          <h4 style={{ 
+            fontSize: '14px', 
+            fontWeight: '800', 
+            marginBottom: 'var(--spacing-lg)', 
+            color: '#374151',
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <Zap size={18} color="#f59e0b" />
+            Według Typu
+          </h4>
+          
+          {Object.entries(analytics.byType).map(([type, data], idx) => {
+            const percentage = data.total > 0 ? Math.round((data.completed / data.total) * 100) : 0;
+            return (
+              <div 
+                key={type} 
+                style={{ 
+                  marginBottom: 'var(--spacing-md)',
+                  padding: 'var(--spacing-md)',
+                  background: 'white',
+                  borderRadius: 'var(--radius-lg)',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                  animation: `slideInRight ${0.3 + idx * 0.1}s ease`
+                }}
+              >
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  marginBottom: 'var(--spacing-sm)' 
+                }}>
+                  <span style={{ 
+                    fontWeight: '700',
+                    fontSize: '13px',
+                    color: '#111827'
+                  }}>
+                    {getTypeIcon(type)} {type}
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ 
+                      fontSize: '12px', 
+                      fontWeight: '700',
+                      color: '#6b7280'
+                    }}>
+                      {data.completed}/{data.total}
+                    </span>
+                    <span style={{ 
+                      fontSize: '14px', 
+                      fontWeight: '900',
+                      color: '#10b981'
+                    }}>
+                      {percentage}%
+                    </span>
+                  </div>
+                </div>
+                <div style={{
+                  height: '8px',
+                  background: '#f3f4f6',
+                  borderRadius: '4px',
+                  overflow: 'hidden'
+                }}>
+                  <div 
+                    style={{ 
+                      height: '100%',
+                      width: `${percentage}%`,
+                      background: 'linear-gradient(90deg, #10b981 0%, #059669 100%)',
+                      borderRadius: '4px',
+                      transition: 'width 1s ease',
+                      boxShadow: '0 0 10px rgba(16, 185, 129, 0.3)'
+                    }} 
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Performance Stats Cards */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+        gap: 'var(--spacing-lg)',
+        marginTop: 'var(--spacing-xl)',
+        paddingTop: 'var(--spacing-xl)',
+        borderTop: '2px solid #e5e7eb'
+      }}>
+        <div style={{
+          padding: 'var(--spacing-lg)',
+          background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+          borderRadius: 'var(--radius-lg)',
+          border: '2px solid #3b82f6',
+          textAlign: 'center'
+        }}>
+          <div style={{ fontSize: '32px', marginBottom: 'var(--spacing-sm)' }}>📊</div>
+          <div style={{ fontSize: '28px', fontWeight: '900', color: '#1e40af', marginBottom: '4px' }}>
+            {analytics.avgAttempts.toFixed(1)}
+          </div>
+          <div style={{ fontSize: '12px', fontWeight: '700', color: '#3b82f6', textTransform: 'uppercase' }}>
+            Średnia prób
+          </div>
+        </div>
+
+        <div style={{
+          padding: 'var(--spacing-lg)',
+          background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+          borderRadius: 'var(--radius-lg)',
+          border: '2px solid #f59e0b',
+          textAlign: 'center'
+        }}>
+          <div style={{ fontSize: '32px', marginBottom: 'var(--spacing-sm)' }}>⚡</div>
+          <div style={{ fontSize: '28px', fontWeight: '900', color: '#92400e', marginBottom: '4px' }}>
+            {analytics.totalXPEarned}
+          </div>
+          <div style={{ fontSize: '12px', fontWeight: '700', color: '#d97706', textTransform: 'uppercase' }}>
+            Całkowite XP
+          </div>
+        </div>
+
+        <div style={{
+          padding: 'var(--spacing-lg)',
+          background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+          borderRadius: 'var(--radius-lg)',
+          border: '2px solid #10b981',
+          textAlign: 'center'
+        }}>
+          <div style={{ fontSize: '32px', marginBottom: 'var(--spacing-sm)' }}>🎯</div>
+          <div style={{ fontSize: '28px', fontWeight: '900', color: '#065f46', marginBottom: '4px' }}>
+            {analytics.percentage}%
+          </div>
+          <div style={{ fontSize: '12px', fontWeight: '700', color: '#059669', textTransform: 'uppercase' }}>
+            Ukończone
+          </div>
+        </div>
+      </div>
+
+      {/* CSS animations */}
+      <style>{`
+        @keyframes slideInLeft {
+          from { opacity: 0; transform: translateX(-20px); }
+          to { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes slideInRight {
+          from { opacity: 0; transform: translateX(20px); }
+          to { opacity: 1; transform: translateX(0); }
+        }
+      `}</style>
+    </div>
+  );
+}
+// Filters Bar Component
+function FiltersBar({
+  searchQuery,
+  setSearchQuery,
+  activeFilter,
+  setActiveFilter,
+  sortBy,
+  setSortBy,
+  viewMode,
+  setViewMode,
+  showFilters,
+  setShowFilters,
+  taskCounts
+}) {
+  return (
+    <div className="card" style={{ marginBottom: 'var(--spacing-lg)' }}>
+      {/* Search and Toggle */}
+      <div style={{ display: 'flex', gap: 'var(--spacing-md)', marginBottom: showFilters ? 'var(--spacing-lg)' : 0, flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: '250px', position: 'relative' }}>
+          <Search 
+            size={18}
+            style = {{
+              position: 'absolute',
+              left: '12px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              color: 'var(-color-text-secondary',
+              pointerEvents: 'none',
+
+            }}
+          />
+          <input
+          type='text'
+          placeholder='Szukaj zadań'
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+           style={{
+              width: '100%',
+              padding: '12px 12px 12px 40px',
+              border: '2px solid var(--color-bg-tertiary)',
+              borderRadius: 'var(--radius-md)',
+              fontSize: '14px',
+              transition: 'all 0.2s'
+            }}
+            onFocus={(e) => {
+              e.target.style.borderColor = 'var(--color-primary)';
+              e.target.style.boxShadow = '0 0 0 3px rgba(124, 58, 237, 0.1)';
+            }}
+            onBlur={(e) => {
+              e.target.style.borderColor = 'var(--color-bg-tertiary)';
+              e.target.style.boxShadow = 'none';
+            }}
+          />
+        </div>
+
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          className={`btn ${showFilters ? 'btn-primary' : 'btn-outline'}`}
+          style={{ padding: '12px 20px' }}
+        >
+          <Filter size={18} style={{ marginRight: '8px' }} />
+          Filtry
+        </button>
+
+        <div style={{ display: 'flex', gap: '8px', border: '2px solid var(--color-bg-tertiary)', borderRadius: 'var(--radius-md)', padding: '4px' }}>
+          <button
+            onClick={() => setViewMode('grid')}
+            className={`btn ${viewMode === 'grid' ? 'btn-primary' : 'btn-ghost'}`}
+            style={{ padding: '8px 16px' }}
+            title="Widok siatki"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="3" width="7" height="7" />
+              <rect x="14" y="3" width="7" height="7" />
+              <rect x="3" y="14" width="7" height="7" />
+              <rect x="14" y="14" width="7" height="7" />
+            </svg>
+          </button>
+          <button
+            onClick={() => setViewMode('list')}
+            className={`btn ${viewMode === 'list' ? 'btn-primary' : 'btn-ghost'}`}
+            style={{ padding: '8px 16px' }}
+            title="Widok listy"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="8" y1="6" x2="21" y2="6" />
+              <line x1="8" y1="12" x2="21" y2="12" />
+              <line x1="8" y1="18" x2="21" y2="18" />
+              <line x1="3" y1="6" x2="3.01" y2="6" />
+              <line x1="3" y1="12" x2="3.01" y2="12" />
+              <line x1="3" y1="18" x2="3.01" y2="18" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {/* Filter Options (Collapsible) */}
+      {showFilters && (
+        <div style={{ 
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: 'var(--spacing-lg)',
+          paddingTop: 'var(--spacing-lg)',
+          borderTop: '1px solid var(--color-bg-tertiary)'
+        }}>
+          {/* Category Filters */}
+          <div>
+            <label style={{ 
+              display: 'block', 
+              fontSize: '12px', 
+              fontWeight: '700', 
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+              color: 'var(--color-text-secondary)',
+              marginBottom: 'var(--spacing-sm)'
+            }}>
+              Kategoria
+            </label>
+            <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap' }}>
+              {Object.entries(FILTER_OPTIONS).map(([key, value]) => (
+                <button
+                  key={value}
+                  onClick={() => setActiveFilter(value)}
+                  className={`btn ${activeFilter === value ? 'btn-primary' : 'btn-outline'}`}
+                  style={{ padding: '8px 16px', fontSize: '13px' }}
+                >
+                  {getFilterLabel(value)}
+                  <span className="badge badge-sm" style={{ 
+                    marginLeft: '8px',
+                    backgroundColor: activeFilter === value ? 'rgba(255,255,255,0.2)' : 'var(--color-bg-secondary)'
+                  }}>
+                    {taskCounts[value] || 0}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Sort Options */}
+          <div>
+            <label style={{ 
+              display: 'block', 
+              fontSize: '12px', 
+              fontWeight: '700', 
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+              color: 'var(--color-text-secondary)',
+              marginBottom: 'var(--spacing-sm)'
+            }}>
+              Sortowanie
+            </label>
+            <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap' }}>
+              {Object.entries(SORT_OPTIONS).map(([key, value]) => (
+                <button
+                  key={value}
+                  onClick={() => setSortBy(value)}
+                  className={`btn ${sortBy === value ? 'btn-primary' : 'btn-outline'}`}
+                  style={{ padding: '8px 16px', fontSize: '13px' }}
+                >
+                  {getSortLabel(value)}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Module Section Component
+function ModuleSection({ module, tasks, completedTasks, favoriteTasks, viewMode, onTaskClick, onToggleFavorite }) {
+  const completedCount = tasks.filter(t => completedTasks.includes(t.id)).length;
+
+  return (
+    <div className="card" style={{ marginBottom: 'var(--spacing-lg)' }}>
+      <div className="card-header" style={{ marginBottom: 'var(--spacing-lg)' }}>
+        <div style={{ flex: 1 }}>
+          <h2 className="card-title" style={{ marginBottom: 'var(--spacing-xs)' }}>
+            {module.title}
+          </h2>
+          {module.description && (
+            <p style={{ 
+              margin: 0, 
+              fontSize: '14px', 
+              color: 'var(--color-text-secondary)' 
+            }}>
+              {module.description}
+            </p>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 'var(--spacing-sm)', alignItems: 'center' }}>
+          <span className="badge badge-outline">
+            <Clock size={14} style={{ marginRight: '6px' }} />
+            {module.duration}
+          </span>
+          <span className="badge badge-success">
+            {completedCount}/{tasks.length} ukończone
+          </span>
+        </div>
+      </div>
+
+      <div style={{ 
+        display: viewMode === 'grid' ? 'grid' : 'flex',
+        flexDirection: viewMode === 'list' ? 'column' : undefined,
+        gridTemplateColumns: viewMode === 'grid' ? 'repeat(auto-fill, minmax(320px, 1fr))' : undefined,
+        gap: 'var(--spacing-md)' 
+      }}>
+        {tasks.map(task => {
+          const isCompleted = completedTasks.includes(task.id);
+          const isLocked = task.prerequisites?.some(prereqId => 
+            !completedTasks.includes(prereqId)
+          );
+          const isFavorite = favoriteTasks.includes(task.id);
+
+          return (
+            <TaskCard
+              key={task.id}
+              task={task}
+              isCompleted={isCompleted}
+              isLocked={isLocked}
+              isFavorite={isFavorite}
+              isRecommended={false}
+              onClick={() => onTaskClick(task)}
+              onToggleFavorite={onToggleFavorite}
+              viewMode={viewMode}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+
+
+// Enhanced Task Card Component
+// Enhanced Task Card Component - with depth and micro-interactions
+function TaskCard({ 
+  task, 
+  isCompleted, 
+  isLocked, 
+  isFavorite,
+  isRecommended,
+  onClick, 
+  onToggleFavorite,
+  viewMode = 'grid',
+  variant = 'default'
+}) {
+  const [isHovered, setIsHovered] = useState(false);
+  const [justFavorited, setJustFavorited] = useState(false);
+
+  const getTypeIcon = () => {
+    switch (task.type) {
+      case 'theory': return '📚';
+      case 'practical': return '🔧';
+      case 'safety': return '⚠️';
+      case 'wiring': return '🔌';
+      case 'diagnostic': return '🔍';
+      case 'certification': return '📜';
+      default: return '📝';
+    }
+  };
+
+  const getDifficultyGradient = () => {
+    switch (task.difficulty) {
+      case 'beginner': return 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+      case 'intermediate': return 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)';
+      case 'advanced': return 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
+      case 'expert': return 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)';
+      default: return 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)';
+    }
+  };
+
+  const getDifficultyLabel = () => {
+    const labels = {
+      beginner: '🌱 Początkujący',
+      intermediate: '🔥 Średniozaawansowany',
+      advanced: '⚡ Zaawansowany',
+      expert: '💎 Ekspert'
+    };
+    return labels[task.difficulty] || task.difficulty;
+  };
+
+  const handleFavoriteClick = (e) => {
+    onToggleFavorite(task.id, e);
+    setJustFavorited(true);
+    setTimeout(() => setJustFavorited(false), 600);
+  };
+
+  const cardStyle = {
+    padding: viewMode === 'list' ? 'var(--spacing-lg)' : 'var(--spacing-xl)',
+    background: isCompleted 
+      ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)' 
+      : variant === 'recommended'
+        ? 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)'
+        : 'white',
+    border: `2px solid ${
+      isCompleted 
+        ? '#10b981' 
+        : isRecommended || variant === 'recommended'
+          ? '#f59e0b'
+          : '#e5e7eb'
+    }`,
+    borderRadius: 'var(--radius-lg)',
+    cursor: isLocked ? 'not-allowed' : 'pointer',
+    opacity: isLocked ? 0.6 : 1,
+    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+    position: 'relative',
+    display: viewMode === 'list' ? 'flex' : 'block',
+    gap: viewMode === 'list' ? 'var(--spacing-lg)' : undefined,
+    alignItems: viewMode === 'list' ? 'center' : undefined,
+    boxShadow: isHovered && !isLocked 
+      ? '0 20px 60px rgba(0,0,0,0.15)' 
+      : '0 4px 12px rgba(0,0,0,0.08)',
+    transform: isHovered && !isLocked ? 'translateY(-8px) scale(1.02)' : 'translateY(0) scale(1)'
+  };
+
+  return (
+    <div
+      onClick={onClick}
+      style={cardStyle}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      {/* Decorative corner accent */}
+      {(isRecommended || variant === 'recommended') && !isCompleted && (
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          right: 0,
+          width: '80px',
+          height: '80px',
+          background: 'linear-gradient(135deg, transparent 50%, #f59e0b 50%)',
+          borderTopRightRadius: 'var(--radius-lg)',
+          overflow: 'hidden'
+        }}>
+          <span style={{
+            position: 'absolute',
+            top: '8px',
+            right: '8px',
+            fontSize: '20px',
+            animation: 'bounce 2s ease-in-out infinite'
+          }}>
+            💎
+          </span>
+        </div>
+      )}
+
+      {/* Favorite Star with animation */}
+      <button
+        onClick={handleFavoriteClick}
+        style={{
+          position: 'absolute',
+          top: 'var(--spacing-md)',
+          left: 'var(--spacing-md)',
+          background: isFavorite ? '#fbbf24' : 'rgba(255,255,255,0.9)',
+          border: '2px solid ' + (isFavorite ? '#f59e0b' : '#e5e7eb'),
+          borderRadius: '50%',
+          width: '40px',
+          height: '40px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          padding: 0,
+          zIndex: 2,
+          transition: 'all 0.3s ease',
+          boxShadow: isFavorite ? '0 4px 12px rgba(251, 191, 36, 0.4)' : '0 2px 8px rgba(0,0,0,0.1)',
+          transform: justFavorited ? 'scale(1.3) rotate(20deg)' : 'scale(1) rotate(0deg)'
+        }}
+        title={isFavorite ? 'Usuń z ulubionych' : 'Dodaj do ulubionych'}
+      >
+        <Star 
+          size={20} 
+          fill={isFavorite ? 'white' : 'none'} 
+          color={isFavorite ? 'white' : '#9ca3af'} 
+          strokeWidth={2.5}
+        />
+      </button>
+
+      {/* Status Badges */}
+      <div style={{
+        position: 'absolute',
+        top: 'var(--spacing-md)',
+        right: 'var(--spacing-md)',
+        display: 'flex',
+        gap: 'var(--spacing-xs)',
+        zIndex: 2
+      }}>
+        {isCompleted && (
+          <div style={{
+            background: '#10b981',
+            borderRadius: '50%',
+            width: '36px',
+            height: '36px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 12px rgba(16, 185, 129, 0.4)',
+            animation: 'checkmarkPop 0.5s ease'
+          }}>
+            <CheckCircle size={24} color="white" />
+          </div>
+        )}
+        
+        {isLocked && (
+          <div style={{
+            background: '#6b7280',
+            borderRadius: '50%',
+            width: '36px',
+            height: '36px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 12px rgba(107, 114, 128, 0.4)'
+          }}>
+            <Lock size={20} color="white" />
+          </div>
+        )}
+      </div>
+
+      {/* Main Content */}
+      <div style={{ 
+        display: 'flex', 
+        flexDirection: viewMode === 'list' ? 'row' : 'column',
+        gap: viewMode === 'list' ? 'var(--spacing-lg)' : undefined,
+        alignItems: viewMode === 'list' ? 'center' : undefined,
+        flex: viewMode === 'list' ? 1 : undefined,
+        marginTop: 'var(--spacing-xxl)'
+      }}>
+        {/* Icon with pulsing background */}
+        <div style={{ 
+          fontSize: viewMode === 'list' ? '32px' : '48px', 
+          flexShrink: 0,
+          position: 'relative',
+          width: 'fit-content'
+        }}>
+          <div style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: '120%',
+            height: '120%',
+            background: getDifficultyGradient(),
+            borderRadius: '50%',
+            opacity: 0.15,
+            animation: isHovered ? 'pulse 2s ease-in-out infinite' : 'none'
+          }} />
+          <span style={{ position: 'relative', zIndex: 1 }}>
+            {getTypeIcon()}
+          </span>
+        </div>
+
+        {/* Text Content */}
+        <div style={{ 
+          flex: viewMode === 'list' ? 1 : undefined,
+          minWidth: 0
+        }}>
+          {/* Title */}
+          <h3 style={{ 
+            margin: '0 0 var(--spacing-sm) 0',
+            fontSize: viewMode === 'list' ? '18px' : '20px',
+            fontWeight: '800',
+            lineHeight: 1.3,
+            color: '#111827'
+          }}>
+            {task.title}
+          </h3>
+
+          {/* Personalization Badge */}
+          {task.adaptations?.motivationText && (
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: 'linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%)',
+              color: '#7c3aed',
+              padding: '6px 12px',
+              borderRadius: 'var(--radius-md)',
+              fontSize: '11px',
+              fontWeight: '800',
+              marginBottom: 'var(--spacing-sm)',
+              border: '1px solid #c4b5fd',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px'
+            }}>
+              🎯 {task.adaptations.motivationText}
+            </div>
+          )}
+
+          {/* Description */}
+          <p style={{ 
+            fontSize: '14px', 
+            color: '#6b7280', 
+            margin: '0 0 var(--spacing-lg) 0',
+            lineHeight: 1.6,
+            display: '-webkit-box',
+            WebkitLineClamp: viewMode === 'list' ? 2 : 3,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden'
+          }}>
+            {task.description}
+          </p>
+        </div>
+
+        {/* Meta Information */}
+        <div style={{ 
+          display: 'flex', 
+          flexDirection: viewMode === 'list' ? 'column' : 'row',
+          justifyContent: 'space-between', 
+          alignItems: viewMode === 'list' ? 'flex-end' : 'center',
+          gap: 'var(--spacing-md)',
+          flexWrap: 'wrap'
+        }}>
+          <div style={{ display: 'flex', gap: 'var(--spacing-sm)', flexWrap: 'wrap' }}>
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '8px 12px',
+              background: 'rgba(107, 114, 128, 0.1)',
+              borderRadius: 'var(--radius-md)',
+              fontSize: '12px',
+              fontWeight: '700',
+              color: '#4b5563',
+              border: '1px solid rgba(107, 114, 128, 0.2)'
+            }}>
+              <Clock size={14} />
+              {task.estimatedTime}
+            </span>
+            
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '8px 12px',
+              background: getDifficultyGradient(),
+              borderRadius: 'var(--radius-md)',
+              fontSize: '12px',
+              fontWeight: '700',
+              color: 'white',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+            }}>
+              {getDifficultyLabel()}
+            </span>
+          </div>
+          
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 'var(--spacing-sm)',
+            padding: '10px 16px',
+            background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+            borderRadius: 'var(--radius-md)',
+            border: '2px solid #fbbf24',
+            boxShadow: '0 4px 12px rgba(251, 191, 36, 0.2)'
+          }}>
+            <Award size={18} color="#d97706" />
+            <span style={{
+              fontSize: '16px',
+              fontWeight: '900',
+              color: '#92400e'
+            }}>
+              +{task.personalizedXP || task.xpReward} XP
+            </span>
+            
+            {task.personalizedXP && task.personalizedXP > task.xpReward && (
+              <span style={{
+                fontSize: '10px',
+                color: '#059669',
+                fontWeight: '900',
+                background: '#d1fae5',
+                padding: '2px 6px',
+                borderRadius: 'var(--radius-sm)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px'
+              }}>
+                +{task.personalizedXP - task.xpReward} BONUS
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Must Pass Warning */}
+      {task.mustPass && (
+        <div style={{
+          marginTop: 'var(--spacing-md)',
+          padding: 'var(--spacing-md)',
+          background: 'linear-gradient(135deg, #fef3c7 0%, #fed7aa 100%)',
+          borderLeft: '4px solid #f59e0b',
+          borderRadius: 'var(--radius-md)',
+          fontSize: '12px',
+          color: '#92400e',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'var(--spacing-sm)',
+          fontWeight: '800'
+        }}>
+          <AlertTriangle size={16} />
+          ZADANIE OBOWIĄZKOWE
+        </div>
+      )}
+
+      {/* Locked Prerequisites Info */}
+      {isLocked && task.prerequisites && (
+        <div style={{
+          marginTop: 'var(--spacing-md)',
+          padding: 'var(--spacing-md)',
+          background: 'rgba(107, 114, 128, 0.1)',
+          borderRadius: 'var(--radius-md)',
+          fontSize: '12px',
+          color: '#4b5563',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'var(--spacing-sm)',
+          fontWeight: '700'
+        }}>
+          <Lock size={14} />
+          Wymagane ukończenie: {task.prerequisites.length} zadań
+           </div>
+      )}
+
+      {/* CSS animations */}
+      <style>{`
+        @keyframes checkmarkPop {
+          0% { transform: scale(0); opacity: 0; }
+          50% { transform: scale(1.2); }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes bounce {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-8px); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// Empty State Component - Interactive and contextual
+function EmptyState({ activeFilter, searchQuery, onClearFilters }) {
+  const getEmptyStateContent = () => {
+    if (searchQuery) {
+      return {
+        icon: '🔍',
+        title: 'Nie znaleziono zadań',
+        description: `Brak wyników dla zapytania "${searchQuery}"`,
+        suggestion: 'Spróbuj zmienić kryteria wyszukiwania lub wybierz inny filtr',
+        action: 'Wyczyść wyszukiwanie'
+      };
+    }
+
+    switch (activeFilter) {
+      case FILTER_OPTIONS.COMPLETED:
+        return {
+          icon: '🎯',
+          title: 'Jeszcze nic nie ukończono',
+          description: 'Czas rozpocząć swoją przygodę!',
+          suggestion: 'Wybierz pierwsze zadanie z kategorii "Dostępne" i zdobądź swoje pierwsze XP',
+          action: 'Pokaż dostępne zadania'
+        };
+      case FILTER_OPTIONS.FAVORITES:
+        return {
+          icon: '⭐',
+          title: 'Brak ulubionych zadań',
+          description: 'Oznacz gwiazdką zadania, które chcesz wykonać',
+          suggestion: 'Kliknij gwiazdkę na karcie zadania, aby dodać je do ulubionych',
+          action: 'Przeglądaj wszystkie zadania'
+        };
+      case FILTER_OPTIONS.RECOMMENDED:
+        return {
+          icon: '💎',
+          title: 'Brak rekomendacji',
+          description: 'Ukończ więcej zadań, aby otrzymać spersonalizowane sugestie',
+          suggestion: 'System AI potrzebuje więcej danych o Twoim stylu nauki',
+          action: 'Zobacz wszystkie zadania'
+        };
+      case FILTER_OPTIONS.LOCKED:
+        return {
+          icon: '🔓',
+          title: 'Świetna robota!',
+          description: 'Wszystkie zadania są już odblokowane',
+          suggestion: 'Kontynuuj naukę, aby zdobywać więcej XP',
+          action: 'Pokaż dostępne zadania'
+        };
+      default:
+        return {
+          icon: '📦',
+          title: 'Brak zadań w tej kategorii',
+          description: 'Spróbuj zmienić filtry lub kategorię',
+          suggestion: 'Możesz również skorzystać z wyszukiwarki powyżej',
+          action: 'Wyczyść wszystkie filtry'
+        };
+    }
+  };
+
+  const content = getEmptyStateContent();
+
+  return (
+    <div 
+      className="card" 
+      style={{ 
+        textAlign: 'center', 
+        padding: 'var(--spacing-xxl)',
+        background: 'linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%)',
+        border: '2px dashed #d1d5db',
+        borderRadius: 'var(--radius-xl)'
+      }}
+    >
+      {/* Icon with animated background */}
+      <div style={{
+        position: 'relative',
+        display: 'inline-block',
+        marginBottom: 'var(--spacing-xl)'
+      }}>
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: '140px',
+          height: '140px',
+          background: 'radial-gradient(circle, rgba(124, 58, 237, 0.1) 0%, transparent 70%)',
+          borderRadius: '50%',
+          animation: 'pulse 3s ease-in-out infinite'
+        }} />
+        <div style={{ 
+          fontSize: '80px', 
+          position: 'relative',
+          zIndex: 1,
+          filter: 'grayscale(20%)'
+        }}>
+          {content.icon}
+        </div>
+      </div>
+
+      <h3 style={{ 
+        marginBottom: 'var(--spacing-md)', 
+        fontSize: '24px',
+        fontWeight: '800',
+        color: '#111827'
+      }}>
+        {content.title}
+      </h3>
+
+      <p style={{ 
+        color: '#6b7280', 
+        marginBottom: 'var(--spacing-sm)',
+        fontSize: '16px',
+        fontWeight: '600',
+        maxWidth: '500px',
+        margin: '0 auto var(--spacing-sm) auto'
+      }}>
+        {content.description}
+      </p>
+
+      <p style={{
+        color: '#9ca3af',
+        fontSize: '14px',
+        marginBottom: 'var(--spacing-xl)',
+        maxWidth: '450px',
+        margin: '0 auto var(--spacing-xl) auto',
+        lineHeight: 1.6
+      }}>
+        💡 {content.suggestion}
+      </p>
+
+      <button 
+        onClick={onClearFilters}
+        style={{
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          color: 'white',
+          border: 'none',
+          padding: '14px 32px',
+          borderRadius: 'var(--radius-lg)',
+          fontSize: '16px',
+          fontWeight: '700',
+          cursor: 'pointer',
+          boxShadow: '0 10px 30px rgba(102, 126, 234, 0.3)',
+          transition: 'all 0.3s ease',
+          outline: 'none'
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = 'translateY(-2px)';
+          e.currentTarget.style.boxShadow = '0 15px 40px rgba(102, 126, 234, 0.4)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'translateY(0)';
+          e.currentTarget.style.boxShadow = '0 10px 30px rgba(102, 126, 234, 0.3)';
+        }}
+      >
+        {content.action}
+      </button>
+
+      {/* Decorative elements */}
+      <div style={{
+        marginTop: 'var(--spacing-xl)',
+        display: 'flex',
+        justifyContent: 'center',
+        gap: 'var(--spacing-lg)',
+        opacity: 0.4
+      }}>
+        <div style={{ fontSize: '24px' }}>🎯</div>
+        <div style={{ fontSize: '24px' }}>✨</div>
+        <div style={{ fontSize: '24px' }}>🚀</div>
+      </div>
+    </div>
+  );
+}
+// ==================== UTILITY FUNCTIONS ====================
+
+function getFilterLabel(filter) {
+  const labels = {
+    [FILTER_OPTIONS.ALL]: 'Wszystkie',
+    [FILTER_OPTIONS.AVAILABLE]: 'Dostępne',
+    [FILTER_OPTIONS.LOCKED]: 'Zablokowane',
+    [FILTER_OPTIONS.COMPLETED]: 'Ukończone',
+    [FILTER_OPTIONS.RECOMMENDED]: 'Polecane',
+    [FILTER_OPTIONS.FAVORITES]: 'Ulubione'
+  };
+  return labels[filter] || filter;
+}
+
+function getSortLabel(sort) {
+  const labels = {
+    [SORT_OPTIONS.DEFAULT]: 'Domyślne',
+    [SORT_OPTIONS.TITLE]: 'Alfabetycznie',
+    [SORT_OPTIONS.DIFFICULTY]: 'Trudność',
+    [SORT_OPTIONS.XP]: 'Nagroda XP',
+    [SORT_OPTIONS.TIME]: 'Czas trwania',
+    [SORT_OPTIONS.RECOMMENDED]: 'Dopasowanie'
+  };
+  return labels[sort] || sort;
+}
+
+function getTypeIcon(type) {
+  const icons = {
+    theory: '📚',
+    practical: '🔧',
+    safety: '⚠️',
+    wiring: '🔌',
+    diagnostic: '🔍',
+    certification: '📜'
+  };
+  return icons[type] || '📝';
+}
+
+function getDifficultyColor(difficulty) {
+  const colors = {
+    beginner: 'var(--color-success)',
+    intermediate: 'var(--color-warning)',
+    advanced: 'var(--color-danger)',
+    expert: 'var(--color-primary)'
+  };
+  return colors[difficulty] || 'var(--color-neutral)';
+}
+
+
+// Global animation styles
+const GlobalStyles = () => (
+  <style>{`
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.05); opacity: 0.8; }
+    }
+    
+    @keyframes fadeInUp {
+      from { 
+        opacity: 0; 
+        transform: translateY(20px); 
+      }
+      to { 
+        opacity: 1; 
+        transform: translateY(0); 
+      }
+    }
+
+    @keyframes electricFlow {
+      0% { background-position: 0% 0%; }
+      100% { background-position: 200% 0%; }
+    }
+
+    @keyframes spark {
+      0%, 100% { 
+        opacity: 1; 
+        transform: translate(-50%, -50%) scale(1); 
+      }
+      50% { 
+        opacity: 0.5; 
+        transform: translate(-50%, -50%) scale(1.5); 
+      }
+    }
+  `}</style>
+);
+
+
+
+
+// ==================== EXPORTS ====================
+export default TasksSystem;
