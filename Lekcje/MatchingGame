@@ -1,0 +1,226 @@
+// ============================================================
+// MATCHING GAME - POPRAWIONA LOGIKA I A11Y
+// ============================================================
+
+import React, { useState, useCallback, useMemo } from 'react';
+import { Cable, Zap, RotateCcw } from 'lucide-react';
+import type { MatchingGameProps, MatchingPair } from '../types/minigames';
+
+// Fisher-Yates shuffle
+const shuffleArray = <T,>(array: T[]): T[] => {
+  const result = [...array];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+};
+
+export const MatchingGame: React.FC<MatchingGameProps> = ({
+  pairs,
+  onComplete,
+  onRestart,
+  reducedMotion = false,
+}) => {
+  // Wymieszane wartości prawej kolumny (raz przy renderze)
+  const [shuffledRight] = useState(() => shuffleArray(pairs.map(p => p.right)));
+  
+  const [selectedLeftId, setSelectedLeftId] = useState<string | null>(null);
+  const [matchedPairIds, setMatchedPairIds] = useState<Set<string>>(new Set());
+  const [wrongRightValue, setWrongRightValue] = useState<string | null>(null);
+  const [attempts, setAttempts] = useState(0);
+
+  // Sprawdź czy gra skończona
+  const isFinished = matchedPairIds.size === pairs.length;
+
+  // Mapa left -> right dla szybkiego lookup
+  const pairMap = useMemo(() => {
+    const map = new Map<string, { id: string; right: string }>();
+    pairs.forEach(p => map.set(p.left, { id: p.id, right: p.right }));
+    return map;
+  }, [pairs]);
+
+  // Obsługa kliknięcia lewej strony
+  const handleLeftClick = useCallback((pair: MatchingPair) => {
+    if (matchedPairIds.has(pair.id)) return;
+    setSelectedLeftId(pair.id);
+    setWrongRightValue(null);
+  }, [matchedPairIds]);
+
+  // Obsługa kliknięcia prawej strony
+  const handleRightClick = useCallback((rightValue: string) => {
+    if (selectedLeftId === null) return;
+    
+    // Znajdź wybraną parę po lewej
+    const selectedPair = pairs.find(p => p.id === selectedLeftId);
+    if (!selectedPair) return;
+
+    setAttempts(prev => prev + 1);
+
+    if (selectedPair.right === rightValue) {
+      // Poprawne dopasowanie
+      setMatchedPairIds(prev => {
+        const newSet = new Set(prev).add(selectedPair.id);
+        
+        // Sprawdź czy to ostatnia para
+        if (newSet.size === pairs.length) {
+          // Oblicz wynik (100% minus kara za błędy)
+          const errorPenalty = Math.max(0, (attempts - pairs.length) * 5);
+          const score = Math.max(50, 100 - errorPenalty);
+          setTimeout(() => onComplete(score), 500);
+        }
+        
+        return newSet;
+      });
+      setSelectedLeftId(null);
+    } else {
+      // Błędne dopasowanie
+      setWrongRightValue(rightValue);
+      setTimeout(() => setWrongRightValue(null), 600);
+    }
+  }, [selectedLeftId, pairs, attempts, onComplete]);
+
+  // Reset gry
+  const handleReset = useCallback(() => {
+    setSelectedLeftId(null);
+    setMatchedPairIds(new Set());
+    setWrongRightValue(null);
+    setAttempts(0);
+    onRestart?.();
+  }, [onRestart]);
+
+  // Pomocnicze funkcje do sprawdzania stanu
+  const isMatchedLeft = (id: string) => matchedPairIds.has(id);
+  const isMatchedRight = (rightValue: string) => 
+    pairs.some(p => matchedPairIds.has(p.id) && p.right === rightValue);
+
+  // Ekran końcowy
+  if (isFinished) {
+    const errorPenalty = Math.max(0, (attempts - pairs.length) * 5);
+    const score = Math.max(50, 100 - errorPenalty);
+    
+    return (
+      <div className="max-w-lg mx-auto text-center py-8">
+        <div className="text-6xl mb-4">{score >= 80 ? '🎯' : '👍'}</div>
+        <h3 className="text-2xl font-bold mb-2">
+          {score >= 80 ? 'Doskonale!' : 'Dobra robota!'}
+        </h3>
+        <p className="text-gray-600 mb-2">
+          Połączyłeś wszystkie {pairs.length} par
+        </p>
+        <p className="text-sm text-gray-500 mb-4">
+          Próby: {attempts} | Wynik: {score}%
+        </p>
+        <button
+          onClick={handleReset}
+          className="px-6 py-3 bg-indigo-500 text-white rounded-xl font-semibold hover:bg-indigo-600 transition-colors flex items-center gap-2 mx-auto"
+        >
+          <RotateCcw className="w-5 h-5" />
+          Zagraj ponownie
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-2xl mx-auto">
+      {/* Instrukcja */}
+      <p className="text-center text-gray-600 mb-4">
+        Połącz elementy z lewej kolumny z odpowiednimi z prawej
+      </p>
+
+      {/* Postęp */}
+      <div className="flex items-center justify-between mb-4 text-sm">
+        <span className="text-gray-600">
+          Połączono: {matchedPairIds.size} / {pairs.length}
+        </span>
+        <span className="text-gray-500">
+          Próby: {attempts}
+        </span>
+      </div>
+
+      {/* Pasek postępu */}
+      <div className="h-1.5 bg-gray-200 rounded-full mb-6 overflow-hidden">
+        <div 
+          className="h-full bg-emerald-500 transition-all duration-300"
+          style={{ width: `${(matchedPairIds.size / pairs.length) * 100}%` }}
+        />
+      </div>
+
+      {/* Kolumny */}
+      <div className="grid grid-cols-2 gap-6">
+        {/* Lewa kolumna */}
+        <div className="space-y-2" role="list" aria-label="Elementy do połączenia">
+          {pairs.map(pair => {
+            const isMatched = isMatchedLeft(pair.id);
+            const isSelected = selectedLeftId === pair.id;
+            
+            return (
+              <button
+                key={pair.id}
+                onClick={() => handleLeftClick(pair)}
+                disabled={isMatched}
+                aria-pressed={isSelected}
+                className={`
+                  w-full p-3 rounded-lg text-left transition-all border-2 text-sm
+                  ${isMatched
+                    ? 'bg-emerald-50 border-emerald-300 text-emerald-700 cursor-default'
+                    : isSelected
+                      ? 'bg-indigo-100 border-indigo-500 text-indigo-700 ring-2 ring-indigo-200'
+                      : 'bg-white border-gray-200 hover:border-indigo-300 hover:bg-indigo-50'
+                  }
+                `}
+              >
+                <div className="flex items-center gap-2">
+                  <Cable className={`w-4 h-4 ${isMatched ? 'text-emerald-500' : 'text-amber-500'}`} />
+                  <span className="font-medium">{pair.left}</span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Prawa kolumna */}
+        <div className="space-y-2" role="list" aria-label="Odpowiedzi">
+          {shuffledRight.map((rightValue, index) => {
+            const isMatched = isMatchedRight(rightValue);
+            const isWrong = wrongRightValue === rightValue;
+            
+            return (
+              <button
+                key={`${rightValue}-${index}`}
+                onClick={() => handleRightClick(rightValue)}
+                disabled={isMatched || selectedLeftId === null}
+                className={`
+                  w-full p-3 rounded-lg text-left transition-all border-2 text-sm
+                  ${isMatched
+                    ? 'bg-emerald-50 border-emerald-300 text-emerald-700 cursor-default'
+                    : isWrong
+                      ? `bg-red-100 border-red-400 text-red-700 ${reducedMotion ? '' : 'animate-shake'}`
+                      : selectedLeftId === null
+                        ? 'bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed'
+                        : 'bg-white border-gray-200 hover:border-purple-300 hover:bg-purple-50'
+                  }
+                `}
+              >
+                <div className="flex items-center gap-2">
+                  <Zap className={`w-4 h-4 ${isMatched ? 'text-emerald-500' : 'text-purple-500'}`} />
+                  <span className="font-medium">{rightValue}</span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Przycisk restartu */}
+      <button
+        onClick={handleReset}
+        className="mt-6 w-full py-2 text-gray-500 hover:text-gray-700 text-sm flex items-center justify-center gap-1"
+      >
+        <RotateCcw className="w-4 h-4" />
+        Zacznij od nowa
+      </button>
+    </div>
+  );
+};
