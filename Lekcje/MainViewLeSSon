@@ -1,0 +1,1066 @@
+'use client';
+
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+
+// ==================== DANE LEKCJI ====================
+
+const ELECTRICIAN_LESSONS = [
+  {
+    id: 'elec-001',
+    title: 'Podstawy BHP dla elektryka',
+    description: 'Poznaj zasady bezpieczeństwa, które mogą uratować życie. Dowiesz się, jak chronić się przed porażeniem prądem i pracować zgodnie z normami.',
+    type: 'Teoria',
+    difficulty: 'beginner',
+    estimatedTime: 15,
+    xpReward: 100,
+    moduleId: 'podstawy',
+    isCompleted: false,
+    isLocked: false,
+    isRecommended: true,
+    isDailyChallenge: false,
+    prerequisites: []
+  },
+  {
+    id: 'elec-002',
+    title: 'Wyposażenie ochronne elektryka',
+    description: 'Praktyczna lekcja o sprzęcie BHP: rękawice izolacyjne, kaski, obuwie – jak ich używać i kiedy są obowiązkowe.',
+    type: 'Praktyka',
+    difficulty: 'beginner',
+    estimatedTime: 20,
+    xpReward: 150,
+    moduleId: 'podstawy',
+    isCompleted: false,
+    isLocked: false,
+    isRecommended: false,
+    isDailyChallenge: true,
+    prerequisites: ['elec-001']
+  },
+  {
+    id: 'elec-003',
+    title: 'Test: Bezpieczeństwo elektryka',
+    description: 'Sprawdź swoją wiedzę z BHP w 10 pytaniach. Musisz zdobyć minimum 80%, żeby przejść dalej.',
+    type: 'Quiz',
+    difficulty: 'beginner',
+    estimatedTime: 10,
+    xpReward: 200,
+    moduleId: 'podstawy',
+    isCompleted: false,
+    isLocked: false,
+    isRecommended: false,
+    isDailyChallenge: false,
+    prerequisites: ['elec-001', 'elec-002']
+  },
+  {
+    id: 'elec-004',
+    title: 'Multimetr – podstawy obsługi',
+    description: 'Dowiedz się, jak mierzyć napięcie, prąd i rezystancję za pomocą multimetru cyfrowego. Krok po kroku.',
+    type: 'Teoria',
+    difficulty: 'intermediate',
+    estimatedTime: 25,
+    xpReward: 150,
+    moduleId: 'narzedzia',
+    isCompleted: false,
+    isLocked: true,
+    isRecommended: false,
+    isDailyChallenge: false,
+    prerequisites: ['elec-003']
+  },
+  {
+    id: 'elec-005',
+    title: 'Praktyka: Pomiary w instalacji',
+    description: 'Zmierz napięcie w prawdziwej instalacji domowej. Nauczysz się diagnozować podstawowe problemy.',
+    type: 'Praktyka',
+    difficulty: 'intermediate',
+    estimatedTime: 30,
+    xpReward: 200,
+    moduleId: 'narzedzia',
+    isCompleted: false,
+    isLocked: true,
+    isRecommended: false,
+    isDailyChallenge: false,
+    prerequisites: ['elec-004']
+  },
+  {
+    id: 'elec-006',
+    title: 'Narzędzia elektryka – przegląd',
+    description: 'Śrubokręty, szczypce, ściągacze izolacji – poznaj najpopularniejsze narzędzia i ich zastosowanie.',
+    type: 'Teoria',
+    difficulty: 'intermediate',
+    estimatedTime: 20,
+    xpReward: 150,
+    moduleId: 'narzedzia',
+    isCompleted: false,
+    isLocked: true,
+    isRecommended: false,
+    isDailyChallenge: false,
+    prerequisites: ['elec-004']
+  },
+  {
+    id: 'elec-007',
+    title: 'Montaż gniazda wtykowego',
+    description: 'Pierwszy projekt praktyczny! Krok po kroku podłączysz gniazdo wtykowe zgodnie z normami.',
+    type: 'Projekt',
+    difficulty: 'intermediate',
+    estimatedTime: 40,
+    xpReward: 250,
+    moduleId: 'instalacje',
+    isCompleted: false,
+    isLocked: true,
+    isRecommended: false,
+    isDailyChallenge: false,
+    prerequisites: ['elec-005', 'elec-006']
+  },
+  {
+    id: 'elec-008',
+    title: 'Podłączenie wyłącznika światła',
+    description: 'Drugi projekt praktyczny – wyłącznik jednobiegunowy. Nauczysz się montażu i testowania obwodu.',
+    type: 'Projekt',
+    difficulty: 'intermediate',
+    estimatedTime: 45,
+    xpReward: 300,
+    moduleId: 'instalacje',
+    isCompleted: false,
+    isLocked: true,
+    isRecommended: false,
+    isDailyChallenge: false,
+    prerequisites: ['elec-007']
+  },
+  {
+    id: 'elec-009',
+    title: 'Diagnostyka awarii – brak prądu',
+    description: 'Co robić, gdy w pokoju nie ma prądu? Poznaj metodę systematycznego sprawdzania źródeł problemu.',
+    type: 'Praktyka',
+    difficulty: 'advanced',
+    estimatedTime: 35,
+    xpReward: 300,
+    moduleId: 'diagnostyka',
+    isCompleted: false,
+    isLocked: true,
+    isRecommended: false,
+    isDailyChallenge: false,
+    prerequisites: ['elec-008']
+  },
+  {
+    id: 'elec-010',
+    title: 'Zwarcia i przeciążenia – teoria',
+    description: 'Zrozum, czym różni się zwarcie od przeciążenia i jak działa automatyka zabezpieczająca.',
+    type: 'Teoria',
+    difficulty: 'advanced',
+    estimatedTime: 30,
+    xpReward: 350,
+    moduleId: 'diagnostyka',
+    isCompleted: false,
+    isLocked: true,
+    isRecommended: false,
+    isDailyChallenge: false,
+    prerequisites: ['elec-008']
+  }
+];
+
+// ==================== TOAST NOTIFICATION ====================
+
+function Toast({ message, type = 'success', onClose }) {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 3000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  const bgColor = type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#6366f1';
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        bottom: 24,
+        right: 24,
+        background: bgColor,
+        color: '#fff',
+        padding: '16px 24px',
+        borderRadius: 12,
+        boxShadow: '0 12px 32px rgba(0,0,0,0.25)',
+        zIndex: 9999,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        fontWeight: 600,
+        fontSize: 14,
+        animation: 'slideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
+      }}
+    >
+      <span>{type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ'}</span>
+      <span>{message}</span>
+    </div>
+  );
+}
+
+// ==================== KOMPONENT KARTY LEKCJI ====================
+
+function LessonCard({ lesson, onClick, onToggleFavorite, isFavorite, index }) {
+  const [isHovered, setIsHovered] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+  const cardRef = useRef(null);
+
+  const difficultyConfig = {
+    beginner: { bg: '#d1fae5', color: '#065f46', emoji: '🟢', label: 'Początkujący' },
+    intermediate: { bg: '#fef3c7', color: '#78350f', emoji: '🟡', label: 'Średniozaawansowany' },
+    advanced: { bg: '#fee2e2', color: '#7f1d1d', emoji: '🔴', label: 'Zaawansowany' }
+  };
+
+  const typeConfig = {
+    Teoria: { bg: '#dbeafe', color: '#1e3a8a', icon: '📖' },
+    Praktyka: { bg: '#fef3c7', color: '#78350f', icon: '⚙️' },
+    Quiz: { bg: '#e0e7ff', color: '#312e81', icon: '❓' },
+    Projekt: { bg: '#fce7f3', color: '#831843', icon: '🔨' }
+  };
+
+  const diff = difficultyConfig[lesson.difficulty] || difficultyConfig.beginner;
+  const typeStyle = typeConfig[lesson.type] || typeConfig.Teoria;
+
+  const handleKeyDown = (e) => {
+    if ((e.key === 'Enter' || e.key === ' ') && !lesson.isLocked) {
+      e.preventDefault();
+      onClick();
+    }
+  };
+
+  return (
+    <div
+      ref={cardRef}
+      onClick={!lesson.isLocked ? onClick : undefined}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => {
+        setIsHovered(false);
+        setShowMenu(false);
+      }}
+      onKeyDown={handleKeyDown}
+      tabIndex={lesson.isLocked ? -1 : 0}
+      role="button"
+      aria-label={`${lesson.title}, ${lesson.type}, ${diff.label}, ${lesson.estimatedTime} minut, ${lesson.xpReward} XP${lesson.isLocked ? ', zablokowane' : ''}`}
+      aria-disabled={lesson.isLocked}
+      style={{
+        position: 'relative',
+        borderRadius: 20,
+        background: lesson.isCompleted
+          ? 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)'
+          : lesson.isLocked
+          ? 'linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%)'
+          : 'linear-gradient(135deg, #ffffff 0%, #fafafa 100%)',
+        padding: 24,
+        cursor: lesson.isLocked ? 'not-allowed' : 'pointer',
+        overflow: 'hidden',
+        border: isHovered && !lesson.isLocked
+          ? '2px solid #6366f1'
+          : lesson.isCompleted
+          ? '2px solid #10b981'
+          : lesson.isRecommended
+          ? '2px solid #f59e0b'
+          : '2px solid #e5e7eb',
+        boxShadow: isHovered && !lesson.isLocked
+          ? '0 24px 48px rgba(99,102,241,0.28), 0 8px 16px rgba(15,23,42,0.12)'
+          : lesson.isCompleted
+          ? '0 8px 20px rgba(16,185,129,0.15)'
+          : '0 4px 12px rgba(15,23,42,0.06)',
+        transform: isHovered && !lesson.isLocked
+          ? 'translateY(-8px) scale(1.02)'
+          : 'translateY(0) scale(1)',
+        transition:
+          'all 320ms cubic-bezier(0.34, 1.56, 0.64, 1), border-color 200ms ease',
+        willChange: 'transform, box-shadow',
+        opacity: 0,
+        animation: `fadeInUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) ${index * 0.08}s forwards`
+      }}
+    >
+      {/* Recommended ribbon */}
+      {lesson.isRecommended && !lesson.isLocked && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 12,
+            left: -32,
+            background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+            color: '#fff',
+            padding: '4px 40px',
+            fontSize: 11,
+            fontWeight: 900,
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
+            transform: 'rotate(-45deg)',
+            boxShadow: '0 4px 12px rgba(245,158,11,0.4)',
+            zIndex: 2
+          }}
+        >
+          Polecane
+        </div>
+      )}
+
+      {/* Daily challenge badge */}
+      {lesson.isDailyChallenge && !lesson.isLocked && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 12,
+            right: 12,
+            background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
+            color: '#fff',
+            padding: '6px 12px',
+            borderRadius: 8,
+            fontSize: 11,
+            fontWeight: 900,
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
+            boxShadow: '0 4px 12px rgba(139,92,246,0.4)',
+            zIndex: 2,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6
+          }}
+        >
+          <span>🎯</span>
+          <span>Wyzwanie dnia</span>
+        </div>
+      )}
+
+      {/* Glow effect */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: -100,
+          background: lesson.isRecommended
+            ? 'radial-gradient(circle at center, rgba(245,158,11,0.15), transparent 70%)'
+            : 'radial-gradient(circle at center, rgba(99,102,241,0.15), transparent 70%)',
+          opacity: isHovered && !lesson.isLocked ? 1 : 0,
+          transition: 'opacity 400ms ease',
+          pointerEvents: 'none',
+          filter: 'blur(40px)'
+        }}
+      />
+
+      {/* Status icon */}
+      <div
+        style={{
+          position: 'absolute',
+          top: lesson.isDailyChallenge ? 56 : 16,
+          right: 16,
+          width: 40,
+          height: 40,
+          borderRadius: '50%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: lesson.isCompleted
+            ? 'linear-gradient(135deg, #10b981, #059669)'
+            : lesson.isLocked
+            ? '#9ca3af'
+            : 'transparent',
+          boxShadow: lesson.isCompleted || lesson.isLocked ? '0 4px 16px rgba(0,0,0,0.2)' : 'none',
+          fontSize: 18,
+          fontWeight: 900,
+          color: '#fff',
+          transform: isHovered && lesson.isCompleted ? 'rotate(360deg) scale(1.2)' : 'rotate(0) scale(1)',
+          transition: 'transform 500ms cubic-bezier(0.68, -0.55, 0.27, 1.55)'
+        }}
+      >
+        {lesson.isCompleted ? '✓' : lesson.isLocked ? '🔒' : ''}
+      </div>
+
+      {/* Main content */}
+      <div style={{ position: 'relative', zIndex: 1 }}>
+        {/* Type badge with icon */}
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '6px 14px',
+            borderRadius: 999,
+            fontSize: 11,
+            fontWeight: 800,
+            letterSpacing: 0.5,
+            textTransform: 'uppercase',
+            background: typeStyle.bg,
+            color: typeStyle.color,
+            marginBottom: 12,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+            transform: isHovered && !lesson.isLocked ? 'scale(1.05)' : 'scale(1)',
+            transition: 'transform 220ms ease'
+          }}
+        >
+          <span>{typeStyle.icon}</span>
+          <span>{lesson.type}</span>
+        </div>
+
+        {/* Title */}
+        <h3
+          style={{
+            margin: '0 0 8px 0',
+            fontSize: 19,
+            fontWeight: 900,
+            color: lesson.isLocked ? '#6b7280' : '#111827',
+            lineHeight: 1.3,
+            paddingRight: 48,
+            transform: isHovered && !lesson.isLocked ? 'translateX(4px)' : 'translateX(0)',
+            transition: 'transform 250ms cubic-bezier(0.34, 1.56, 0.64, 1)'
+          }}
+        >
+          {lesson.title}
+        </h3>
+
+        {/* Description */}
+        <p
+          style={{
+            margin: '0 0 16px 0',
+            fontSize: 14,
+            lineHeight: 1.6,
+            color: lesson.isLocked ? '#9ca3af' : '#6b7280',
+            maxHeight: isHovered && !lesson.isLocked ? 200 : 45,
+            overflow: 'hidden',
+            transition: 'max-height 350ms ease',
+            opacity: lesson.isLocked ? 0.6 : 1
+          }}
+        >
+          {lesson.description}
+        </p>
+
+        {/* Meta info */}
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '7px 13px',
+              background: 'rgba(148,163,184,0.12)',
+              borderRadius: 9,
+              fontSize: 12,
+              fontWeight: 700,
+              color: '#475569'
+            }}
+          >
+            <span>⏱️</span>
+            <span>{lesson.estimatedTime} min</span>
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '7px 13px',
+              background: 'linear-gradient(135deg, #fef3c7, #fde68a)',
+              border: '1.5px solid #f59e0b',
+              borderRadius: 9,
+              fontSize: 12,
+              fontWeight: 900,
+              color: '#78350f',
+              transform: isHovered && !lesson.isLocked ? 'scale(1.1)' : 'scale(1)',
+              transition: 'transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1)'
+            }}
+          >
+            <span>⚡</span>
+            <span>+{lesson.xpReward} XP</span>
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '7px 13px',
+              background: diff.bg,
+              borderRadius: 9,
+              fontSize: 11,
+              fontWeight: 800,
+              color: diff.color
+            }}
+          >
+            {diff.emoji}
+            <span>{diff.label}</span>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingTop: 14,
+            borderTop: '1.5px solid rgba(148,163,184,0.2)'
+          }}
+        >
+          <button
+            type="button"
+            disabled={lesson.isLocked}
+            aria-label={lesson.isLocked ? 'Lekcja zablokowana' : lesson.isCompleted ? 'Powtórz lekcję' : 'Rozpocznij lekcję'}
+            style={{
+              padding: '11px 22px',
+              background: lesson.isLocked
+                ? '#e5e7eb'
+                : lesson.isCompleted
+                ? 'linear-gradient(135deg, #10b981, #059669)'
+                : 'linear-gradient(135deg, #6366f1, #4f46e5)',
+              border: 'none',
+              borderRadius: 11,
+              fontSize: 14,
+              fontWeight: 800,
+              color: lesson.isLocked ? '#9ca3af' : '#fff',
+              cursor: lesson.isLocked ? 'not-allowed' : 'pointer',
+              boxShadow: lesson.isLocked
+                ? 'none'
+                : isHovered
+                ? '0 10px 24px rgba(99,102,241,0.4)'
+                : '0 4px 12px rgba(99,102,241,0.25)',
+              transform: isHovered && !lesson.isLocked ? 'scale(1.06)' : 'scale(1)',
+              transition: 'all 220ms cubic-bezier(0.34, 1.56, 0.64, 1)'
+            }}
+          >
+            {lesson.isLocked ? '🔒 Zablokowane' : lesson.isCompleted ? '↻ Powtórz' : '▶ Rozpocznij'}
+          </button>
+
+          {!lesson.isLocked && (
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <div
+                onClick={e => {
+                  e.stopPropagation();
+                  onToggleFavorite(lesson.id);
+                }}
+                role="button"
+                tabIndex={0}
+                aria-label={isFavorite ? 'Usuń z ulubionych' : 'Dodaj do ulubionych'}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onToggleFavorite(lesson.id);
+                  }
+                }}
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: isFavorite ? '#fef3c7' : 'rgba(148,163,184,0.12)',
+                  fontSize: 17,
+                  cursor: 'pointer',
+                  transform: isHovered ? 'scale(1.2) rotate(15deg)' : 'scale(1) rotate(0)',
+                  transition: 'transform 280ms cubic-bezier(0.68, -0.55, 0.27, 1.55)'
+                }}
+              >
+                {isFavorite ? '⭐' : '☆'}
+              </div>
+
+              <div
+                onClick={e => {
+                  e.stopPropagation();
+                  setShowMenu(!showMenu);
+                }}
+                role="button"
+                tabIndex={0}
+                aria-label="Więcej opcji"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setShowMenu(!showMenu);
+                  }
+                }}
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: showMenu ? '#e0e7ff' : 'rgba(148,163,184,0.12)',
+                  fontSize: 17,
+                  cursor: 'pointer',
+                  transition: 'all 200ms ease'
+                }}
+              >
+                ⋮
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Quick menu */}
+        {showMenu && (
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              position: 'absolute',
+              bottom: 12,
+              right: 12,
+              background: '#fff',
+              borderRadius: 12,
+              padding: 8,
+              boxShadow: '0 12px 32px rgba(0,0,0,0.15)',
+              zIndex: 10,
+              minWidth: 160,
+              animation: 'scaleIn 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)'
+            }}
+          >
+            {['📤 Udostępnij', '🚩 Zgłoś problem', '📊 Zobacz statystyki'].map((item, i) => (
+              <div
+                key={i}
+                role="button"
+                tabIndex={0}
+                onClick={() => setShowMenu(false)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setShowMenu(false);
+                  }
+                }}
+                style={{
+                  padding: '10px 14px',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: '#374151',
+                  cursor: 'pointer',
+                  borderRadius: 8,
+                  transition: 'background 150ms ease'
+                }}
+                onMouseEnter={e => e.target.style.background = '#f3f4f6'}
+                onMouseLeave={e => e.target.style.background = 'transparent'}
+              >
+                {item}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <style jsx>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(30px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        @keyframes scaleIn {
+          from {
+            opacity: 0;
+            transform: scale(0.9);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// ==================== GŁÓWNY WIDOK ====================
+
+export default function ElectricianLessonsView() {
+  const [lessons, setLessons] = useState(ELECTRICIAN_LESSONS);
+  const [favorites, setFavorites] = useState([]);
+  const [filterDifficulty, setFilterDifficulty] = useState('all');
+  const [filterType, setFilterType] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState('default');
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
+  const [toast, setToast] = useState(null);
+  const [streak, setStreak] = useState(7); // przykładowa passa
+
+  const filteredLessons = useMemo(() => {
+    let filtered = lessons.filter(lesson => {
+      const matchDifficulty = filterDifficulty === 'all' || lesson.difficulty === filterDifficulty;
+      const matchType = filterType === 'all' || lesson.type === filterType;
+      const matchSearch =
+        searchQuery === '' ||
+        lesson.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        lesson.description.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchDifficulty && matchType && matchSearch;
+    });
+
+    // Sortowanie
+    if (sortBy === 'xp-high') filtered.sort((a, b) => b.xpReward - a.xpReward);
+    if (sortBy === 'xp-low') filtered.sort((a, b) => a.xpReward - b.xpReward);
+    if (sortBy === 'time-short') filtered.sort((a, b) => a.estimatedTime - b.estimatedTime);
+    if (sortBy === 'time-long') filtered.sort((a, b) => b.estimatedTime - a.estimatedTime);
+
+    return filtered;
+  }, [lessons, filterDifficulty, filterType, searchQuery, sortBy]);
+
+  const handleLessonClick = lessonId => {
+  const lesson = lessons.find(l => l.id === lessonId);
+  if (!lesson) return;
+
+  // Znajdź i oznacz jako ukończoną (tymczasowo)
+  setLessons(prev =>
+    prev.map(l =>
+      l.id === lessonId ? { ...l, isCompleted: true } : l
+    )
+  );
+
+  // Przekaż do rodzica (TasksSystem), żeby otworzył modal
+  if (props.onLessonClick) {
+    props.onLessonClick(lesson);
+  }
+};
+
+
+  const handleToggleFavorite = lessonId => {
+    const wasFavorite = favorites.includes(lessonId);
+    setFavorites(prev =>
+      wasFavorite ? prev.filter(id => id !== lessonId) : [...prev, lessonId]
+    );
+    setToast({
+      message: wasFavorite ? 'Usunięto z ulubionych' : 'Dodano do ulubionych',
+      type: 'success'
+    });
+  };
+
+  const stats = useMemo(() => {
+    const total = lessons.length;
+    const completed = lessons.filter(l => l.isCompleted).length;
+    const locked = lessons.filter(l => l.isLocked).length;
+    const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+    const totalXP = lessons.filter(l => l.isCompleted).reduce((sum, l) => sum + l.xpReward, 0);
+    return { total, completed, locked, percentage, totalXP };
+  }, [lessons]);
+
+  return (
+    <div style={{ padding: '32px', maxWidth: 1400, margin: '0 auto', minHeight: '100vh' }}>
+      {/* Animated header */}
+      <div
+        style={{
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          borderRadius: 24,
+          padding: 36,
+          marginBottom: 32,
+          color: '#fff',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+          position: 'relative',
+          overflow: 'hidden'
+        }}
+      >
+        {/* Animated background pattern */}
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.1), transparent 50%)',
+            animation: 'pulse 4s ease-in-out infinite'
+          }}
+        />
+
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <h1 style={{ margin: '0 0 8px 0', fontSize: 36, fontWeight: 900 }}>
+            ⚡ Lekcje Elektryka
+          </h1>
+          <p style={{ margin: '0 0 28px 0', fontSize: 16, opacity: 0.95 }}>
+            Przejdź przez wszystkie moduły i zostań ekspertem
+          </p>
+
+          {/* Stats with streak */}
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 20 }}>
+            <div
+              style={{
+                flex: 1,
+                minWidth: 180,
+                padding: 18,
+                background: 'rgba(255,255,255,0.22)',
+                borderRadius: 16,
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(255,255,255,0.3)'
+              }}
+            >
+              <div style={{ fontSize: 30, fontWeight: 900 }}>{stats.completed}/{stats.total}</div>
+              <div style={{ fontSize: 12, fontWeight: 700, opacity: 0.9, marginTop: 6 }}>
+                Ukończone lekcje
+              </div>
+            </div>
+
+            <div
+              style={{
+                flex: 1,
+                minWidth: 180,
+                padding: 18,
+                background: 'rgba(255,255,255,0.22)',
+                borderRadius: 16,
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(255,255,255,0.3)'
+              }}
+            >
+              <div style={{ fontSize: 30, fontWeight: 900 }}>{stats.percentage}%</div>
+              <div style={{ fontSize: 12, fontWeight: 700, opacity: 0.9, marginTop: 6 }}>
+                Postęp ogólny
+              </div>
+            </div>
+
+            <div
+              style={{
+                flex: 1,
+                minWidth: 180,
+                padding: 18,
+                background: 'rgba(255,255,255,0.22)',
+                borderRadius: 16,
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(255,255,255,0.3)'
+              }}
+            >
+              <div style={{ fontSize: 30, fontWeight: 900 }}>{stats.totalXP}</div>
+              <div style={{ fontSize: 12, fontWeight: 700, opacity: 0.9, marginTop: 6 }}>
+                Zdobyte XP
+              </div>
+            </div>
+
+            <div
+              style={{
+                flex: 1,
+                minWidth: 180,
+                padding: 18,
+                background: 'linear-gradient(135deg, rgba(251,146,60,0.9), rgba(249,115,22,0.9))',
+                borderRadius: 16,
+                backdropFilter: 'blur(10px)',
+                border: '2px solid rgba(255,255,255,0.4)',
+                boxShadow: '0 8px 24px rgba(251,146,60,0.35)'
+              }}
+            >
+              <div style={{ fontSize: 30, fontWeight: 900, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span>🔥</span>
+                <span>{streak}</span>
+              </div>
+              <div style={{ fontSize: 12, fontWeight: 700, opacity: 0.95, marginTop: 6 }}>
+                Dni z rzędu
+              </div>
+            </div>
+          </div>
+
+          {/* Progress bar */}
+          <div
+            style={{
+              background: 'rgba(255,255,255,0.2)',
+              borderRadius: 999,
+              height: 12,
+              overflow: 'hidden',
+              position: 'relative'
+            }}
+          >
+            <div
+              style={{
+                background: 'linear-gradient(90deg, #10b981, #059669)',
+                height: '100%',
+                width: `${stats.percentage}%`,
+                borderRadius: 999,
+                transition: 'width 800ms cubic-bezier(0.34, 1.56, 0.64, 1)',
+                boxShadow: '0 0 20px rgba(16,185,129,0.6)'
+              }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Filters with view toggle */}
+      <div
+        style={{
+          background: '#fff',
+          borderRadius: 16,
+          padding: 20,
+          marginBottom: 32,
+          boxShadow: '0 4px 12px rgba(15,23,42,0.06)',
+          display: 'flex',
+          gap: 16,
+          flexWrap: 'wrap',
+          alignItems: 'center'
+        }}
+      >
+        <input
+          type="text"
+          placeholder="🔍 Szukaj lekcji..."
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          aria-label="Wyszukaj lekcje"
+          style={{
+            flex: 1,
+            minWidth: 250,
+            padding: '11px 18px',
+            border: '2px solid #e5e7eb',
+            borderRadius: 11,
+            fontSize: 14,
+            fontWeight: 600,
+            outline: 'none',
+            transition: 'border-color 200ms ease'
+          }}
+          onFocus={e => (e.target.style.borderColor = '#6366f1')}
+          onBlur={e => (e.target.style.borderColor = '#e5e7eb')}
+        />
+
+        <select
+          value={filterDifficulty}
+          onChange={e => setFilterDifficulty(e.target.value)}
+          aria-label="Filtruj według poziomu trudności"
+          style={{
+            padding: '11px 18px',
+            border: '2px solid #e5e7eb',
+            borderRadius: 11,
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: 'pointer',
+            outline: 'none',
+            background: '#fff'
+          }}
+        >
+          <option value="all">Wszystkie poziomy</option>
+          <option value="beginner">🟢 Początkujący</option>
+          <option value="intermediate">🟡 Średniozaawansowany</option>
+          <option value="advanced">🔴 Zaawansowany</option>
+        </select>
+
+        <select
+          value={filterType}
+          onChange={e => setFilterType(e.target.value)}
+          aria-label="Filtruj według typu lekcji"
+          style={{
+            padding: '11px 18px',
+            border: '2px solid #e5e7eb',
+            borderRadius: 11,
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: 'pointer',
+            outline: 'none',
+            background: '#fff'
+          }}
+        >
+          <option value="all">Wszystkie typy</option>
+          <option value="Teoria">📖 Teoria</option>
+          <option value="Praktyka">⚙️ Praktyka</option>
+          <option value="Quiz">❓ Quiz</option>
+          <option value="Projekt">🔨 Projekt</option>
+        </select>
+
+        <select
+          value={sortBy}
+          onChange={e => setSortBy(e.target.value)}
+          aria-label="Sortuj lekcje"
+          style={{
+            padding: '11px 18px',
+            border: '2px solid #e5e7eb',
+            borderRadius: 11,
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: 'pointer',
+            outline: 'none',
+            background: '#fff'
+          }}
+        >
+          <option value="default">Domyślne</option>
+          <option value="xp-high">XP: od najwyższych</option>
+          <option value="xp-low">XP: od najniższych</option>
+          <option value="time-short">Czas: najkrótsze</option>
+          <option value="time-long">Czas: najdłuższe</option>
+        </select>
+
+        {/* View mode toggle */}
+        <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
+          <button
+            onClick={() => setViewMode('grid')}
+            aria-label="Widok siatki"
+            aria-pressed={viewMode === 'grid'}
+            style={{
+              padding: '10px 14px',
+              background: viewMode === 'grid' ? '#6366f1' : '#f3f4f6',
+              color: viewMode === 'grid' ? '#fff' : '#6b7280',
+              border: 'none',
+              borderRadius: 10,
+              fontSize: 16,
+              cursor: 'pointer',
+              fontWeight: 700,
+              transition: 'all 200ms ease'
+            }}
+          >
+            ▦
+          </button>
+          <button
+            onClick={() => setViewMode('list')}
+            aria-label="Widok listy"
+            aria-pressed={viewMode === 'list'}
+            style={{
+              padding: '10px 14px',
+              background: viewMode === 'list' ? '#6366f1' : '#f3f4f6',
+              color: viewMode === 'list' ? '#fff' : '#6b7280',
+              border: 'none',
+              borderRadius: 10,
+              fontSize: 16,
+              cursor: 'pointer',
+              fontWeight: 700,
+              transition: 'all 200ms ease'
+            }}
+          >
+            ☰
+          </button>
+        </div>
+      </div>
+
+      {/* Lessons grid/list */}
+      <div
+        style={{
+          display: viewMode === 'grid' ? 'grid' : 'flex',
+          flexDirection: viewMode === 'list' ? 'column' : undefined,
+          gridTemplateColumns: viewMode === 'grid' ? 'repeat(auto-fill, minmax(380px, 1fr))' : undefined,
+          gap: 24
+        }}
+      >
+        {filteredLessons.map((lesson, index) => (
+          <LessonCard
+            key={lesson.id}
+            lesson={lesson}
+            onClick={() => handleLessonClick(lesson.id)}
+            onToggleFavorite={handleToggleFavorite}
+            isFavorite={favorites.includes(lesson.id)}
+            index={index}
+          />
+        ))}
+      </div>
+
+      {/* Empty state */}
+      {filteredLessons.length === 0 && (
+        <div
+          style={{
+            textAlign: 'center',
+            padding: 80,
+            color: '#9ca3af',
+            fontSize: 16
+          }}
+        >
+          <div style={{ fontSize: 48, marginBottom: 16 }}>🔍</div>
+          <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 8, color: '#6b7280' }}>
+            Brak wyników
+          </div>
+          <div>Spróbuj zmienić filtry lub wyszukiwaną frazę</div>
+        </div>
+      )}
+
+      {/* Toast */}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+
+      <style jsx>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.6; }
+        }
+        @keyframes slideIn {
+          from {
+            transform: translateX(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+      `}</style>
+    </div>
+  );
+}
