@@ -1,0 +1,247 @@
+// ============================================================
+// GENERATOR FISZEK DLA LEKCJI ELEKTRYKA
+// ============================================================
+
+/**
+ * Generuje fiszki na podstawie danych lekcji
+ * @param {string} lessonId - ID lekcji z ELECTRICIAN_LESSONS
+ * @returns {Flashcard[]} - Tablica 10-20 fiszek
+ */
+const generateFlashcardsForLesson = useCallback((lessonId) => {
+  const lesson = ELECTRICIAN_LESSONS?.[lessonId];
+  if (!lesson) {
+    console.warn(`Lekcja ${lessonId} nie znaleziona`);
+    return [];
+  }
+
+  const cards = [];
+  let cardId = 0;
+
+  const createCard = (type, front, back, difficulty = 'medium', hint) => ({
+    id: `${lessonId}-fc-${cardId++}`,
+    type,
+    front,
+    back,
+    difficulty,
+    category: lesson.category || 'ogólne',
+    hint,
+  });
+
+  // ========================================
+  // 1. FISZKI Z CELÓW NAUKI (learningObjectives)
+  // ========================================
+  if (lesson.learningObjectives?.length) {
+    lesson.learningObjectives.slice(0, 4).forEach((objective, idx) => {
+      cards.push(createCard(
+        'definition',
+        `Czego nauczysz się w tej lekcji? (Cel ${idx + 1})`,
+        objective,
+        'easy'
+      ));
+    });
+  }
+
+  // ========================================
+  // 2. FISZKI BEZPIECZEŃSTWA (safety)
+  // ========================================
+  if (lesson.safetyRules?.length) {
+    lesson.safetyRules.slice(0, 3).forEach((rule) => {
+      cards.push(createCard(
+        'safety',
+        `⚠️ ZASADA BHP: ${rule.title || 'Jaką zasadę bezpieczeństwa musisz przestrzegać?'}`,
+        rule.description || rule,
+        'hard',
+        'Pamiętaj: bezpieczeństwo zawsze na pierwszym miejscu!'
+      ));
+    });
+  }
+
+  // ========================================
+  // 3. FISZKI Z BŁĘDÓW (commonMistakes)
+  // ========================================
+  if (lesson.commonMistakes?.length) {
+    lesson.commonMistakes.slice(0, 3).forEach((mistake) => {
+      cards.push(createCard(
+        'true-false',
+        `PRAWDA czy FAŁSZ: "${mistake.wrong || mistake}"`,
+        `FAŁSZ! Poprawnie: ${mistake.correct || 'Unikaj tego błędu w praktyce.'}`,
+        'medium'
+      ));
+    });
+  }
+
+  // ========================================
+  // 4. FISZKI Z KROKÓW (steps)
+  // ========================================
+  if (lesson.steps?.length) {
+    // Pytanie o kolejność
+    const stepsPreview = lesson.steps.slice(0, 3).map((s, i) => `${i + 1}. ${s.title || s}`).join('\n');
+    cards.push(createCard(
+      'definition',
+      'Jakie są pierwsze kroki w tej procedurze?',
+      stepsPreview,
+      'medium'
+    ));
+
+    // Pytania o poszczególne kroki
+    lesson.steps.slice(0, 4).forEach((step, idx) => {
+      if (step.description) {
+        cards.push(createCard(
+          'tool-usage',
+          `Krok ${idx + 1}: Co należy zrobić i dlaczego?`,
+          `${step.title}: ${step.description}`,
+          idx < 2 ? 'easy' : 'medium'
+        ));
+      }
+    });
+  }
+
+  // ========================================
+  // 5. FISZKI NARZĘDZIOWE (tools)
+  // ========================================
+  if (lesson.tools?.length) {
+    lesson.tools.slice(0, 3).forEach((tool) => {
+      cards.push(createCard(
+        'tool-usage',
+        `🔧 Do czego służy: ${tool.name || tool}?`,
+        tool.usage || tool.description || `Narzędzie używane w tej lekcji.`,
+        'easy'
+      ));
+    });
+  }
+
+  // ========================================
+  // 6. FISZKI SCENARIUSZOWE (realWorldApplications)
+  // ========================================
+  if (lesson.realWorldApplications?.length) {
+    lesson.realWorldApplications.slice(0, 2).forEach((application) => {
+      cards.push(createCard(
+        'scenario',
+        `📍 SCENARIUSZ: ${application.situation || 'Jesteś na budowie...'}\n\nCo zrobisz?`,
+        application.solution || application.action || 'Zastosujesz wiedzę z tej lekcji.',
+        'hard',
+        'Pomyśl o bezpieczeństwie i procedurach.'
+      ));
+    });
+  }
+
+  // ========================================
+  // 7. FISZKI Z DEFINICJI KLUCZOWYCH (keyTerms)
+  // ========================================
+  if (lesson.keyTerms?.length) {
+    lesson.keyTerms.slice(0, 4).forEach((term) => {
+      cards.push(createCard(
+        'definition',
+        `📚 Zdefiniuj: ${term.term || term.name || term}`,
+        term.definition || term.description || term,
+        'easy'
+      ));
+    });
+  }
+
+  // ========================================
+  // 8. FISZKI PRAWDA/FAŁSZ GENERYCZNE
+  // ========================================
+  if (lesson.description) {
+    cards.push(createCard(
+      'true-false',
+      `PRAWDA czy FAŁSZ: Ta lekcja dotyczy "${lesson.title}"?`,
+      `PRAWDA! ${lesson.description.slice(0, 100)}...`,
+      'easy'
+    ));
+  }
+
+  // Ogranicz do 15-20 kart i pomieszaj
+  const shuffled = cards
+    .sort(() => Math.random() - 0.5)
+    .slice(0, Math.min(20, Math.max(10, cards.length)));
+
+  return shuffled;
+}, []);
+
+// ============================================================
+// HANDLERY FISZEK
+// ============================================================
+
+const handleStartFlashcards = useCallback((lessonId, xpReward = 150) => {
+  setFlashcardsLoading(true);
+  setFlashcardsLessonId(lessonId);
+  
+  // Symulacja ładowania (można usunąć w produkcji)
+  setTimeout(() => {
+    const cards = generateFlashcardsForLesson(lessonId);
+    setFlashcards(cards);
+    setCurrentFlashcardIndex(0);
+    setIsFlashcardFlipped(false);
+    setRememberedCards([]);
+    setToReviewCards([]);
+    setShowFlashcardsModal(true);
+    setFlashcardsLoading(false);
+  }, 300);
+}, [generateFlashcardsForLesson]);
+
+const handleFlipFlashcard = useCallback(() => {
+  setIsFlashcardFlipped(prev => !prev);
+}, []);
+
+const handleRememberCard = useCallback(() => {
+  const currentCard = flashcards[currentFlashcardIndex];
+  if (currentCard) {
+    setRememberedCards(prev => [...prev, currentCard.id]);
+  }
+  goToNextFlashcard();
+}, [flashcards, currentFlashcardIndex]);
+
+const handleReviewCard = useCallback(() => {
+  const currentCard = flashcards[currentFlashcardIndex];
+  if (currentCard) {
+    setToReviewCards(prev => [...prev, currentCard.id]);
+  }
+  goToNextFlashcard();
+}, [flashcards, currentFlashcardIndex]);
+
+const goToNextFlashcard = useCallback(() => {
+  setIsFlashcardFlipped(false);
+  
+  if (currentFlashcardIndex < flashcards.length - 1) {
+    setTimeout(() => {
+      setCurrentFlashcardIndex(prev => prev + 1);
+    }, 200);
+  }
+}, [currentFlashcardIndex, flashcards.length]);
+
+const goToPrevFlashcard = useCallback(() => {
+  if (currentFlashcardIndex > 0) {
+    setIsFlashcardFlipped(false);
+    setCurrentFlashcardIndex(prev => prev - 1);
+  }
+}, [currentFlashcardIndex]);
+
+const handleFlashcardsComplete = useCallback(async () => {
+  // Oblicz XP: 10 XP za każdą zapamiętaną kartę, max 150
+  const earnedXP = Math.min(150, rememberedCards.length * 10);
+  
+  try {
+    await addXP(earnedXP, `Fiszki: ${flashcardsLessonId}`);
+    
+    // Jeśli zapamiętano >= 70% kart, oznacz lekcję
+    if (rememberedCards.length >= Math.ceil(flashcards.length * 0.7)) {
+      completeTask(flashcardsLessonId);
+      updateStreak();
+    }
+    
+    console.log(`✅ Fiszki ukończone! Zapamiętano: ${rememberedCards.length}/${flashcards.length}, XP: ${earnedXP}`);
+    
+  } catch (error) {
+    console.error('Błąd podczas kończenia fiszek:', error);
+  } finally {
+    // Reset i zamknij
+    setTimeout(() => {
+      setShowFlashcardsModal(false);
+      setFlashcards([]);
+      setCurrentFlashcardIndex(0);
+      setRememberedCards([]);
+      setToReviewCards([]);
+    }, 1500);
+  }
+}, [rememberedCards, flashcards, flashcardsLessonId, addXP, completeTask, updateStreak]);
