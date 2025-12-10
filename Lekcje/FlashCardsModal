@@ -1,0 +1,691 @@
+// ============================================================
+// FLASHCARDS MODAL COMPONENT
+// Dodaj przed głównym return w TasksSystem
+// ============================================================
+
+const renderFlashcardsModal = () => {
+  if (!showFlashcardsModal) return null;
+  
+  const currentCard = flashcards[currentFlashcardIndex];
+  const isLastCard = currentFlashcardIndex === flashcards.length - 1;
+  const isComplete = isLastCard && (rememberedCards.includes(currentCard?.id) || toReviewCards.includes(currentCard?.id));
+  const progress = flashcards.length > 0 ? ((currentFlashcardIndex + 1) / flashcards.length) * 100 : 0;
+  const maxXP = 150;
+  const currentXP = Math.min(maxXP, rememberedCards.length * 10);
+
+  // Ekran końcowy
+  if (isComplete || (isLastCard && isFlashcardFlipped)) {
+    const finalXP = Math.min(maxXP, rememberedCards.length * 10);
+    const percentage = Math.round((rememberedCards.length / flashcards.length) * 100);
+    
+    return (
+      <div style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0,0,0,0.7)',
+        backdropFilter: 'blur(8px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+        padding: 24,
+      }}>
+        <div style={{
+          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+          borderRadius: 24,
+          padding: 40,
+          maxWidth: 500,
+          width: '100%',
+          textAlign: 'center',
+          boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+        }}>
+          {/* Emoji wyniku */}
+          <div style={{ fontSize: 72, marginBottom: 16 }}>
+            {percentage >= 80 ?  : percentage >= 50 ? }
+          </div>
+          
+          <h2 style={{ margin: '0 0 8px', fontSize: 28, fontWeight: 800, color: '#111827' }}>
+            {percentage >= 80 ? 'Świetna robota!' : percentage >= 50 ? 'Dobry wynik!' : 'Warto powtórzyć'}
+          </h2>
+          
+          <p style={{ margin: '0 0 24px', color: '#6b7280', fontSize: 16 }}>
+            Zapamiętano <strong>{rememberedCards.length}</strong> z <strong>{flashcards.length}</strong> kart ({percentage}%)
+          </p>
+          
+          {/* XP */}
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '12px 24px',
+            background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+            borderRadius: 999,
+            marginBottom: 24,
+          }}>
+            <Zap size={24} color="#d97706" fill="#d97706" />
+            <span style={{ fontSize: 24, fontWeight: 900, color: '#92400e' }}>+{finalXP} XP</span>
+          </div>
+          
+          {/* Statystyki */}
+          <div style={{ display: 'flex', gap: 16, marginBottom: 24, justifyContent: 'center' }}>
+            <div style={{
+              padding: 16,
+              background: '#f0fdf4',
+              borderRadius: 12,
+              border: '2px solid #10b981',
+              minWidth: 100,
+            }}>
+              <div style={{ fontSize: 28, fontWeight: 900, color: '#059669' }}>{rememberedCards.length}</div>
+              <div style={{ fontSize: 12, color: '#065f46', fontWeight: 600 }}>Zapamiętane</div>
+            </div>
+            <div style={{
+              padding: 16,
+              background: '#fef3c7',
+              borderRadius: 12,
+              border: '2px solid #f59e0b',
+              minWidth: 100,
+            }}>
+              <div style={{ fontSize: 28, fontWeight: 900, color: '#d97706' }}>{toReviewCards.length}</div>
+              <div style={{ fontSize: 12, color: '#92400e', fontWeight: 600 }}>Do powtórki</div>
+            </div>
+          </div>
+          
+          {/* Przyciski */}
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+            <button
+              onClick={handleFlashcardsComplete}
+              style={{
+                padding: '14px 28px',
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: 12,
+                fontSize: 16,
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(16,185,129,0.4)',
+              }}
+            >
+              Zakończ i odbierz XP
+            </button>
+            {toReviewCards.length > 0 && (
+              <button
+                onClick={() => {
+                  // Restart z kartami do powtórki
+                  const reviewCards = flashcards.filter(c => toReviewCards.includes(c.id));
+                  setFlashcards(reviewCards);
+                  setCurrentFlashcardIndex(0);
+                  setIsFlashcardFlipped(false);
+                  setToReviewCards([]);
+                }}
+                style={{
+                  padding: '14px 28px',
+                  background: '#f3f4f6',
+                  color: '#374151',
+                  border: '2px solid #e5e7eb',
+                  borderRadius: 12,
+                  fontSize: 16,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                Powtórz trudne ({toReviewCards.length})
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{
+      position: 'fixed',
+      inset: 0,
+      background: 'rgba(0,0,0,0.7)',
+      backdropFilter: 'blur(8px)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1000,
+      padding: 24,
+    }}>
+      <div style={{
+        background: 'white',
+        borderRadius: 24,
+        padding: 32,
+        maxWidth: 600,
+        width: '100%',
+        maxHeight: '90vh',
+        overflow: 'auto',
+        position: 'relative',
+        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+      }}>
+        {/* Przycisk zamknij */}
+        <button
+          onClick={() => setShowFlashcardsModal(false)}
+          style={{
+            position: 'absolute',
+            top: 16,
+            right: 16,
+            background: '#f3f4f6',
+            border: 'none',
+            borderRadius: '50%',
+            width: 40,
+            height: 40,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            fontSize: 20,
+          }}
+        >
+          ✕
+        </button>
+
+        {/* Nagłówek */}
+        <div style={{ marginBottom: 24, paddingRight: 48 }}>
+          <span style={{
+            display: 'inline-block',
+            padding: '4px 12px',
+            background: '#ede9fe',
+            color: '#7c3aed',
+            borderRadius: 999,
+            fontSize: 12,
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            marginBottom: 8,
+          }}>
+             Fiszki
+          </span>
+          <h2 style={{ margin: '0 0 4px', fontSize: 24, fontWeight: 800, color: '#111827' }}>
+            Sprawdź swoją wiedzę
+          </h2>
+          <p style={{ margin: 0, color: '#6b7280', fontSize: 14 }}>
+            Zdobądź do <strong>{maxXP} XP</strong> za ukończenie • Aktualnie: <strong>{currentXP} XP</strong>
+          </p>
+        </div>
+
+        {/* Pasek postępu */}
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13, color: '#6b7280' }}>
+            <span>Karta {currentFlashcardIndex + 1} z {flashcards.length}</span>
+            <div style={{ display: 'flex', gap: 12 }}>
+              <span style={{ color: '#10b981' }}>✓ {rememberedCards.length}</span>
+              <span style={{ color: '#f59e0b' }}>↻ {toReviewCards.length}</span>
+            </div>
+          </div>
+          <div style={{ height: 6, background: '#e5e7eb', borderRadius: 3, overflow: 'hidden' }}>
+            <div style={{
+              height: '100%',
+              width: `${progress}%`,
+              background: 'linear-gradient(90deg, #8b5cf6, #7c3aed)',
+              borderRadius: 3,
+              transition: 'width 0.3s ease',
+            }} />
+          </div>
+        </div>
+
+        {/* Brak kart */}
+        {!currentCard ? (
+          <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}></div>
+            <p>Brak kart do wyświetlenia.</p>
+          </div>
+        ) : (
+          <>
+            {/* Karta */}
+            <div
+              onClick={handleFlipFlashcard}
+              style={{
+                position: 'relative',
+                height: 280,
+                cursor: 'pointer',
+                perspective: 1000,
+                marginBottom: 24,
+              }}
+            >
+              <div style={{
+                position: 'absolute',
+                inset: 0,
+                transformStyle: 'preserve-3d',
+                transition: 'transform 0.5s ease',
+                transform: isFlashcardFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+              }}>
+                {/* Przód */}
+                <div style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                  borderRadius: 20,
+                  padding: 24,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backfaceVisibility: 'hidden',
+                  color: 'white',
+                  textAlign: 'center',
+                  boxShadow: '0 10px 40px rgba(139,92,246,0.3)',
+                }}>
+                  {/* Badge typu */}
+                  <span style={{
+                    position: 'absolute',
+                    top: 16,
+                    left: 16,
+                    padding: '4px 10px',
+                    background: 'rgba(255,255,255,0.2)',
+                    borderRadius: 999,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                  }}>
+                    {currentCard.type === 'definition' && ' Definicja'}
+                    {currentCard.type === 'safety' && ' BHP'}
+                    {currentCard.type === 'tool-usage' && ' Narzędzie'}
+                    {currentCard.type === 'true-false' && ' P/F'}
+                    {currentCard.type === 'scenario' && ' Scenariusz'}
+                  </span>
+                  
+                  <p style={{
+                    fontSize: 18,
+                    fontWeight: 600,
+                    lineHeight: 1.5,
+                    margin: 0,
+                    maxWidth: '90%',
+                  }}>
+                    {currentCard.front}
+                  </p>
+                  
+                  <p style={{
+                    position: 'absolute',
+                    bottom: 16,
+                    fontSize: 13,
+                    opacity: 0.7,
+                  }}>
+                    Kliknij, aby zobaczyć odpowiedź
+                  </p>
+                </div>
+
+                {/* Tył */}
+                <div style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  borderRadius: 20,
+                  padding: 24,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backfaceVisibility: 'hidden',
+                  transform: 'rotateY(180deg)',
+                  color: 'white',
+                  textAlign: 'center',
+                  boxShadow: '0 10px 40px rgba(16,185,129,0.3)',
+                }}>
+                  <CheckCircle size={32} style={{ marginBottom: 16, opacity: 0.7 }} />
+                  <p style={{
+                    fontSize: 16,
+                    fontWeight: 500,
+                    lineHeight: 1.6,
+                    margin: 0,
+                    maxWidth: '90%',
+                  }}>
+                    {currentCard.back}
+                  </p>
+                  
+                  {currentCard.hint && (
+                    <p style={{
+                      marginTop: 16,
+                      padding: '8px 12px',
+                      background: 'rgba(255,255,255,0.15)',
+                      borderRadius: 8,
+                      fontSize: 12,
+                      opacity: 0.9,
+                    }}>
+                       {currentCard.hint}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Przyciski akcji */}
+            {isFlashcardFlipped ? (
+              <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+                <button
+                  onClick={handleReviewCard}
+                  style={{
+                    flex: 1,
+                    padding: '14px 20px',
+                    background: '#fef3c7',
+                    color: '#92400e',
+                    border: '2px solid #f59e0b',
+                    borderRadius: 12,
+                    fontSize: 15,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  ↻ Muszę powtórzyć
+                </button>
+                <button
+                  onClick={handleRememberCard}
+                  style={{
+                    flex: 1,
+                    padding: '14px 20px',
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 12,
+                    fontSize: 15,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 12px rgba(16,185,129,0.3)',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  ✓ Zapamiętane!
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={handleFlipFlashcard}
+                style={{
+                  width: '100%',
+                  padding: '14px 20px',
+                  background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 12,
+                  fontSize: 15,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  marginBottom: 16,
+                  boxShadow: '0 4px 12px rgba(139,92,246,0.3)',
+                }}
+              >
+                 Pokaż odpowiedź
+              </button>
+            )}
+
+            {/* Nawigacja */}
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <button
+                onClick={goToPrevFlashcard}
+                disabled={currentFlashcardIndex === 0}
+                style={{
+                 padding: '10px 20px',
+                  background: currentFlashcardIndex === 0 ? '#f3f4f6' : '#e5e7eb',
+                  color: currentFlashcardIndex === 0 ? '#9ca3af' : '#374151',
+                  border: 'none',
+                  borderRadius: 10,
+                  fontSize: 14,
+                  fontWeight: 700,
+                  cursor: currentFlashcardIndex === 0 ? 'not-allowed' : 'pointer',
+                  opacity: currentFlashcardIndex === 0 ? 0.5 : 1,
+                }}
+              >
+                ← Poprzednia
+              </button>
+              
+              <span style={{ 
+                alignSelf: 'center', 
+                fontSize: 13, 
+                color: '#6b7280',
+                fontWeight: 600,
+              }}>
+                {currentFlashcardIndex + 1} / {flashcards.length}
+              </span>
+              
+              <button
+                onClick={goToNextFlashcard}
+                disabled={currentFlashcardIndex === flashcards.length - 1}
+                style={{
+                  padding: '10px 20px',
+                  background: currentFlashcardIndex === flashcards.length - 1 ? '#f3f4f6' : '#e5e7eb',
+                  color: currentFlashcardIndex === flashcards.length - 1 ? '#9ca3af' : '#374151',
+                  border: 'none',
+                  borderRadius: 10,
+                  fontSize: 14,
+                  fontWeight: 700,
+                  cursor: currentFlashcardIndex === flashcards.length - 1 ? 'not-allowed' : 'pointer',
+                  opacity: currentFlashcardIndex === flashcards.length - 1 ? 0.5 : 1,
+                }}
+              >
+                Następna →
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* Legenda */}
+        <div style={{
+          marginTop: 24,
+          padding: 16,
+          background: '#f9fafb',
+          borderRadius: 12,
+          display: 'flex',
+          gap: 16,
+          fontSize: 12,
+          color: '#6b7280',
+          flexWrap: 'wrap',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 16 }}></span>
+            <span><strong>Wskazówka:</strong> Kliknij kartę aby ją odwrócić</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 16 }}></span>
+            <span>Lub użyj strzałek ← →</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================
+// HANDLERY DLA FLASHCARDS
+// Dodaj te funkcje w TasksSystem przed return
+// ============================================================
+
+const handleFlipFlashcard = () => {
+  setIsFlashcardFlipped(!isFlashcardFlipped);
+};
+
+const handleRememberCard = () => {
+  const currentCard = flashcards[currentFlashcardIndex];
+  if (currentCard && !rememberedCards.includes(currentCard.id)) {
+    setRememberedCards(prev => [...prev, currentCard.id]);
+  }
+  goToNextFlashcard();
+};
+
+const handleReviewCard = () => {
+  const currentCard = flashcards[currentFlashcardIndex];
+  if (currentCard && !toReviewCards.includes(currentCard.id)) {
+    setToReviewCards(prev => [...prev, currentCard.id]);
+  }
+  goToNextFlashcard();
+};
+
+const goToNextFlashcard = () => {
+  if (currentFlashcardIndex < flashcards.length - 1) {
+    setCurrentFlashcardIndex(prev => prev + 1);
+    setIsFlashcardFlipped(false);
+  }
+};
+
+const goToPrevFlashcard = () => {
+  if (currentFlashcardIndex > 0) {
+    setCurrentFlashcardIndex(prev => prev - 1);
+    setIsFlashcardFlipped(false);
+  }
+};
+
+const handleFlashcardsComplete = async () => {
+  const finalXP = Math.min(150, rememberedCards.length * 10);
+  
+  try {
+    // Dodaj XP
+    await addXP(finalXP, 'Fiszki: Podstawy BHP');
+    
+    // Oznacz lekcję jako ukończoną jeśli wynik >= 70%
+    const percentage = (rememberedCards.length / flashcards.length) * 100;
+    if (percentage >= 70 && activeLesson) {
+      completeTask(activeLesson.id);
+      updateStreak();
+    }
+    
+    // Track w personalizacji
+    if (dispatch) {
+      dispatch({
+        type: 'TRACK_SESSION',
+        payload: {
+          taskId: activeLesson?.id || 'flashcards',
+          action: 'flashcards_complete',
+          score: percentage,
+          timestamp: Date.now(),
+          xpEarned: finalXP,
+        },
+      });
+    }
+    
+    console.log(` Fiszki ukończone! Wynik: ${percentage}%, XP: ${finalXP}`);
+  } catch (error) {
+    console.error('Błąd podczas kończenia fiszek:', error);
+  } finally {
+    // Zamknij modal
+    setShowFlashcardsModal(false);
+    setFlashcards([]);
+    setCurrentFlashcardIndex(0);
+    setIsFlashcardFlipped(false);
+    setRememberedCards([]);
+    setToReviewCards([]);
+  }
+};
+
+// ============================================================
+// KEYBOARD NAVIGATION
+// Dodaj useEffect dla obsługi klawiszy
+// ============================================================
+
+useEffect(() => {
+  if (!showFlashcardsModal) return;
+  
+  const handleKeyPress = (e) => {
+    switch(e.key) {
+      case 'ArrowLeft':
+        e.preventDefault();
+        goToPrevFlashcard();
+        break;
+      case 'ArrowRight':
+        e.preventDefault();
+        goToNextFlashcard();
+        break;
+      case ' ':
+      case 'Enter':
+        e.preventDefault();
+        if (!isFlashcardFlipped) {
+          handleFlipFlashcard();
+        }
+        break;
+      case '1':
+        if (isFlashcardFlipped) {
+          handleReviewCard();
+        }
+        break;
+      case '2':
+        if (isFlashcardFlipped) {
+          handleRememberCard();
+        }
+        break;
+      case 'Escape':
+        setShowFlashcardsModal(false);
+        break;
+    }
+  };
+  
+  window.addEventListener('keydown', handleKeyPress);
+  return () => window.removeEventListener('keydown', handleKeyPress);
+}, [showFlashcardsModal, currentFlashcardIndex, isFlashcardFlipped, flashcards]);
+
+// ============================================================
+// STATE DECLARATIONS
+// Dodaj te state'y na początku TasksSystem
+// ============================================================
+
+const [showFlashcardsModal, setShowFlashcardsModal] = useState(false);
+const [flashcards, setFlashcards] = useState([]);
+const [currentFlashcardIndex, setCurrentFlashcardIndex] = useState(0);
+const [isFlashcardFlipped, setIsFlashcardFlipped] = useState(false);
+const [rememberedCards, setRememberedCards] = useState([]);
+const [toReviewCards, setToReviewCards] = useState([]);
+
+// ============================================================
+// PRZYKŁADOWE DANE FISZEK
+// Dodaj gdzieś na początku pliku lub w osobnym pliku
+// ============================================================
+
+const SAMPLE_FLASHCARDS = [
+  {
+    id: 'flash-1',
+    type: 'definition',
+    front: 'Co to jest napięcie elektryczne?',
+    back: 'Napięcie elektryczne to różnica potencjałów elektrycznych między dwoma punktami obwodu. Jednostką napięcia jest wolt (V).',
+    hint: 'Analogia: to jak ciśnienie wody w rurze',
+  },
+  {
+    id: 'flash-2',
+    type: 'safety',
+    front: 'Jakie są 3 podstawowe zasady bezpieczeństwa przy pracy z prądem?',
+    back: '1. Zawsze wyłącz zasilanie przed pracą\n2. Sprawdź brak napięcia multimetrem\n3. Używaj izolowanych narzędzi',
+    hint: 'Bezpieczeństwo przede wszystkim!',
+  },
+  {
+    id: 'flash-3',
+    type: 'tool-usage',
+    front: 'Do czego służy multimetr?',
+    back: 'Multimetr służy do mierzenia napięcia, natężenia prądu i oporu elektrycznego w obwodzie.',
+    hint: 'Podstawowe narzędzie każdego elektryka',
+  },
+  {
+    id: 'flash-4',
+    type: 'true-false',
+    front: 'Prawda czy fałsz: Można pracować przy instalacji pod napięciem bez rękawic izolacyjnych?',
+    back: 'FAŁSZ! Nigdy nie pracuj przy instalacji pod napięciem bez odpowiedniego sprzętu ochronnego.',
+    hint: 'Zasada bezpieczeństwa nr 1',
+  },
+  {
+    id: 'flash-5',
+    type: 'scenario',
+    front: 'W pomieszczeniu nie świeci się żadna lampa. Co należy sprawdzić najpierw?',
+    back: '1. Sprawdź bezpieczniki/wyłączniki w tablicy\n2. Sprawdź czy lampy są dokręcone\n3. Sprawdź czy jest napięcie w gniazdkach\n4. Jeśli wszystko działa - wezwij elektryka',
+    hint: 'Systematyczne podejście od najprostszych przyczyn',
+  },
+];
+
+// ============================================================
+// FUNKCJA STARTUJĄCA FISZKI
+// Wywołaj ją po kliknięciu "Rozpocznij" w lekcji
+// ============================================================
+
+const handleStartFlashcards = (lessonFlashcards, lesson) => {
+  setFlashcards(lessonFlashcards);
+  setActiveLesson(lesson);
+  setCurrentFlashcardIndex(0);
+  setIsFlashcardFlipped(false);
+  setRememberedCards([]);
+  setToReviewCards([]);
+  setShowFlashcardsModal(true);
+};
+
+// ============================================================
+// DODAJ DO RETURN W TasksSystem
+// ============================================================
+
+// Gdzieś przed zamykającym </div>
+{renderFlashcardsModal()}
