@@ -1,0 +1,85 @@
+/ HANDLERY FISZEK
+// ============================================================
+
+const handleStartFlashcards = useCallback((lessonId, xpReward = 150) => {
+  setFlashcardsLoading(true);
+  setFlashcardsLessonId(lessonId);
+  
+  // Symulacja ładowania (można usunąć w produkcji)
+  setTimeout(() => {
+    const cards = generateFlashcardsForLesson(lessonId);
+    setFlashcards(cards);
+    setCurrentFlashcardIndex(0);
+    setIsFlashcardFlipped(false);
+    setRememberedCards([]);
+    setToReviewCards([]);
+    setShowFlashcardsModal(true);
+    setFlashcardsLoading(false);
+  }, 300);
+}, [generateFlashcardsForLesson]);
+
+const handleFlipFlashcard = useCallback(() => {
+  setIsFlashcardFlipped(prev => !prev);
+}, []);
+
+const handleRememberCard = useCallback(() => {
+  const currentCard = flashcards[currentFlashcardIndex];
+  if (currentCard) {
+    setRememberedCards(prev => [...prev, currentCard.id]);
+  }
+  goToNextFlashcard();
+}, [flashcards, currentFlashcardIndex]);
+
+const handleReviewCard = useCallback(() => {
+  const currentCard = flashcards[currentFlashcardIndex];
+  if (currentCard) {
+    setToReviewCards(prev => [...prev, currentCard.id]);
+  }
+  goToNextFlashcard();
+}, [flashcards, currentFlashcardIndex]);
+
+const goToNextFlashcard = useCallback(() => {
+  setIsFlashcardFlipped(false);
+  
+  if (currentFlashcardIndex < flashcards.length - 1) {
+    setTimeout(() => {
+      setCurrentFlashcardIndex(prev => prev + 1);
+    }, 200);
+  }
+}, [currentFlashcardIndex, flashcards.length]);
+
+const goToPrevFlashcard = useCallback(() => {
+  if (currentFlashcardIndex > 0) {
+    setIsFlashcardFlipped(false);
+    setCurrentFlashcardIndex(prev => prev - 1);
+  }
+}, [currentFlashcardIndex]);
+
+const handleFlashcardsComplete = useCallback(async () => {
+  // Oblicz XP: 10 XP za każdą zapamiętaną kartę, max 150
+  const earnedXP = Math.min(150, rememberedCards.length * 10);
+  
+  try {
+    await addXP(earnedXP, `Fiszki: ${flashcardsLessonId}`);
+    
+    // Jeśli zapamiętano >= 70% kart, oznacz lekcję
+    if (rememberedCards.length >= Math.ceil(flashcards.length * 0.7)) {
+      completeTask(flashcardsLessonId);
+      updateStreak();
+    }
+    
+    console.log(`✅ Fiszki ukończone! Zapamiętano: ${rememberedCards.length}/${flashcards.length}, XP: ${earnedXP}`);
+    
+  } catch (error) {
+    console.error('Błąd podczas kończenia fiszek:', error);
+  } finally {
+    // Reset i zamknij
+    setTimeout(() => {
+      setShowFlashcardsModal(false);
+      setFlashcards([]);
+      setCurrentFlashcardIndex(0);
+      setRememberedCards([]);
+      setToReviewCards([]);
+    }, 1500);
+  }
+}, [rememberedCards, flashcards, flashcardsLessonId, addXP, completeTask, updateStreak]);
