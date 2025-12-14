@@ -1,0 +1,269 @@
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+
+function CalcHint({ calc, onPass }) {
+  const [userAnswer, setUserAnswer] = useState('');
+  const [isCorrect, setIsCorrect] = useState(null);          // true | false | null
+  const [attempts, setAttempts] = useState(0);
+  const [showHint, setShowHint] = useState(false);
+  const [timeElapsed, setTimeElapsed] = useState(0);
+  const [timerActive, setTimerActive] = useState(true);
+  const [error, setError] = useState('');
+  const [tolerance, setTolerance] = useState(calc?.tolerance ?? 0.01);
+
+  const inputRef = useRef(null);
+  const resultRef = useRef(null);
+  const successRef = useRef(null);
+
+  // Timer
+  useEffect(() => {
+    if (!timerActive) return;
+    const interval = setInterval(() => setTimeElapsed(t => t + 1), 1000);
+    return () => clearInterval(interval);
+  }, [timerActive]);
+
+  // Format mm:ss
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Normalizacja liczby (przecinek/kropka, spacje)
+  const parseNumber = (val) => {
+    if (typeof val !== 'string') return NaN;
+    const normalized = val.trim().replace(/\s+/g, '').replace(',', '.');
+    return Number.parseFloat(normalized);
+  };
+
+  // Walidacja na blur/submit
+  const validate = (val) => {
+    if (!val || !val.trim()) return 'Wpisz odpowiedź liczbą (np. 12.5 lub 12,5).';
+    const n = parseNumber(val);
+    if (Number.isNaN(n)) return 'Nieprawidłowy format liczby.';
+    if (!Number.isFinite(n)) return 'Wartość musi być skończona.';
+    return '';
+  };
+
+  // Podpowiedzi zależne od liczby prób
+  const progressiveHint = useMemo(() => {
+    if (!calc?.hints || !calc.hints.length) return null;
+    const idx = Math.min(attempts, calc.hints.length) - 1;
+    return idx >= 0 ? calc.hints[idx] : null;
+  }, [attempts, calc]);
+
+  const checkAnswer = () => {
+    const err = validate(userAnswer);
+    setError(err);
+    if (err) {
+      setIsCorrect(null);
+      setTimeout(() => resultRef.current?.focus(), 0);
+      return;
+    }
+
+    const answer = parseNumber(userAnswer);
+    const correct =
+      Math.abs(answer - calc.correctAnswer) <= tolerance;
+
+    setIsCorrect(correct);
+    setAttempts(prev => prev + 1);
+
+    if (correct) {
+      setTimerActive(false);
+      setTimeout(() => successRef.current?.focus(), 0);
+      setTimeout(() => onPass?.(), 1500);
+    } else {
+      setTimeout(() => resultRef.current?.focus(), 0);
+    }
+  };
+
+  const resetState = () => {
+    setUserAnswer('');
+    setIsCorrect(null);
+    setAttempts(0);
+    setShowHint(false);
+    setError('');
+    setTimeElapsed(0);
+    setTimerActive(true);
+    setTimeout(() => inputRef.current?.focus(), 0);
+  };
+
+  const onKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      checkAnswer();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setUserAnswer('');
+      setError('');
+    }
+  };
+
+  return (
+    <div className="calc-hint" role="group" aria-labelledby="calc-title">
+      {/* Header with stats */}
+      <div className="calc-hint__header">
+        <div className="calc-hint__title">
+          <div className="calc-hint__icon" aria-hidden>🧮</div>
+          <div>
+            <h4 id="calc-title">Obliczenie praktyczne</h4>
+            <p>Rozwiąż zadanie aby kontynuować</p>
+          </div>
+        </div>
+        <div className="calc-hint__stats">
+          <div className="calc-hint__stat calc-hint__stat--time">
+            <span className="calc-hint__stat-icon" aria-hidden>⏱️</span>
+            <span className="calc-hint__stat-value">{formatTime(timeElapsed)}</span>
+            <button
+              type="button"
+              className="calc-hint__btn-link"
+              onClick={() => setTimerActive(a => !a)}
+              aria-pressed={timerActive}
+            >
+              {timerActive ? 'Pauza' : 'Wznów'}
+            </button>
+          </div>
+          <div className="calc-hint__stat calc-hint__stat--attempts">
+            <span className="calc-hint__stat-icon" aria-hidden>🎯</span>
+            <span className="calc-hint__stat-value">
+              {attempts} {attempts === 1 ? 'próba' : 'próby'}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Question */}
+      <div className="calc-hint__question">
+        <p>{calc.question}</p>
+      </div>
+
+      {/* Formula */}
+      {calc.formula && (
+        <div className="calc-hint__formula" aria-labelledby="formula-label">
+          <div id="formula-label" className="calc-hint__formula-label">
+            <span aria-hidden>ℹ️</span>
+            Wzór do wykorzystania
+          </div>
+          <code>{calc.formula}</code>
+        </div>
+      )}
+
+      {/* Input + actions */}
+      <form
+        className="calc-hint__form"
+        onSubmit={(e) => { e.preventDefault(); checkAnswer(); }}
+        noValidate
+      >
+        <label className="calc-hint__label" htmlFor="answer">
+          Odpowiedź (liczba)
+        </label>
+        <input
+          id="answer"
+          ref={inputRef}
+          className={`calc-hint__input ${error ? 'is-invalid' : ''} ${isCorrect === true ? 'is-correct' : isCorrect === false ? 'is-wrong' : ''}`}
+          value={userAnswer}
+          onChange={(e) => { setUserAnswer(e.target.value); if (error) setError(''); }}
+          onKeyDown={onKeyDown}
+          inputMode="decimal"
+          pattern="^-?\\d*[\\.,]?\\d*$"
+          placeholder="np. 12,5"
+          aria-invalid={!!error}
+          aria-describedby="answer-help"
+          autoComplete="off"
+        />
+        <div id="answer-help" className="calc-hint__help">
+          Użyj kropki lub przecinka, dozwolony błąd ±{tolerance}. [np. 12.5] 
+        </div>
+
+        {error && (
+          <div
+            className="calc-hint__error"
+            role="alert"
+            aria-live="assertive"
+            ref={resultRef}
+            tabIndex={-1}
+          >
+            {error}
+          </div>
+        )}
+
+        {isCorrect === false && (
+          <div
+            className="calc-hint__feedback calc-hint__feedback--wrong"
+            role="status"
+            aria-live="polite"
+            ref={resultRef}
+            tabIndex={-1}
+          >
+            Niepoprawnie. Spróbuj ponownie lub skorzystaj z podpowiedzi.
+          </div>
+        )}
+
+        {isCorrect === true && (
+          <div
+            className="calc-hint__feedback calc-hint__feedback--correct"
+            role="status"
+            aria-live="polite"
+            ref={successRef}
+            tabIndex={-1}
+          >
+            Brawo! Odpowiedź poprawna.
+          </div>
+        )}
+
+        <div className="calc-hint__actions">
+          <button type="submit" className="btn btn-primary">
+            Sprawdź
+          </button>
+          <button type="button" className="btn" onClick={resetState}>
+            Reset
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => setShowHint(s => !s)}
+            aria-expanded={showHint}
+          >
+            {showHint ? 'Ukryj wskazówkę' : 'Pokaż wskazówkę'}
+          </button>
+        </div>
+
+        {/* Tolerance control (optional for admins/advanced users) */}
+        <div className="calc-hint__tolerance">
+          <label htmlFor="tol">Tolerancja błędu: ±{tolerance}</label>
+          <input
+            id="tol"
+            type="range"
+            min="0"
+            max="1"
+            step="0.005"
+            value={tolerance}
+            onChange={(e) => setTolerance(parseFloat(e.target.value))}
+          />
+        </div>
+      </form>
+
+      {/* Progressive hints */}
+      {(showHint || progressiveHint) && (
+        <div className="calc-hint__hints">
+          {showHint && calc?.hint && (
+            <div className="calc-hint__hint">
+              <strong>Wskazówka:</strong> {calc.hint}
+            </div>
+          )}
+          {progressiveHint && (
+            <div className="calc-hint__hint">
+              <strong>Podpowiedź {attempts}:</strong> {progressiveHint}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* SR-only status */}
+      <div className="sr-only" aria-live="polite">
+        Czas {formatTime(timeElapsed)}. Próby {attempts}. {isCorrect === true ? 'Poprawna odpowiedź.' : isCorrect === false ? 'Błędna odpowiedź.' : ''}
+      </div>
+    </div>
+  );
+}
+
+export default CalcHint;
