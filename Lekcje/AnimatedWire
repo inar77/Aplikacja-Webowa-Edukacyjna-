@@ -1,0 +1,59 @@
+// ============================================================
+// ANIMOWANY PRZEWÓD - LEKKA WERSJA (CSS animations zamiast SVG)
+// ============================================================
+
+import React, { memo, useState, useEffect } from 'react';
+
+interface AnimatedWireProps {
+  className?: string;
+  animate?: boolean;
+}
+
+export const AnimatedWire = memo(({ className = '', animate = true }: AnimatedWireProps) => {
+  // Wyłącz animację po 5 sekundach dla oszczędności baterii
+  const [isAnimating, setIsAnimating] = useState(animate);
+  
+  useEffect(() => {
+    if (!animate) return;
+    const timer = setTimeout(() => setIsAnimating(false), 5000);
+    return () => clearTimeout(timer);
+  }, [animate]);
+
+  return (
+    <svg 
+      viewBox="0 0 120 40" 
+      className={`w-full h-10 ${className}`}
+      aria-hidden="true"
+    >
+      {/* Przewód - statyczny */}
+      <path
+        d="M0 20 Q30 10 60 20 T120 20"
+        fill="none"
+        stroke="#374151"
+        strokeWidth="4"
+        strokeLinecap="round"
+      />
+      {/* Izolacja */}
+      <path
+        d="M0 20 Q30 10 60 20 T120 20"
+        fill="none"
+        stroke="#fbbf24"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeDasharray="8 12"
+      />
+      {/* Animowana iskra - tylko jeśli aktywna */}
+      {isAnimating && (
+        ircle r="3" fill="#3b82f6">
+          <animateMotion
+            dur="2s"
+            repeatCount="3"
+            path="M0 20 Q30 10 60 20 T120 20"
+          />
+        </circle>
+      )}
+    </svg>
+  );
+});
+
+AnimatedWire.displayName = 'AnimatedWire';
