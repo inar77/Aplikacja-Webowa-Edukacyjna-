@@ -1,0 +1,351 @@
+// ============================================================
+// ELECTRICIAN LESSON CARD - ULEPSZONA KARTA LEKCJI
+// ============================================================
+
+import React, { useState, useEffect } from 'react';
+import {
+  Zap, Shield, Wrench, Flame, BookOpen, Target,
+  Clock, Star, CheckCircle, Lock, ChevronRight,
+  Lightbulb, Cable, Gauge
+} from 'lucide-react';
+
+// Ikony dla typów lekcji elektryka
+const LESSON_TYPE_CONFIG = {
+  'bhp': {
+    icon: Shield,
+    label: 'BHP',
+    color: 'from-red-500 to-orange-500',
+    bgLight: 'bg-red-50',
+    textColor: 'text-red-700',
+    borderColor: 'border-red-200'
+  },
+  'teoria': {
+    icon: BookOpen,
+    label: 'Teoria',
+    color: 'from-blue-500 to-indigo-500',
+    bgLight: 'bg-blue-50',
+    textColor: 'text-blue-700',
+    borderColor: 'border-blue-200'
+  },
+  'praktyka': {
+    icon: Wrench,
+    label: 'Praktyka',
+    color: 'from-green-500 to-emerald-500',
+    bgLight: 'bg-green-50',
+    textColor: 'text-green-700',
+    borderColor: 'border-green-200'
+  },
+  'wyzwanie': {
+    icon: Flame,
+    label: 'Wyzwanie',
+    color: 'from-orange-500 to-red-500',
+    bgLight: 'bg-orange-50',
+    textColor: 'text-orange-700',
+    borderColor: 'border-orange-200'
+  },
+  'quiz': {
+    icon: Target,
+    label: 'Quiz',
+    color: 'from-purple-500 to-pink-500',
+    bgLight: 'bg-purple-50',
+    textColor: 'text-purple-700',
+    borderColor: 'border-purple-200'
+  },
+  'multimetr': {
+    icon: Gauge,
+    label: 'Multimetr',
+    color: 'from-cyan-500 to-blue-500',
+    bgLight: 'bg-cyan-50',
+    textColor: 'text-cyan-700',
+    borderColor: 'border-cyan-200'
+  }
+};
+
+// ============================================================
+// ANIMOWANY PRZEWÓD ELEKTRYCZNY (SVG)
+// ============================================================
+const AnimatedWire = ({ className = '' }) => {
+  return (
+    <svg 
+      viewBox="0 0 120 40" 
+      className={`w-full h-10 ${className}`}
+      style={{ overflow: 'visible' }}
+    >
+      {/* Przewód */}
+      <path
+        d="M0 20 Q30 10 60 20 T120 20"
+        fill="none"
+        stroke="#374151"
+        strokeWidth="4"
+        strokeLinecap="round"
+      />
+      {/* Izolacja */}
+      <path
+        d="M0 20 Q30 10 60 20 T120 20"
+        fill="none"
+        stroke="#fbbf24"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeDasharray="8 12"
+      />
+      {/* Animowany przepływ energii */}
+      ircle r="3" fill="#3b82f6">
+        <animateMotion
+          dur="2s"
+          repeatCount="indefinite"
+          path="M0 20 Q30 10 60 20 T120 20"
+        />
+      </circle>
+      ircle r="3" fill="#3b82f6" opacity="0.5">
+        <animateMotion
+          dur="2s"
+          repeatCount="indefinite"
+          begin="0.5s"
+          path="M0 20 Q30 10 60 20 T120 20"
+        />
+      </circle>
+    </svg>
+  );
+};
+
+// ============================================================
+// ANIMOWANY STREAK (OGIEŃ)
+// ============================================================
+const AnimatedStreak = ({ days }) => {
+  return (
+    <div className="relative flex items-center gap-2">
+      <div className="relative">
+        <Flame 
+          className="w-6 h-6 text-orange-500 animate-pulse" 
+          style={{ 
+            animation: 'pulse 2s ease-in-out infinite, glow 1.5s ease-in-out infinite alternate'
+          }}
+        />
+        <div 
+          className="absolute inset-0 bg-orange-400 rounded-full blur-md opacity-30"
+          style={{ animation: 'pulse 2s ease-in-out infinite' }}
+        />
+      </div>
+      <span className="font-bold text-orange-600">{days}</span>
+      <span className="text-sm text-gray-600">dni z rzędu</span>
+    </div>
+  );
+};
+
+// ============================================================
+// PROGRESS ELEKTRYKA Z GRAFIKĄ
+// ============================================================
+const ElectricianProgress = ({ 
+  completedLessons, 
+  totalLessons, 
+  progressPercent, 
+  xp, 
+  streak 
+}) => {
+  return (
+    <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 rounded-2xl p-6 text-white relative overflow-hidden">
+      {/* Tło z wzorem przewodów */}
+      <div className="absolute inset-0 opacity-10">
+        <svg className="w-full h-full" viewBox="0 0 400 150">
+          <pattern id="circuit" x="0" y="0" width="50" height="50" patternUnits="userSpaceOnUse">
+            <path d="M25 0 v25 h25" fill="none" stroke="white" strokeWidth="1"/>
+            ircle cx="25" cy="25" r="3" fill="white"/>
+          </pattern>
+          <rect width="100%" height="100%" fill="url(#circuit)"/>
+        </svg>
+      </div>
+      
+      <div className="relative z-10 flex items-center justify-between">
+        {/* Lewa strona - info */}
+        <div className="flex-1">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-3 bg-yellow-400 rounded-xl">
+              <Zap className="w-8 h-8 text-yellow-900" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold">Lekcje Elektryka</h2>
+              <p className="text-indigo-200">Przejdź przez wszystkie moduły i zostań ekspertem</p>
+            </div>
+          </div>
+          
+          {/* Statystyki */}
+          <div className="grid grid-cols-4 gap-4 mt-6">
+            <div className="bg-white/10 backdrop-blur rounded-xl p-3 text-center">
+              <p className="text-2xl font-bold">{completedLessons}/{totalLessons}</p>
+              <p className="text-xs text-indigo-200">Ukończone lekcje</p>
+            </div>
+            <div className="bg-white/10 backdrop-blur rounded-xl p-3 text-center">
+              <p className="text-2xl font-bold">{progressPercent}%</p>
+              <p className="text-xs text-indigo-200">Postęp ogólny</p>
+            </div>
+            <div className="bg-white/10 backdrop-blur rounded-xl p-3 text-center">
+              <p className="text-2xl font-bold">{xp}</p>
+              <p className="text-xs text-indigo-200">Zdobyte XP</p>
+            </div>
+            <div className="bg-gradient-to-br from-orange-400 to-red-500 rounded-xl p-3 text-center relative overflow-hidden">
+              <div className="absolute inset-0 bg-white/20 animate-pulse" />
+              <p className="text-2xl font-bold relative z-10 flex items-center justify-center gap-1">
+                <Flame className="w-5 h-5" />
+                {streak}
+              </p>
+              <p className="text-xs relative z-10">Dni z rzędu</p>
+            </div>
+          </div>
+          
+          {/* Pasek postępu */}
+          <div className="mt-4">
+            <div className="h-2 bg-white/20 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-green-400 to-emerald-500 rounded-full transition-all duration-500"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+          </div>
+        </div>
+        
+        {/* Prawa strona - animowany schemat */}
+        <div className="hidden lg:block w-32 ml-6">
+          <svg viewBox="0 0 100 100" className="w-full h-full">
+            {/* Skrzynka bezpiecznikowa */}
+            <rect x="20" y="20" width="60" height="60" rx="4" fill="#1e293b" stroke="#475569" strokeWidth="2"/>
+            <rect x="30" y="30" width="15" height="8" rx="2" fill="#22c55e">
+              <animate attributeName="opacity" values="1;0.5;1" dur="2s" repeatCount="indefinite"/>
+            </rect>
+            <rect x="55" y="30" width="15" height="8" rx="2" fill="#22c55e">
+              <animate attributeName="opacity" values="1;0.5;1" dur="2s" begin="0.3s" repeatCount="indefinite"/>
+            </rect>
+            <rect x="30" y="45" width="15" height="8" rx="2" fill="#eab308">
+              <animate attributeName="opacity" values="1;0.7;1" dur="1.5s" repeatCount="indefinite"/>
+            </rect>
+            <rect x="55" y="45" width="15" height="8" rx="2" fill="#22c55e"/>
+            <rect x="30" y="60" width="15" height="8" rx="2" fill="#22c55e"/>
+            <rect x="55" y="60" width="15" height="8" rx="2" fill="#ef4444">
+              <animate attributeName="opacity" values="1;0.3;1" dur="1s" repeatCount="indefinite"/>
+            </rect>
+            {/* Przewody wychodzące */}
+            <path d="M50 80 v15" stroke="#fbbf24" strokeWidth="3" strokeLinecap="round"/>
+            ircle cx="50" cy="95" r="3" fill="#3b82f6">
+              <animate attributeName="opacity" values="0;1;0" dur="1s" repeatCount="indefinite"/>
+            </circle>
+          </svg>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================
+// ULEPSZONA KARTA LEKCJI
+// ============================================================
+const ElectricianLessonCard = ({ 
+  lesson, 
+  isCompleted, 
+  isLocked, 
+  isRecommended,
+  onStart 
+}) => {
+  const typeConfig = LESSON_TYPE_CONFIG[lesson.type] || LESSON_TYPE_CONFIG.teoria;
+  const TypeIcon = typeConfig.icon;
+  
+  return (
+    <div 
+      className={`
+        relative rounded-2xl border-2 transition-all duration-300
+        ${isLocked 
+          ? 'bg-gray-100 border-gray-200 opacity-60 cursor-not-allowed' 
+          : isCompleted
+            ? `${typeConfig.bgLight} ${typeConfig.borderColor} hover:shadow-md`
+            : 'bg-white border-gray-200 hover:shadow-lg hover:border-gray-300 cursor-pointer'
+        }
+        ${isRecommended ? 'ring-2 ring-yellow-400 ring-offset-2' : ''}
+      `}
+      onClick={() => !isLocked && onStart(lesson)}
+    >
+      {/* Rekomendowana etykieta */}
+      {isRecommended && (
+        <div className="absolute -top-3 left-4 px-3 py-1 bg-gradient-to-r from-yellow-400 to-orange-400 text-white text-xs font-bold rounded-full shadow-lg">
+          ⭐ POLECANE
+        </div>
+      )}
+      
+      {/* Ukończona znaczka */}
+      {isCompleted && (
+        <div className="absolute -top-2 -right-2 w-8 h-8 bg-green-500 rounded-full flex items-center justify-center shadow-lg">
+          <CheckCircle className="w-5 h-5 text-white" />
+        </div>
+      )}
+      
+      {/* Zablokowana nakładka */}
+      {isLocked && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-200/50 rounded-2xl">
+          <Lock className="w-8 h-8 text-gray-400" />
+        </div>
+      )}
+      
+      <div className="p-5">
+        {/* Nagłówek z ikoną typu */}
+        <div className="flex items-start gap-3 mb-3">
+          <div className={`p-2 rounded-xl bg-gradient-to-br ${typeConfig.color} text-white`}>
+            <TypeIcon className="w-5 h-5" />
+          </div>
+          <div className="flex-1">
+            <span className={`text-xs font-semibold uppercase tracking-wider ${typeConfig.textColor}`}>
+              {typeConfig.label}
+            </span>
+            <h3 className="text-lg font-bold text-gray-800 line-clamp-2">
+              {lesson.title}
+            </h3>
+          </div>
+        </div>
+        
+        {/* Opis */}
+        <p className="text-sm text-gray-600 mb-4 line-clamp-2">
+          {lesson.description}
+        </p>
+        
+        {/* Meta info */}
+        <div className="flex items-center gap-4 text-xs text-gray-500 mb-4">
+          <span className="flex items-center gap-1">
+            <Clock className="w-4 h-4" />
+            {lesson.duration} min
+          </span>
+          <span className="flex items-center gap-1 text-yellow-600 font-semibold">
+            <Zap className="w-4 h-4" />
+            +{lesson.xp} XP
+          </span>
+          {lesson.difficulty && (
+            <span className="flex items-center gap-1">
+              {[...Array(lesson.difficulty)].map((_, i) => (
+                <Star key={i} className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+              ))}
+            </span>
+          )}
+        </div>
+        
+        {/* Przycisk */}
+        <button
+          disabled={isLocked}
+          className={`
+            w-full py-2.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all
+            ${isCompleted
+              ? 'bg-green-100 text-green-700 hover:bg-green-200'
+              : isLocked
+                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                : `bg-gradient-to-r ${typeConfig.color} text-white hover:shadow-md`
+            }
+          `}
+        >
+          {isCompleted ? (
+            <>↻ Powtórz</>
+          ) : isLocked ? (
+            <>🔒 Zablokowane</>
+          ) : (
+            <>Rozpocznij <ChevronRight className="w-4 h-4" /></>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+export { ElectricianProgress, ElectricianLessonCard, AnimatedWire, AnimatedStreak, LESSON_TYPE_CONFIG };
