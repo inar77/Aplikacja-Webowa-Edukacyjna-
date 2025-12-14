@@ -1,0 +1,548 @@
+// ============================================================
+// FLASHCARD GAME - CZYSTY KOD BEZ MAGICZNYCH LICZB
+// ============================================================
+
+import React, { useState, useCallback, useMemo } from 'react';
+import { Lightbulb, CheckCircle, RotateCcw } from 'lucide-react';
+import type { FlashcardGameProps, Flashcard } from 'app/types/minigames';
+
+// ============================================================
+// STAŁE KONFIGURACYJNE
+// ============================================================
+
+const GAME_CONFIG = {
+  ANIMATION: {
+    FLIP_DURATION_MS: 300,
+    TRANSITION_DELAY_MS: 300,
+  },
+  SCORING: {
+    PASSING_THRESHOLD_PERCENT: 70,
+    MAX_SCORE_PERCENT: 100,
+    MIN_SCORE_PERCENT: 0,
+  },
+  PROGRESS: {
+    INITIAL_INDEX: 0,
+  },
+} as const;
+
+// ============================================================
+// ENUMY I TYPY
+// ============================================================
+
+enum GameResult {
+  EXCELLENT = 'EXCELLENT',    // >= 70%
+  NEEDS_PRACTICE = 'NEEDS_PRACTICE', // < 70%
+}
+
+enum CardSide {
+  FRONT = 'FRONT',
+  BACK = 'BACK',
+}
+
+// ============================================================
+// KONFIGURACJA WYŚWIETLANIA
+// ============================================================
+
+const RESULT_CONFIG = {
+  [GameResult.EXCELLENT]: {
+    emoji: '🎉',
+    title: 'Świetnie!',
+    description: 'Znałeś większość pojęć',
+  },
+  [GameResult.NEEDS_PRACTICE]: {
+    emoji: '📚',
+    title: 'Jeszcze trochę praktyki',
+    description: 'Kontynuuj naukę',
+  },
+} as const;
+
+const THEME = {
+  COLORS: {
+    PRIMARY: {
+      base: 'indigo-500',
+      hover: 'indigo-600',
+      light: 'indigo-100',
+      focus: 'indigo-400',
+    },
+    SUCCESS: {
+      base: 'emerald-500',
+      text: 'emerald-600',
+      light: 'emerald-100',
+      hover: 'emerald-200',
+    },
+    ERROR: {
+      base: 'red-500',
+      text: 'red-700',
+      light: 'red-100',
+      hover: 'red-200',
+    },
+    NEUTRAL: {
+      text: 'gray-600',
+      textHover: 'gray-700',
+      bg: 'gray-200',
+    },
+  },
+  SIZES: {
+    CARD_HEIGHT: 'h-64',
+    ICON_LARGE: 'w-10 h-10',
+    ICON_SMALL: 'w-4 h-4',
+    ICON_MEDIUM: 'w-5 h-5',
+    PROGRESS_BAR: 'h-1.5',
+  },
+  SPACING: {
+    CARD_GAP: 'gap-4',
+    CONTENT_GAP: 'gap-3',
+    SMALL_GAP: 'gap-2',
+  },
+} as const;
+
+const ARIA_LABELS = {
+  CARD_FRONT: 'Kliknij aby zobaczyć definicję',
+  CARD_BACK: 'Kliknij aby zobaczyć termin',
+  BUTTON_KNOW: 'Oznacz jako znane',
+  BUTTON_DONT_KNOW: 'Oznacz jako nieznane',
+  BUTTON_RESTART: 'Rozpocznij grę od nowa',
+} as const;
+
+const UI_TEXT = {
+  CARD_COUNTER: (current: number, total: number) => `Karta ${current} z ${total}`,
+  SCORE_DISPLAY: (known: number, total: number, percent: number) => 
+    `Znałeś ${known} z ${total} pojęć (${percent}%)`,
+  CLICK_TO_FLIP: 'Kliknij, aby zobaczyć definicję',
+  BUTTON_LABELS: {
+    DONT_KNOW: '✗ Nie wiem',
+    KNOW: '✓ Wiem!',
+    RESTART: 'Zacznij od nowa',
+  },
+} as const;
+
+// ============================================================
+// FUNKCJE POMOCNICZE
+// ============================================================
+
+/**
+ * Oblicza końcowy wynik procentowy
+ */
+const calculateScore = (knownCount: number, totalCards: number): number => {
+  if (totalCards === 0) return GAME_CONFIG.SCORING.MIN_SCORE_PERCENT;
+  
+  return Math.round(
+    (knownCount / totalCards) * GAME_CONFIG.SCORING.MAX_SCORE_PERCENT
+  );
+};
+
+/**
+ * Określa rezultat gry na podstawie wyniku
+ */
+const determineGameResult = (scorePercent: number): GameResult => {
+  return scorePercent >= GAME_CONFIG.SCORING.PASSING_THRESHOLD_PERCENT
+    ? GameResult.EXCELLENT
+    : GameResult.NEEDS_PRACTICE;
+};
+
+/**
+ * Sprawdza czy karta jest ostatnią w talii
+ */
+const isLastCardInDeck = (currentIndex: number, totalCards: number): boolean => {
+  return currentIndex === totalCards - 1;
+};
+
+/**
+ * Sprawdza czy gra jest zakończona
+ */
+const isGameFinished = (currentIndex: number, totalCards: number): boolean => {
+  return currentIndex >= totalCards;
+};
+
+/**
+ * Oblicza procent postępu
+ */
+const calculateProgressPercent = (current: number, total: number): number => {
+  if (total === 0) return GAME_CONFIG.SCORING.MIN_SCORE_PERCENT;
+  return (current / total) * GAME_CONFIG.SCORING.MAX_SCORE_PERCENT;
+};
+
+// ============================================================
+// KOMPONENT GŁÓWNY
+// ============================================================
+
+export const FlashcardGame: React.FC<FlashcardGameProps> = ({
+  cards,
+  onComplete,
+  onRestart,
+  reducedMotion = false,
+}) => {
+  // ============================================================
+  // STATE
+  // ============================================================
+  
+  const [currentIndex, setCurrentIndex] = useState(GAME_CONFIG.PROGRESS.INITIAL_INDEX);
+  const [isFlipped, setIsFlipped] = useState(false);
+  const [knownIds, setKnownIds] = useState<Set<string>>(new Set());
+  const [unknownIds, setUnknownIds] = useState<Set<string>>(new Set());
+
+  // ============================================================
+  // COMPUTED VALUES
+  // ============================================================
+  
+  const currentCard = cards[currentIndex];
+  const isLastCard = isLastCardInDeck(currentIndex, cards.length);
+  const isFinished = isGameFinished(currentIndex, cards.length);
+
+  const stats = useMemo(() => ({
+    current: currentIndex + 1,
+    total: cards.length,
+    known: knownIds.size,
+    unknown: unknownIds.size,
+    progressPercent: calculateProgressPercent(currentIndex + 1, cards.length),
+  }), [currentIndex, cards.length, knownIds.size, unknownIds.size]);
+
+  // ============================================================
+  // HANDLERS
+  // ============================================================
+
+  /**
+   * Oblicza końcowy wynik uwzględniając aktualną decyzję
+   */
+  const calculateFinalScore = useCallback((
+    known: Set<string>, 
+    includeCurrentCard: boolean
+  ): number => {
+    const knownCount = known.size + (includeCurrentCard ? 1 : 0);
+    return calculateScore(knownCount, cards.length);
+  }, [cards.length]);
+
+  /**
+   * Przechodzi do następnej karty lub kończy grę
+   */
+  const goToNext = useCallback((wasMarkedAsKnown: boolean) => {
+    setIsFlipped(false);
+    
+    if (isLastCard) {
+      const finalScore = calculateFinalScore(knownIds, wasMarkedAsKnown);
+      
+      setTimeout(() => {
+        onComplete(finalScore);
+      }, GAME_CONFIG.ANIMATION.TRANSITION_DELAY_MS);
+    } else {
+      setTimeout(() => {
+        setCurrentIndex(prev => prev + 1);
+      }, GAME_CONFIG.ANIMATION.TRANSITION_DELAY_MS);
+    }
+  }, [isLastCard, knownIds, calculateFinalScore, onComplete]);
+
+  /**
+   * Obsługuje oznaczenie karty jako znanej
+   */
+  const handleMarkAsKnown = useCallback(() => {
+    if (!currentCard) return;
+    
+    setKnownIds(prev => new Set(prev).add(currentCard.id));
+    goToNext(true);
+  }, [currentCard, goToNext]);
+
+  /**
+   * Obsługuje oznaczenie karty jako nieznanej
+   */
+  const handleMarkAsUnknown = useCallback(() => {
+    if (!currentCard) return;
+    
+    setUnknownIds(prev => new Set(prev).add(currentCard.id));
+    goToNext(false);
+  }, [currentCard, goToNext]);
+
+  /**
+   * Odwraca kartę
+   */
+  const handleFlipCard = useCallback(() => {
+    setIsFlipped(prev => !prev);
+  }, []);
+
+  /**
+   * Obsługuje nawigację klawiaturą
+   */
+  const handleCardKeyPress = useCallback((e: React.KeyboardEvent) => {
+    const ALLOWED_KEYS = ['Enter', ' '];
+    
+    if (ALLOWED_KEYS.includes(e.key)) {
+      e.preventDefault();
+      handleFlipCard();
+    }
+  }, [handleFlipCard]);
+
+  /**
+   * Resetuje grę do stanu początkowego
+   */
+  const handleResetGame = useCallback(() => {
+    setCurrentIndex(GAME_CONFIG.PROGRESS.INITIAL_INDEX);
+    setIsFlipped(false);
+    setKnownIds(new Set());
+    setUnknownIds(new Set());
+    onRestart?.();
+  }, [onRestart]);
+
+  // ============================================================
+  // RENDER: EKRAN KOŃCOWY
+  // ============================================================
+
+  if (isFinished) {
+    const finalScore = calculateScore(knownIds.size, cards.length);
+    const gameResult = determineGameResult(finalScore);
+    const resultConfig = RESULT_CONFIG[gameResult];
+
+    return (
+      <div className="max-w-lg mx-auto text-center py-8">
+        <div className="text-6xl mb-4" role="img" aria-label="Wynik">
+          {resultConfig.emoji}
+        </div>
+        
+        <h3 className="text-2xl font-bold mb-2">
+          {resultConfig.title}
+        </h3>
+        
+        <p className={`text-${THEME.COLORS.NEUTRAL.text} mb-4`}>
+          {UI_TEXT.SCORE_DISPLAY(knownIds.size, cards.length, finalScore)}
+        </p>
+        
+        <button
+          onClick={handleResetGame}
+          aria-label={ARIA_LABELS.BUTTON_RESTART}
+          className={`
+            px-6 py-3 
+            bg-${THEME.COLORS.PRIMARY.base} 
+            hover:bg-${THEME.COLORS.PRIMARY.hover}
+            text-white rounded-xl font-semibold 
+            transition-colors 
+            flex items-center ${THEME.SPACING.SMALL_GAP} mx-auto
+          `}
+        >
+          <RotateCcw className={THEME.SIZES.ICON_MEDIUM} />
+          {UI_TEXT.BUTTON_LABELS.RESTART}
+        </button>
+      </div>
+    );
+  }
+
+  // ============================================================
+  // RENDER: GRA W TOKU
+  // ============================================================
+
+  return (
+    <div className="max-w-lg mx-auto">
+      {/* Nagłówek z postępem */}
+      <div className={`flex items-center justify-between mb-4 text-sm text-${THEME.COLORS.NEUTRAL.text}`}>
+        <span>{UI_TEXT.CARD_COUNTER(stats.current, stats.total)}</span>
+        <div className={`flex ${THEME.SPACING.CONTENT_GAP}`}>
+          <span className={`text-${THEME.COLORS.SUCCESS.text} font-medium`}>
+            ✓ {stats.known}
+          </span>
+          <span className={`text-${THEME.COLORS.ERROR.text} font-medium`}>
+            ✗ {stats.unknown}
+          </span>
+        </div>
+      </div>
+
+      {/* Pasek postępu */}
+      <div className={`${THEME.SIZES.PROGRESS_BAR} bg-${THEME.COLORS.NEUTRAL.bg} rounded-full mb-6 overflow-hidden`}>
+        <div 
+          className={`h-full bg-${THEME.COLORS.PRIMARY.base} transition-all duration-300`}
+          style={{ width: `${stats.progressPercent}%` }}
+          role="progressbar"
+          aria-valuenow={stats.progressPercent}
+          aria-valuemin={GAME_CONFIG.SCORING.MIN_SCORE_PERCENT}
+          aria-valuemax={GAME_CONFIG.SCORING.MAX_SCORE_PERCENT}
+          aria-label="Postęp gry"
+        />
+      </div>
+
+      {/* Karta */}
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={handleFlipCard}
+        onKeyDown={handleCardKeyPress}
+        aria-label={isFlipped ? ARIA_LABELS.CARD_BACK : ARIA_LABELS.CARD_FRONT}
+        className={`
+          relative ${THEME.SIZES.CARD_HEIGHT} 
+          cursor-pointer 
+          focus:outline-none 
+          focus:ring-2 
+          focus:ring-${THEME.COLORS.PRIMARY.focus} 
+          focus:ring-offset-2 
+          rounded-2xl
+        `}
+        style={{ perspective: '1000px' }}
+      >
+        <div
+          className={`
+            absolute inset-0 transition-transform
+            ${reducedMotion ? '' : 'transform-gpu'}
+          `}
+          style={{
+            transformStyle: 'preserve-3d',
+            transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+            transitionDuration: `${GAME_CONFIG.ANIMATION.FLIP_DURATION_MS}ms`,
+          }}
+        >
+          {/* Przód karty - Termin */}
+          <CardFace
+            side={CardSide.FRONT}
+            icon={<Lightbulb className={`${THEME.SIZES.ICON_LARGE} text-white/50`} />}
+            title={currentCard?.term}
+            subtitle={UI_TEXT.CLICK_TO_FLIP}
+            gradient="from-indigo-500 to-purple-600"
+          />
+
+          {/* Tył karty - Definicja */}
+          <CardFace
+            side={CardSide.BACK}
+            icon={<CheckCircle className={`${THEME.SIZES.ICON_LARGE} text-white/50`} />}
+            content={currentCard?.definition}
+            gradient="from-emerald-500 to-teal-600"
+          />
+        </div>
+      </div>
+
+      {/* Przyciski oceny */}
+      {isFlipped && (
+        <div className={`flex ${THEME.SPACING.CARD_GAP} mt-6`}>
+          <ActionButton
+            onClick={handleMarkAsUnknown}
+            label={UI_TEXT.BUTTON_LABELS.DONT_KNOW}
+            ariaLabel={ARIA_LABELS.BUTTON_DONT_KNOW}
+            variant="error"
+          />
+          <ActionButton
+            onClick={handleMarkAsKnown}
+            label={UI_TEXT.BUTTON_LABELS.KNOW}
+            ariaLabel={ARIA_LABELS.BUTTON_KNOW}
+            variant="success"
+          />
+        </div>
+      )}
+
+      {/* Przycisk restartu */}
+      <button
+        onClick={handleResetGame}
+        aria-label={ARIA_LABELS.BUTTON_RESTART}
+        className={`
+          mt-4 w-full py-2 
+          text-${THEME.COLORS.NEUTRAL.text} 
+          hover:text-${THEME.COLORS.NEUTRAL.textHover} 
+          text-sm flex items-center justify-center gap-1
+        `}
+      >
+        <RotateCcw className={THEME.SIZES.ICON_SMALL} />
+        {UI_TEXT.BUTTON_LABELS.RESTART}
+      </button>
+    </div>
+  );
+};
+
+// ============================================================
+// KOMPONENTY POMOCNICZE
+// ============================================================
+
+/**
+ * Strona karty (przód lub tył)
+ */
+interface CardFaceProps {
+  side: CardSide;
+  icon: React.ReactNode;
+  gradient: string;
+  title?: string;
+  content?: string;
+  subtitle?: string;
+}
+
+const CardFace: React.FC<CardFaceProps> = ({
+  side,
+  icon,
+  gradient,
+  title,
+  content,
+  subtitle,
+}) => (
+  <div
+    className={`
+      absolute inset-0 
+      bg-gradient-to-br ${gradient}
+      rounded-2xl p-6 
+      flex flex-col items-center justify-center 
+      shadow-lg
+    `}
+    style={{
+      backfaceVisibility: 'hidden',
+      transform: side === CardSide.BACK ? 'rotateY(180deg)' : 'rotateY(0deg)',
+    }}
+  >
+    <div className="mb-4">{icon}</div>
+    
+    {title && (
+      <h3 className="text-2xl font-bold text-white text-center">
+        {title}
+      </h3>
+    )}
+    
+    {content && (
+      <p className="text-lg text-white text-center leading-relaxed">
+        {content}
+      </p>
+    )}
+    
+    {subtitle && (
+      <p className={`mt-4 text-${THEME.COLORS.PRIMARY.base}-200 text-sm`}>
+        {subtitle}
+      </p>
+    )}
+  </div>
+);
+
+/**
+ * Przycisk akcji (Wiem/Nie wiem)
+ */
+interface ActionButtonProps {
+  onClick: () => void;
+  label: string;
+  ariaLabel: string;
+  variant: 'success' | 'error';
+}
+
+const ActionButton: React.FC<ActionButtonProps> = ({
+  onClick,
+  label,
+  ariaLabel,
+  variant,
+}) => {
+  const colors = variant === 'success' 
+    ? THEME.COLORS.SUCCESS 
+    : THEME.COLORS.ERROR;
+
+  return (
+    <button
+      onClick={onClick}
+      aria-label={ariaLabel}
+      className={`
+        flex-1 py-3 
+        bg-${colors.light} 
+        text-${colors.text} 
+        hover:bg-${colors.hover}
+        rounded-xl font-semibold 
+        transition-colors
+      `}
+    >
+      {label}
+    </button>
+  );
+};
+
+// ============================================================
+// EKSPORT KONFIGURACJI (dla testów/dokumentacji)
+// ============================================================
+
+export const FLASHCARD_CONSTANTS = {
+  GAME_CONFIG,
+  THEME,
+  ARIA_LABELS,
+  UI_TEXT,
+} as const;
