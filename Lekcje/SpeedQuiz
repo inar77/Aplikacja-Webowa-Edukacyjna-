@@ -1,0 +1,211 @@
+// ============================================================
+// SPEED QUIZ - POPRAWIONY TIMER I LOGIKA STANU
+// ============================================================
+
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { Clock, RotateCcw, SkipForward } from 'lucide-react';
+import type { SpeedQuizProps, SpeedQuestion } from '../types/minigames';
+
+export const SpeedQuiz: React.FC<SpeedQuizProps> = ({
+  questions,
+  timePerQuestion = 15,
+  onComplete,
+  onRestart,
+  reducedMotion = false,
+}) => {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(timePerQuestion);
+  const [correctCount, setCorrectCount] = useState(0);
+  const [answered, setAnswered] = useState(false);
+  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
+  const [isFinished, setIsFinished] = useState(false);
+
+  // Ref dla intervalu - jeden stały interval
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const currentQuestion = questions[currentIndex];
+
+  // Zarządzanie timerem - jeden interval na cały komponent
+  useEffect(() => {
+    // Wyczyść poprzedni interval
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+    }
+
+    // Jeśli odpowiedziano lub skończono, nie odliczaj
+    if (answered || isFinished) return;
+
+    // Ustaw nowy interval
+    intervalRef.current = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          // Czas minął - traktuj jako brak odpowiedzi
+          handleTimeout();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [currentIndex, answered, isFinished]);
+
+  // Obsługa timeout (wywoływana z intervalRef)
+  const handleTimeout = useCallback(() => {
+    if (answered) return;
+    setAnswered(true);
+    setSelectedAnswer(null);
+    
+    // Przejdź dalej po chwili
+    setTimeout(() => goToNextQuestion(false), 1500);
+  }, [answered]);
+
+  // Przejście do następnego pytania
+  const goToNextQuestion = useCallback((wasCorrect: boolean) => {
+    const newCorrectCount = wasCorrect ? correctCount + 1 : correctCount;
+    
+    if (currentIndex >= questions.length - 1) {
+      // Ostatnie pytanie - zakończ
+      setIsFinished(true);
+      const finalScore = Math.round((newCorrectCount / questions.length) * 100);
+      onComplete(finalScore);
+    } else {
+      // Następne pytanie
+      setCurrentIndex(prev => prev + 1);
+      setTimeLeft(timePerQuestion);
+      setAnswered(false);
+      setSelectedAnswer(null);
+      if (wasCorrect) {
+        setCorrectCount(prev => prev + 1);
+      }
+    }
+  }, [currentIndex, correctCount, questions.length, timePerQuestion, onComplete]);
+
+  // Obsługa odpowiedzi
+  const handleAnswer = useCallback((answerIndex: number) => {
+    if (answered) return;
+
+    setSelectedAnswer(answerIndex);
+    setAnswered(true);
+
+    const isCorrect = answerIndex === currentQuestion.correct;
+    
+    // Przejdź dalej po animacji feedbacku
+    setTimeout(() => goToNextQuestion(isCorrect), 1200);
+  }, [answered, currentQuestion, goToNextQuestion]);
+
+  // Pomiń pytanie
+  const handleSkip = useCallback(() => {
+    if (answered) return;
+    setAnswered(true);
+    setSelectedAnswer(null);
+    setTimeout(() => goToNextQuestion(false), 500);
+  }, [answered, goToNextQuestion]);
+
+  // Reset gry
+  const handleReset = useCallback(() => {
+    setCurrentIndex(0);
+    setTimeLeft(timePerQuestion);
+    setCorrectCount(0);
+    setAnswered(false);
+    setSelectedAnswer(null);
+    setIsFinished(false);
+    onRestart?.();
+  }, [timePerQuestion, onRestart]);
+
+  // Ekran końcowy
+  if (isFinished) {
+    const finalScore = Math.round((correctCount / questions.length) * 100);
+    
+    return (
+      <div className="max-w-xl mx-auto text-center py-8">
+        <div className="text-6xl mb-4">
+          {finalScore >= 80 ? '🏆' : finalScore >= 50 ? '👍' : '📖'}
+        </div>
+        <h3 className="text-2xl font-bold mb-2">
+          {finalScore >= 80 ? 'Świetny wynik!' : finalScore >= 50 ? 'Nieźle!' : 'Spróbuj ponownie'}
+        </h3>
+        <p className="text-gray-600 mb-2">
+          Poprawnie: {correctCount} z {questions.length}
+        </p>
+        <p className="text-3xl font-bold text-indigo-600 mb-6">{finalScore}%</p>
+        <button
+          onClick={handleReset}
+          className="px-6 py-3 bg-indigo-500 text-white rounded-xl font-semibold hover:bg-indigo-600 transition-colors flex items-center gap-2 mx-auto"
+        >
+          <RotateCcw className="w-5 h-5" />
+          Zagraj ponownie
+        </button>
+      </div>
+    );
+  }
+
+  // Timer jest krytyczny
+  const isTimeCritical = timeLeft <= 5;
+
+  return (
+    <div className="max-w-xl mx-auto">
+      {/* Header z timerem */}
+      <div className="flex items-center justify-between mb-4">
+        <span className="text-sm text-gray-600">
+          Pytanie {currentIndex + 1} z {questions.length}
+        </span>
+        <div
+          className={`
+            flex items-center gap-2 px-3 py-1.5 rounded-full font-bold text-sm
+            ${isTimeCritical 
+              ? `bg-red-100 text-red-600 ${reducedMotion ? '' : 'animate-pulse'}` 
+              : 'bg-gray-100 text-gray-700'
+            }
+          `}
+          role="timer"
+          aria-live="polite"
+        >
+          <Clock className="w-4 h-4" />
+          {timeLeft}s
+        </div>
+      </div>
+
+      {/* Pasek postępu czasu */}
+      <div className="h-1.5 bg-gray-200 rounded-full mb-6 overflow-hidden">
+        <div
+          className={`h-full transition-all duration-1000 ease-linear ${
+            isTimeCritical ? 'bg-red-500' : 'bg-indigo-500'
+          }`}
+          style={{ width: `${(timeLeft / timePerQuestion) * 100}%` }}
+        />
+      </div>
+
+      {/* Pasek postępu pytań */}
+      <div className="flex gap-1 mb-6">
+        {questions.map((_, idx) => (
+          <div
+            key={idx}
+            className={`
+              h-1 flex-1 rounded-full transition-colors
+              ${idx < currentIndex 
+                ? 'bg-emerald-500' 
+                : idx === currentIndex 
+                  ? 'bg-indigo-500' 
+                  : 'bg-gray-200'
+              }
+            `}
+          />
+        ))}
+      </div>
+
+      {/* Pytanie */}
+      <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-5 mb-5">
+        <h3 className="text-lg font-bold text-gray-800">
+          {currentQuestion.question}
+        </h3>
+      </div>
+
+      {/* Odpowiedzi */}
+      <div className="space-y-2.5">
+        {currentQuestion.options.map((option, index) => {
+          const isCorre
