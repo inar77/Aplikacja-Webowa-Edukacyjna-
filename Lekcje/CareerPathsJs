@@ -1,0 +1,445 @@
+// components/Tasks/CareerPaths.js
+// ============================================================
+// CAREER PATHS - Definicje sciezek kariery i zadan
+// ============================================================
+
+export const CAREER_PATHS = {
+  electrician: {
+    id: 'electrician',
+    name: 'Elektryk',
+    description: 'Instalacje elektryczne, automatyka, systemy zasilania',
+    icon: '⚡',
+    color: '#3b82f6',
+    modules: [
+      // ============================================================
+      // MODUL 1: PODSTAWY BHP I BEZPIECZENSTWO
+      // ============================================================
+      {
+        id: 'safety-basics',
+        title: 'Podstawy BHP',
+        description: 'Bezpieczenstwo przy pracy z pradem elektrycznym',
+        icon: '⚠️',
+        duration: '2-3 godziny',
+        tasks: [
+          {
+            id: 'bhp-basics',
+            title: 'BHP: Twoje zycie jest najcenniejsze',
+            description: 'Poznaj podstawowe zasady bezpieczenstwa przy pracy z pradem. Nauczysz sie rozpoznawac zagrozenia i reagowac w sytuacjach awaryjnych.',
+            type: 'theory',
+            xpReward: 150,
+            difficulty: 'beginner',
+            estimatedTime: '15 min',
+            mustPass: true
+          },
+          {
+            id: 'ppe-equipment',
+            title: 'Srodki ochrony osobistej',
+            description: 'Rekawice izolacyjne, obuwie, kaski - jak dobierac i uzywac sprzetu ochronnego.',
+            type: 'practical',
+            xpReward: 120,
+            difficulty: 'beginner',
+            estimatedTime: '20 min',
+            prerequisites: ['bhp-basics']
+          },
+          {
+            id: 'first-aid-electric',
+            title: 'Pierwsza pomoc przy porazeniu',
+            description: 'Jak reagowac gdy ktos zostanie porazony pradem. Procedury ratunkowe.',
+            type: 'safety',
+            xpReward: 200,
+            difficulty: 'intermediate',
+            estimatedTime: '25 min',
+            prerequisites: ['bhp-basics'],
+            mustPass: true
+          }
+        ]
+      },
+      // ============================================================
+      // MODUL 2: TEORIA ELEKTRYCZNOSCI
+      // ============================================================
+      {
+        id: 'electricity-theory',
+        title: 'Teoria elektrycznosci',
+        description: 'Podstawy fizyki pradu elektrycznego i obwodow',
+        icon: '📚',
+        duration: '4-5 godzin',
+        tasks: [
+          {
+            id: 'ohms-law',
+            title: 'Prawo Ohma',
+            description: 'Zrozum zaleznosc miedzy napieciem, pradem i rezystancja. Fundament pracy elektryka.',
+            type: 'theory',
+            xpReward: 180,
+            difficulty: 'beginner',
+            estimatedTime: '20 min'
+          },
+          {
+            id: 'ohms-law-calc',
+            title: 'Obliczenia - Prawo Ohma',
+            description: 'Praktyczne obliczenia z wykorzystaniem prawa Ohma. Rozwiaz realistyczne problemy instalacyjne.',
+            type: 'calc',
+            xpReward: 200,
+            difficulty: 'intermediate',
+            estimatedTime: '15 min',
+            prerequisites: ['ohms-law'],
+            calcConfig: {
+              question: 'Oblicz prad plynacy przez zarowke o rezystancji 92 Ohm podlaczona do napiecia 230V.',
+              formula: 'I = U / R',
+              correctAnswer: 2.5,
+              tolerance: 0.1,
+              hint: 'Podziel napiecie przez rezystancje. I = 230V / 92 Ohm',
+              hints: [
+                'Prawo Ohma: I = U / R',
+                'U = 230V (napiecie sieciowe)',
+                'R = 92 Ohm (rezystancja zarowki)'
+              ]
+            }
+          },
+          {
+            id: 'power-formula',
+            title: 'Moc elektryczna',
+            description: 'Wzory na moc: P = U * I, P = I^2 * R, P = U^2 / R',
+            type: 'theory',
+            xpReward: 160,
+            difficulty: 'intermediate',
+            estimatedTime: '25 min',
+            prerequisites: ['ohms-law']
+          },
+          {
+            id: 'power-calc',
+            title: 'Obliczenia mocy',
+            description: 'Oblicz moc urzadzen elektrycznych i dobierz odpowiednie zabezpieczenia.',
+            type: 'calc',
+            xpReward: 220,
+            difficulty: 'intermediate',
+            estimatedTime: '15 min',
+            prerequisites: ['power-formula'],
+            calcConfig: {
+              question: 'Grzejnik elektryczny pobiera prad 8.7A przy napieciu 230V. Oblicz jego moc w watach.',
+              formula: 'P = U * I',
+              correctAnswer: 2001,
+              tolerance: 5,
+              hint: 'Pomnoz napiecie przez prad. P = 230V * 8.7A',
+              hints: [
+                'Wzor na moc: P = U * I',
+                'U = 230V',
+                'I = 8.7A'
+              ]
+            }
+          },
+          {
+            id: 'wire-cross-section-calc',
+            title: 'Dobor przekroju przewodu',
+            description: 'Oblicz minimalny przekroj przewodu dla danego obciazenia.',
+            type: 'calc',
+            xpReward: 280,
+            difficulty: 'advanced',
+            estimatedTime: '20 min',
+            prerequisites: ['power-calc'],
+            calcConfig: {
+              question: 'Urzadzenie o mocy 4600W bedzie zasilane z gniazdka 230V. Oblicz minimalny prad (w amperach), ktory musi przewodzic przewod.',
+              formula: 'I = P / U',
+              correctAnswer: 20,
+              tolerance: 0.5,
+              hint: 'Podziel moc przez napiecie. I = 4600W / 230V',
+              hints: [
+                'Przeksztalc wzor: P = U * I => I = P / U',
+                'P = 4600W (moc urzadzenia)',
+                'U = 230V (napiecie sieciowe)',
+                'Dla 20A potrzebujesz przewodu 2.5mm2'
+              ]
+            }
+          }
+        ]
+      },
+      // ============================================================
+      // MODUL 3: NARZEDZIA I POMIARY
+      // ============================================================
+      {
+        id: 'tools-measurements',
+        title: 'Narzedzia i pomiary',
+        description: 'Multimetry, mierniki i techniki pomiarowe',
+        icon: '🔧',
+        duration: '3-4 godziny',
+        tasks: [
+          {
+            id: 'multimeter-basics',
+            title: 'Multimetr: Twoje trzecie oko',
+            description: 'Poznaj budowe i funkcje multimetru cyfrowego. Nauczysz sie mierzyc napiecie, prad i rezystancje.',
+            type: 'practical',
+            xpReward: 200,
+            difficulty: 'beginner',
+            estimatedTime: '25 min'
+          },
+          {
+            id: 'voltage-measurement',
+            title: 'Pomiar napiecia',
+            description: 'Techniki bezpiecznego pomiaru napiecia AC i DC.',
+            type: 'practical',
+            xpReward: 180,
+            difficulty: 'beginner',
+            estimatedTime: '20 min',
+            prerequisites: ['multimeter-basics']
+          },
+          {
+            id: 'continuity-test',
+            title: 'Test ciaglosci obwodu',
+            description: 'Sprawdzanie ciaglosci przewodow i wykrywanie przerw.',
+            type: 'practical',
+            xpReward: 160,
+            difficulty: 'beginner',
+            estimatedTime: '15 min',
+            prerequisites: ['multimeter-basics']
+          },
+          {
+            id: 'resistance-calc',
+            title: 'Interpretacja pomiarow rezystancji',
+            description: 'Jak odczytywac i interpretowac wyniki pomiarow rezystancji.',
+            type: 'calc',
+            xpReward: 200,
+            difficulty: 'intermediate',
+            estimatedTime: '15 min',
+            prerequisites: ['continuity-test'],
+            calcConfig: {
+              question: 'Multimetr pokazuje rezystancje 0.5 Ohm na przewodzie o dlugosci 50m. Oblicz rezystancje na 1km tego przewodu.',
+              formula: 'R_1km = R_pomiar * (1000 / dlugosc)',
+              correctAnswer: 10,
+              tolerance: 0.5,
+              hint: 'Przelicz proporcjonalnie: 0.5 Ohm na 50m, ile na 1000m?',
+              hints: [
+                'Rezystancja jest proporcjonalna do dlugosci',
+                '50m => 0.5 Ohm',
+                '1000m => ? Ohm',
+                'Mnoznik: 1000/50 = 20'
+              ]
+            }
+          }
+        ]
+      },
+      // ============================================================
+      // MODUL 4: INSTALACJE ELEKTRYCZNE
+      // ============================================================
+      {
+        id: 'electrical-installations',
+        title: 'Instalacje elektryczne',
+        description: 'Projektowanie i wykonywanie instalacji',
+        icon: '🔌',
+        duration: '6-8 godzin',
+        tasks: [
+          {
+            id: 'wiring-basics',
+            title: 'Okablowanie: L/N/PE i porzadek',
+            description: 'Standardy prowadzenia przewodow, oznaczenia kolorow i zasady montazu.',
+            type: 'practical',
+            xpReward: 220,
+            difficulty: 'intermediate',
+            estimatedTime: '30 min',
+            prerequisites: ['bhp-basics', 'multimeter-basics']
+          },
+          {
+            id: 'socket-installation',
+            title: 'Montaz gniazdka',
+            description: 'Krok po kroku: jak prawidlowo zamontowac gniazdko elektryczne.',
+            type: 'practical',
+            xpReward: 250,
+            difficulty: 'intermediate',
+            estimatedTime: '35 min',
+            prerequisites: ['wiring-basics']
+          },
+          {
+            id: 'circuit-breaker-sizing',
+            title: 'Dobor bezpiecznikow',
+            description: 'Jak dobierac bezpieczniki i wylaczniki róznicowoprądowe.',
+            type: 'theory',
+            xpReward: 200,
+            difficulty: 'intermediate',
+            estimatedTime: '25 min',
+            prerequisites: ['power-formula']
+          },
+          {
+            id: 'breaker-calc',
+            title: 'Obliczenia zabezpieczen',
+            description: 'Oblicz wymagany prad znamionowy bezpiecznika dla danego obwodu.',
+            type: 'calc',
+            xpReward: 260,
+            difficulty: 'advanced',
+            estimatedTime: '20 min',
+            prerequisites: ['circuit-breaker-sizing'],
+            calcConfig: {
+              question: 'Obwod zasilajacy 6 gniazdek, kazde moze byc obciazone max 2300W. Oblicz minimalny prad bezpiecznika (w amperach) przy napieciu 230V.',
+              formula: 'I = P_total / U',
+              correctAnswer: 60,
+              tolerance: 2,
+              hint: 'Najpierw oblicz calkowita moc (6 * 2300W), potem podziel przez napiecie.',
+              hints: [
+                'Calkowita moc: 6 * 2300W = 13800W',
+                'Prad: I = 13800W / 230V = 60A',
+                'Uwaga: to teoretyczne max, w praktyce stosuje sie wspolczynnik jednoczesnosci'
+              ]
+            }
+          },
+          {
+            id: 'three-phase-intro',
+            title: 'Wprowadzenie do ukladow trojfazowych',
+            description: 'Podstawy zasilania trojfazowego: L1, L2, L3, N, PE.',
+            type: 'theory',
+            xpReward: 280,
+            difficulty: 'advanced',
+            estimatedTime: '40 min',
+            prerequisites: ['circuit-breaker-sizing']
+          },
+          {
+            id: 'three-phase-calc',
+            title: 'Obliczenia trojfazowe',
+            description: 'Oblicz moc i prad w ukladzie trojfazowym.',
+            type: 'calc',
+            xpReward: 320,
+            difficulty: 'expert',
+            estimatedTime: '25 min',
+            prerequisites: ['three-phase-intro'],
+            calcConfig: {
+              question: 'Silnik trojfazowy pobiera prad 10A na kazdej fazie przy napieciu miedzyfazowym 400V. Oblicz moc silnika w kW (zaokraglij do 1 miejsca po przecinku).',
+              formula: 'P = sqrt(3) * U * I',
+              correctAnswer: 6.9,
+              tolerance: 0.2,
+              hint: 'Wzor na moc trojfazowa: P = pierwiastek(3) * U * I = 1.732 * 400 * 10',
+              hints: [
+                'Dla ukladu trojfazowego: P = sqrt(3) * U * I',
+                'sqrt(3) ≈ 1.732',
+                'P = 1.732 * 400V * 10A = 6928W = 6.9kW'
+              ]
+            }
+          }
+        ]
+      },
+      // ============================================================
+      // MODUL 5: DIAGNOSTYKA I NAPRAWY
+      // ============================================================
+      {
+        id: 'diagnostics',
+        title: 'Diagnostyka i naprawy',
+        description: 'Wykrywanie i usuwanie usterek',
+        icon: '🔍',
+        duration: '4-5 godzin',
+        tasks: [
+          {
+            id: 'fault-finding',
+            title: 'Metodyka szukania usterek',
+            description: 'Systematyczne podejscie do diagnozowania problemow elektrycznych.',
+            type: 'diagnostic',
+            xpReward: 240,
+            difficulty: 'intermediate',
+            estimatedTime: '30 min',
+            prerequisites: ['continuity-test', 'voltage-measurement']
+          },
+          {
+            id: 'short-circuit-detection',
+            title: 'Wykrywanie zwarc',
+            description: 'Jak zlokalizowac zwarcie w instalacji elektrycznej.',
+            type: 'diagnostic',
+            xpReward: 260,
+            difficulty: 'advanced',
+            estimatedTime: '35 min',
+            prerequisites: ['fault-finding']
+          },
+          {
+            id: 'voltage-drop-calc',
+            title: 'Obliczanie spadku napiecia',
+            description: 'Sprawdz czy spadek napiecia na przewodzie miesci sie w normie.',
+            type: 'calc',
+            xpReward: 280,
+            difficulty: 'advanced',
+            estimatedTime: '20 min',
+            prerequisites: ['fault-finding'],
+            calcConfig: {
+              question: 'Przewod miedziany 2.5mm2 o dlugosci 30m zasila odbiornik 16A. Oblicz spadek napiecia w % przy napieciu 230V. Rezystywnosc miedzi: 0.0175 Ohm*mm2/m.',
+              formula: 'dU% = (2 * L * I * rho) / (S * U) * 100',
+              correctAnswer: 2.9,
+              tolerance: 0.3,
+              hint: 'dU = 2 * 30 * 16 * 0.0175 / 2.5 = 6.72V, dU% = 6.72/230 * 100',
+              hints: [
+                'R przewodu = 2 * L * rho / S (x2 bo tam i z powrotem)',
+                'R = 2 * 30 * 0.0175 / 2.5 = 0.42 Ohm',
+                'dU = R * I = 0.42 * 16 = 6.72V',
+                'dU% = 6.72 / 230 * 100 = 2.9%'
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  },
+  plumber: {
+    id: 'plumber',
+    name: 'Hydraulik',
+    description: 'Instalacje wodno-kanalizacyjne, CO, systemy',
+    icon: '🔧',
+    color: '#10b981',
+    modules: []
+  },
+  mechanic: {
+    id: 'mechanic',
+    name: 'Mechanik',
+    description: 'Naprawy, diagnostyka, serwis pojazdow',
+    icon: '🔩',
+    color: '#f59e0b',
+    modules: []
+  }
+};
+
+// ============================================================
+// HELPER FUNCTIONS
+// ============================================================
+
+export const getCareerPath = (careerKey) => {
+  return CAREER_PATHS[careerKey] || null;
+};
+
+export const calculateProgress = (careerKey, completedTasks = []) => {
+  const career = CAREER_PATHS[careerKey];
+  if (!career?.modules) {
+    return { completed: 0, total: 0, percentage: 0 };
+  }
+
+  const allTasks = career.modules.flatMap(m => m.tasks);
+  const total = allTasks.length;
+  const completed = allTasks.filter(task => completedTasks.includes(task.id)).length;
+  const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+  return { completed, total, percentage };
+};
+
+export const getNextTask = (careerKey, completedTasks = []) => {
+  const career = CAREER_PATHS[careerKey];
+  if (!career?.modules) return null;
+
+  for (const module of career.modules) {
+    for (const task of module.tasks) {
+      if (completedTasks.includes(task.id)) continue;
+      
+      const hasPrerequisites = !task.prerequisites || 
+        task.prerequisites.every(prereq => completedTasks.includes(prereq));
+      
+      if (hasPrerequisites) {
+        return { ...task, moduleId: module.id, moduleTitle: module.title };
+      }
+    }
+  }
+
+  return null;
+};
+
+export const getModuleProgress = (careerKey, moduleId, completedTasks = []) => {
+  const career = CAREER_PATHS[careerKey];
+  const module = career?.modules?.find(m => m.id === moduleId);
+  
+  if (!module) return { completed: 0, total: 0, percentage: 0 };
+
+  const total = module.tasks.length;
+  const completed = module.tasks.filter(t => completedTasks.includes(t.id)).length;
+  const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+  return { completed, total, percentage };
+};
+
+export default CAREER_PATHS;
