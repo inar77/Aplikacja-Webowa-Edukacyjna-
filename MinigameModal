@@ -1,0 +1,172 @@
+'use client';
+import React from 'react';
+import { FlashcardGame, MatchingGame, SpeedQuiz } from '../Learning/mini-games';
+
+// ============================================================
+// MINIGAME MODAL COMPONENT
+// Wyswietla modal z aktywna minigra (fiszki, dopasowywanie, quiz)
+// ============================================================
+export default function MinigameModal({ 
+  activeMinigame, 
+  onComplete, 
+  onClose 
+}) {
+  if (!activeMinigame) return null;
+
+  const getMinigameConfig = () => {
+    switch (activeMinigame.type) {
+      case 'flashcard':
+        return {
+          label: 'Fiszki',
+          icon: '📚',
+          bgColor: '#ede9fe',
+          textColor: '#7c3aed',
+          title: 'Sprawdz swoja wiedze'
+        };
+      case 'matching':
+        return {
+          label: 'Dopasowywanie',
+          icon: '🔗',
+          bgColor: '#fef3c7',
+          textColor: '#d97706',
+          title: 'Polacz w pary'
+        };
+      case 'quiz':
+        return {
+          label: 'Quiz',
+          icon: '⚡',
+          bgColor: '#dbeafe',
+          textColor: '#2563eb',
+          title: 'Szybki quiz'
+        };
+      default:
+        return {
+          label: 'Minigra',
+          icon: '🎮',
+          bgColor: '#f3f4f6',
+          textColor: '#374151',
+          title: 'Minigra'
+        };
+    }
+  };
+
+  const config = getMinigameConfig();
+
+  return (
+    <div 
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0,0,0,0.6)',
+        backdropFilter: 'blur(4px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+        padding: 'var(--spacing-xl, 24px)',
+      }}
+      onClick={onClose}
+    >
+      <div 
+        style={{
+          background: 'white',
+          borderRadius: 'var(--radius-xl, 16px)',
+          padding: 'var(--spacing-xl, 24px)',
+          maxWidth: '700px',
+          width: '100%',
+          maxHeight: '90vh',
+          overflow: 'auto',
+          position: 'relative',
+          boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* CLOSE BUTTON */}
+        <button
+          onClick={onClose}
+          style={{
+            position: 'absolute',
+            top: 16,
+            right: 16,
+            background: '#f3f4f6',
+            border: 'none',
+            borderRadius: '50%',
+            width: 40,
+            height: 40,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            fontSize: 20,
+            transition: 'all 0.2s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = '#e5e7eb';
+            e.currentTarget.style.transform = 'scale(1.1)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = '#f3f4f6';
+            e.currentTarget.style.transform = 'scale(1)';
+          }}
+          aria-label="Zamknij"
+        >
+          ✕
+        </button>
+        
+        {/* HEADER */}
+        <div style={{ marginBottom: 24, paddingRight: 40 }}>
+          <span 
+            style={{
+              display: 'inline-block',
+              padding: '4px 12px',
+              background: config.bgColor,
+              color: config.textColor,
+              borderRadius: 999,
+              fontSize: 12,
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              marginBottom: 8,
+            }}
+          >
+            {config.icon} {config.label}
+          </span>
+          <h2 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: '#111827' }}>
+            {config.title}
+          </h2>
+          <p style={{ margin: '8px 0 0', color: '#6b7280', fontSize: 14 }}>
+            Zdobadz do <strong style={{ color: '#f59e0b' }}>{activeMinigame.xpReward} XP</strong> za ukonczenie
+          </p>
+        </div>
+        
+        {/* MINIGAME CONTENT */}
+        {activeMinigame.type === 'flashcard' && (
+          <FlashcardGame
+            cards={activeMinigame.data || []}
+            onComplete={onComplete}
+            onRestart={() => {}}
+            reducedMotion={false}
+          />
+        )}
+        
+        {activeMinigame.type === 'matching' && (
+          <MatchingGame
+            pairs={activeMinigame.data || []}
+            onComplete={onComplete}
+            onRestart={() => {}}
+            reducedMotion={false}
+          />
+        )}
+        
+        {activeMinigame.type === 'quiz' && (
+          <SpeedQuiz
+            questions={activeMinigame.data || []}
+            timePerQuestion={15}
+            onComplete={onComplete}
+            onRestart={() => {}}
+            reducedMotion={false}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
