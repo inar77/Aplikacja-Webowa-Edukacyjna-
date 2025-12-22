@@ -1,0 +1,477 @@
+'use client';
+
+import React, { useState, useCallback, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Compass,
+  Brain,
+  ArrowLeftRight,
+  Sparkles,
+  TrendingUp,
+  BookOpen,
+  Play,
+  ChevronRight,
+  Target,
+  Zap,
+  Clock,
+  Star
+} from 'lucide-react';
+
+// Import components
+import UniversalCompetencies from './UniversalCompetencies';
+import CompetencyTrainingGround from './CompetencyTrainingGround';
+import SkillTransferMap from './SkillTransferMap';
+import DiscoveryMode from './DiscoveryMode';
+import AdaptiveRecommendations from './AdaptiveRecommendations';
+import RecommendedTaskCard, { RecommendedTask, TaskFormatType } from './RecommendedTaskCard';
+
+// Types for task handling
+interface TaskConfig {
+  id: string;
+  title: string;
+  format: TaskFormatType;
+  variant?: 'flashcard' | 'matching' | 'speed-quiz';
+  lessonId?: string;
+  minigameConfig?: {
+    cards: any[];
+    timeLimit?: number;
+  };
+  calcConfig?: {
+    formula: string;
+    variables: any[];
+    solution: number;
+  };
+  quizConfig?: {
+    questions: any[];
+    passingScore: number;
+  };
+  xpReward: number;
+}
+
+// View modes
+type ViewMode = 'dashboard' | 'competencies' | 'transfer' | 'discovery' | 'recommendations';
+
+interface Props {
+  onStartMinigame?: (variant: string, cards: any[], lessonId?: string, xpReward?: number) => void;
+  onOpenLesson?: (lessonId: string) => void;
+  onOpenCalcHint?: (config: any) => void;
+  onOpenQuiz?: (config: any) => void;
+  onSectionChange?: (section: string, data?: any) => void;
+}
+
+// Sample recommended tasks
+const SAMPLE_TASKS: RecommendedTask[] = [
+  {
+    id: 'task-1',
+    title: 'BHP - Twoje życie jest najcenniejsze',
+    description: 'Interaktywna lekcja o bezpieczeństwie z animacjami i checklistą',
+    format: 'lesson',
+    status: 'available',
+    difficulty: 'beginner',
+    estimatedTime: '20 min',
+    xpReward: 100,
+    matchReason: 'Podstawa każdego elektryka - zacznij od bezpieczeństwa',
+    competencyId: 'safety'
+  },
+  {
+    id: 'task-2',
+    title: 'Obliczenia praktyczne - przewód i zabezpieczenie',
+    description: 'Dobierz przekrój przewodu do obciążenia i zabezpieczenia',
+    format: 'calc',
+    status: 'available',
+    difficulty: 'intermediate',
+    estimatedTime: '15 min',
+    xpReward: 150,
+    matchReason: 'Lubisz zadania z obliczeń - Twoja dokładność: 88%',
+    competencyId: 'calculations'
+  },
+  {
+    id: 'task-3',
+    title: 'Multimetr - Twoje trzecie oko',
+    description: 'Wideo-lekcja o pomiarach + quiz sprawdzający',
+    format: 'video',
+    status: 'in_progress',
+    progress: 45,
+    difficulty: 'beginner',
+    estimatedTime: '25 min',
+    xpReward: 120,
+    matchReason: 'W trakcie - kontynuuj gdzie skończyłeś',
+    competencyId: 'diagnostics'
+  },
+  {
+    id: 'task-4',
+    title: 'Symbole elektryczne - Memory Game',
+    description: 'Naucz się symboli schematów przez zabawę',
+    format: 'matching',
+    status: 'available',
+    difficulty: 'beginner',
+    estimatedTime: '10 min',
+    xpReward: 80,
+    matchReason: 'Minigry kończysz 3x szybciej niż lekcje tekstowe',
+    competencyId: 'diagnostics'
+  },
+  {
+    id: 'task-5',
+    title: 'Prawo Ohma - Fiszki',
+    description: 'Zapamiętaj wzory i zależności przez powtórzenia',
+    format: 'flashcard',
+    status: 'available',
+    difficulty: 'beginner',
+    estimatedTime: '8 min',
+    xpReward: 60,
+    matchReason: 'Spaced repetition - optymalne powtórki',
+    competencyId: 'calculations'
+  },
+  {
+    id: 'task-6',
+    title: 'Zaawansowana diagnostyka usterek',
+    description: 'Symulacja diagnostyki rzeczywistych problemów',
+    format: 'simulation',
+    status: 'locked',
+    difficulty: 'advanced',
+    estimatedTime: '30 min',
+    xpReward: 200,
+    matchReason: 'Wymaga ukończenia podstaw diagnostyki',
+    lockedReason: 'Najpierw ukończ: Multimetr - podstawy',
+    unlockRequirement: 'task-3',
+    competencyId: 'diagnostics'
+  }
+];
+
+export default function SmartRecommendationSystem({
+  onStartMinigame,
+  onOpenLesson,
+  onOpenCalcHint,
+  onOpenQuiz,
+  onSectionChange
+}: Props) {
+  const [viewMode, setViewMode] = useState<ViewMode>('dashboard');
+  const [tasks] = useState<RecommendedTask[]>(SAMPLE_TASKS);
+
+  // Task click handler - routes to appropriate action
+  const handleTaskClick = useCallback((task: RecommendedTask | TaskConfig) => {
+    const format = task.format;
+
+    switch (format) {
+      case 'lesson':
+        // Open lesson detail view
+        if ('lessonId' in task && task.lessonId) {
+          onOpenLesson?.(task.lessonId);
+        }
+        onSectionChange?.('lesson-detail', { lessonId: task.id });
+        break;
+
+      case 'flashcard':
+      case 'matching':
+        // Start minigame
+        if ('minigameConfig' in task && task.minigameConfig) {
+          onStartMinigame?.(
+            format === 'flashcard' ? 'flashcard' : 'matching',
+            task.minigameConfig.cards,
+            'lessonId' in task ? task.lessonId : undefined,
+            task.xpReward
+          );
+        } else {
+          // Default minigame start
+          onSectionChange?.('minigame', { 
+            variant: format,
+            taskId: task.id 
+          });
+        }
+        break;
+
+      case 'calc':
+        // Open CalcHint
+        if ('calcConfig' in task && task.calcConfig) {
+          onOpenCalcHint?.(task.calcConfig);
+        } else {
+          onSectionChange?.('calc-hint', { taskId: task.id });
+        }
+        break;
+
+      case 'quiz':
+        // Open quiz modal
+        if ('quizConfig' in task && task.quizConfig) {
+          onOpenQuiz?.(task.quizConfig);
+        } else {
+          onSectionChange?.('quiz', { taskId: task.id });
+        }
+        break;
+
+      case 'video':
+        // Open video lesson
+        onSectionChange?.('video-lesson', { taskId: task.id });
+        break;
+
+      case 'audio':
+        // Open audio lesson
+        onSectionChange?.('audio-lesson', { taskId: task.id });
+        break;
+
+      case 'simulation':
+        // Open simulation
+        onSectionChange?.('simulation', { taskId: task.id });
+        break;
+
+      default:
+        console.log('Unknown task format:', format);
+    }
+  }, [onStartMinigame, onOpenLesson, onOpenCalcHint, onOpenQuiz, onSectionChange]);
+
+  // Handle task preview
+  const handleTaskPreview = useCallback((task: RecommendedTask) => {
+    onSectionChange?.('task-preview', { task });
+  }, [onSectionChange]);
+
+  // Handle unlock redirect
+  const handleUnlockRedirect = useCallback((requirementId: string) => {
+    const requiredTask = tasks.find(t => t.id === requirementId);
+    if (requiredTask) {
+      handleTaskClick(requiredTask);
+    }
+  }, [tasks, handleTaskClick]);
+
+  // Featured task (first available)
+  const featuredTask = useMemo(() => 
+    tasks.find(t => t.status === 'available' || t.status === 'in_progress'), 
+    [tasks]
+  );
+
+  // Navigation tabs
+  const navTabs = [
+    { id: 'dashboard', label: 'Dashboard', icon: Target },
+    { id: 'competencies', label: 'Trenuj myślenie', icon: Brain },
+    { id: 'transfer', label: 'Transfer umiejętności', icon: ArrowLeftRight },
+    { id: 'discovery', label: 'Eksploracja', icon: Compass },
+    { id: 'recommendations', label: 'Rekomendacje', icon: Brain }
+  ];
+
+  return (
+    <div className="min-h-screen bg-gray-950 p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Header Navigation */}
+        <div className="flex items-center gap-2 mb-8 overflow-x-auto pb-2">
+          {navTabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setViewMode(tab.id as ViewMode)}
+              className={`
+                flex items-center gap-2 px-4 py-2.5 rounded-xl whitespace-nowrap transition-all
+                ${viewMode === tab.id 
+                  ? 'bg-violet-500/20 text-violet-300 border border-violet-500/30' 
+                  : 'bg-gray-800/50 text-gray-400 border border-gray-700/50 hover:bg-gray-800 hover:text-gray-300'
+                }
+              `}
+            >
+              <tab.icon className="w-4 h-4" />
+              <span className="text-sm font-medium">{tab.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Main Content */}
+        <AnimatePresence mode="wait">
+          {viewMode === 'dashboard' && (
+            <motion.div
+              key="dashboard"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="space-y-6"
+            >
+              {/* Welcome Section */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-2xl font-bold text-white mb-1">Witaj z powrotem!</h1>
+                  <p className="text-gray-400">Kontynuuj swoją ścieżkę rozwoju zawodowego</p>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="text-right">
+                    <span className="text-sm text-gray-500">Twój streak</span>
+                    <div className="flex items-center gap-1">
+                      <Zap className="w-5 h-5 text-amber-400" />
+                      <span className="text-xl font-bold text-amber-400">7 dni</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-sm text-gray-500">Łącznie XP</span>
+                    <div className="flex items-center gap-1">
+                      <Star className="w-5 h-5 text-violet-400" />
+                      <span className="text-xl font-bold text-violet-400">2,450</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Featured Task */}
+              {featuredTask && (
+                <div className="mb-6">
+                  <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                    <Star className="w-5 h-5 text-amber-400" />
+                    Polecane dla Ciebie
+                  </h2>
+                  <RecommendedTaskCard
+                    task={featuredTask}
+                    variant="featured"
+                    onOpenLesson={handleTaskClick}
+                    onPreview={handleTaskPreview}
+                    onUnlockRedirect={handleUnlockRedirect}
+                  />
+                </div>
+              )}
+
+              {/* Task Grid */}
+              <div>
+                <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <BookOpen className="w-5 h-5 text-violet-400" />
+                  Twoja kolejka nauki
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {tasks.filter(t => t.id !== featuredTask?.id).map((task) => (
+                    <RecommendedTaskCard
+                      key={task.id}
+                      task={task}
+                      onOpenLesson={handleTaskClick}
+                      onPreview={handleTaskPreview}
+                      onUnlockRedirect={handleUnlockRedirect}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Quick Stats */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="p-4 bg-gray-800/50 rounded-xl border border-gray-700">
+                  <div className="flex items-center gap-2 text-gray-400 mb-2">
+                    <Target className="w-4 h-4" />
+                    <span className="text-sm">Ukończone zadania</span>
+                  </div>
+                  <span className="text-2xl font-bold text-white">24</span>
+                </div>
+                <div className="p-4 bg-gray-800/50 rounded-xl border border-gray-700">
+                  <div className="flex items-center gap-2 text-gray-400 mb-2">
+                    <Clock className="w-4 h-4" />
+                    <span className="text-sm">Czas nauki</span>
+                  </div>
+                  <span className="text-2xl font-bold text-white">12.5h</span>
+                </div>
+                <div className="p-4 bg-gray-800/50 rounded-xl border border-gray-700">
+                  <div className="flex items-center gap-2 text-gray-400 mb-2">
+                    <TrendingUp className="w-4 h-4" />
+                    <span className="text-sm">Postęp ścieżki</span>
+                  </div>
+                  <span className="text-2xl font-bold text-emerald-400">67%</span>
+                </div>
+                <div className="p-4 bg-gray-800/50 rounded-xl border border-gray-700">
+                  <div className="flex items-center gap-2 text-gray-400 mb-2">
+                    <Sparkles className="w-4 h-4" />
+                    <span className="text-sm">Kompetencje</span>
+                  </div>
+                  <span className="text-2xl font-bold text-violet-400">5/8</span>
+                </div>
+              </div>
+
+              {/* Quick Access to Other Sections */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <button 
+                  onClick={() => setViewMode('competencies')}
+                  className="p-4 bg-gradient-to-br from-violet-500/10 to-purple-500/10 rounded-xl border border-violet-500/20 hover:border-violet-500/40 transition-all text-left group"
+                >
+                  <Sparkles className="w-6 h-6 text-violet-400 mb-2" />
+                  <h3 className="font-semibold text-white mb-1">Kompetencje Uniwersalne</h3>
+                  <p className="text-sm text-gray-400">Umiejętności które przenoszą się między zawodami</p>
+                  <ChevronRight className="w-4 h-4 text-gray-500 absolute bottom-4 right-4 group-hover:translate-x-1 transition-transform" />
+                </button>
+
+                <button 
+                  onClick={() => setViewMode('transfer')}
+                  className="p-4 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 rounded-xl border border-emerald-500/20 hover:border-emerald-500/40 transition-all text-left group"
+                >
+                  <ArrowLeftRight className="w-6 h-6 text-emerald-400 mb-2" />
+                  <h3 className="font-semibold text-white mb-1">Transfer Umiejętności</h3>
+                  <p className="text-sm text-gray-400">Zobacz jak Twoje umiejętności pasują do innych zawodów</p>
+                  <ChevronRight className="w-4 h-4 text-gray-500 absolute bottom-4 right-4 group-hover:translate-x-1 transition-transform" />
+                </button>
+
+                <button 
+                  onClick={() => setViewMode('discovery')}
+                  className="p-4 bg-gradient-to-br from-cyan-500/10 to-blue-500/10 rounded-xl border border-cyan-500/20 hover:border-cyan-500/40 transition-all text-left group"
+                >
+                  <Compass className="w-6 h-6 text-cyan-400 mb-2" />
+                  <h3 className="font-semibold text-white mb-1">Tryb Eksploracji</h3>
+                  <p className="text-sm text-gray-400">Odkrywaj zawody bez presji - w swoim tempie</p>
+                  <ChevronRight className="w-4 h-4 text-gray-500 absolute bottom-4 right-4 group-hover:translate-x-1 transition-transform" />
+                </button>
+              </div>
+            </motion.div>
+          )}
+
+          {viewMode === 'competencies' && (
+            <motion.div
+              key="competencies"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+            >
+              <CompetencyTrainingGround 
+                onStartChallenge={(challengeId) => console.log('Challenge:', challengeId)}
+                onStartLesson={(lessonId, competencyId) => {
+                  console.log('Lesson:', lessonId, competencyId);
+                  onSectionChange?.('lesson-detail', { lessonId, competencyId });
+                }}
+                onSimulationComplete={(competencyId, score) => {
+                  console.log('Simulation complete:', competencyId, score);
+                }}
+              />
+            </motion.div>
+          )}
+
+          {viewMode === 'transfer' && (
+            <motion.div
+              key="transfer"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+            >
+              <SkillTransferMap 
+                currentCareer="elektryk"
+                onSelectPath={(path) => console.log('Selected path:', path)}
+              />
+            </motion.div>
+          )}
+
+          {viewMode === 'discovery' && (
+            <motion.div
+              key="discovery"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+            >
+              <DiscoveryMode 
+                onExploreCareer={(id) => console.log('Explore:', id)}
+                onBookmark={(id) => console.log('Bookmark:', id)}
+                onStartLearning={(id) => console.log('Start learning:', id)}
+              />
+            </motion.div>
+          )}
+
+          {viewMode === 'recommendations' && (
+            <motion.div
+              key="recommendations"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+            >
+              <AdaptiveRecommendations 
+                onAcceptRecommendation={(rec) => console.log('Accept:', rec)}
+                onDismissRecommendation={(rec, reason) => console.log('Dismiss:', rec, reason)}
+                onFeedback={(rec, helpful) => console.log('Feedback:', rec, helpful)}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+}
+
