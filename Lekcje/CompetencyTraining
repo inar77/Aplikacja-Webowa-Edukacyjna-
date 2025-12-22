@@ -1,0 +1,434 @@
+'use client';
+
+import React, { useState, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Zap,
+  Target,
+  Search,
+  Wrench,
+  Brain,
+  ChevronRight,
+  Play,
+  Trophy,
+  Clock,
+  Star,
+  Check,
+  X,
+  ArrowRight,
+  Lightbulb,
+  RefreshCw,
+  Sparkles,
+  AlertTriangle,
+  Shield,
+  TrendingUp,
+  Flame
+} from 'lucide-react';
+
+// ============================================================
+// TYPES
+// ============================================================
+
+interface ThinkingChallenge {
+  id: string;
+  type: 'problem' | 'diagnosis' | 'execution';
+  title: string;
+  hook: string; // Jedno zdanie sytuacji
+  risk: string; // Co ryzykujesz
+  action: string; // Co musisz zrobić
+  icon: React.ReactNode;
+  gradient: string;
+  glowColor: string;
+  estimatedTime: string;
+  xpReward: number;
+  skillId: string;
+  skillName: string;
+  skillGain: number;
+  format: 'case' | 'minigame' | 'calc' | 'quiz';
+}
+
+interface ThinkingTrack {
+  id: string;
+  name: string;
+  description: string;
+  level: number;
+  maxLevel: number;
+  progress: number;
+  todayGain: number;
+  lessonsCompleted: number;
+  lessonsTotal: number;
+  nextLesson: string;
+  icon: React.ReactNode;
+  gradient: string;
+  relatedSkills: string[];
+}
+
+interface Simulation {
+  id: string;
+  competencyId: string;
+  context: string;
+  stake: string;
+  decisions: {
+    id: string;
+    action: string;
+    result: string;
+    learning: string;
+    score: number;
+  }[];
+  mainLesson: string;
+  transfer: string[];
+}
+
+// ============================================================
+// DATA - Wyzwania (KONKRETNE SCENARIUSZE)
+// ============================================================
+
+const CHALLENGES: ThinkingChallenge[] = [
+  {
+    id: 'challenge-1',
+    type: 'problem',
+    title: 'Rozgryź awarię',
+    hook: 'Klient dzwoni: „Połowa mieszkania nie ma prądu". Masz 5 minut na telefon.',
+    risk: 'Źle zadane pytanie = wyjazd w ciemno + strata czasu',
+    action: 'Zadaj 3 pytania, które zawężą problem do jednego obwodu',
+    icon: <Brain className="w-7 h-7" />,
+    gradient: 'from-violet-600 via-purple-600 to-fuchsia-600',
+    glowColor: 'rgba(139, 92, 246, 0.4)',
+    estimatedTime: '8 min',
+    xpReward: 120,
+    skillId: 'problem-solving',
+    skillName: 'Rozwiązywanie problemów',
+    skillGain: 3,
+    format: 'case'
+  },
+  {
+    id: 'challenge-2',
+    type: 'diagnosis',
+    title: 'Znajdź ukrytą usterkę',
+    hook: 'Wyskakują korki. Wymieniłeś bezpiecznik – znowu wyskoczył. Co teraz?',
+    risk: 'Wymiana kolejnych części na ślepo = koszt + frustracja klienta',
+    action: 'Zdiagnozuj, czy to przeciążenie, zwarcie czy uszkodzenie izolacji',
+    icon: <Search className="w-7 h-7" />,
+    gradient: 'from-cyan-500 via-blue-600 to-indigo-600',
+    glowColor: 'rgba(34, 211, 238, 0.4)',
+    estimatedTime: '10 min',
+    xpReward: 150,
+    skillId: 'diagnostics',
+    skillName: 'Diagnostyka',
+    skillGain: 4,
+    format: 'case'
+  },
+  {
+    id: 'challenge-3',
+    type: 'execution',
+    title: 'Zrób to bez błędu',
+    hook: 'Musisz podłączyć rozdzielnicę. Schemat jest, narzędzia też. Jeden błąd = porażenie.',
+    risk: 'Pominięcie kroku = wypadek lub niedziałająca instalacja',
+    action: 'Ułóż kroki w prawidłowej kolejności i wskaż weryfikację po każdym',
+    icon: <Shield className="w-7 h-7" />,
+    gradient: 'from-emerald-500 via-green-600 to-teal-600',
+    glowColor: 'rgba(16, 185, 129, 0.4)',
+    estimatedTime: '7 min',
+    xpReward: 100,
+    skillId: 'precision',
+    skillName: 'Precyzja wykonania',
+    skillGain: 2,
+    format: 'quiz'
+  }
+];
+
+// ============================================================
+// DATA - Trasy treningowe
+// ============================================================
+
+const TRACKS: ThinkingTrack[] = [
+  {
+    id: 'track-problem',
+    name: 'Mistrz diagnozowania',
+    description: 'Od „nie działa" do „wiem dlaczego" w 5 minut',
+    level: 2,
+    maxLevel: 5,
+    progress: 65,
+    todayGain: 3,
+    lessonsCompleted: 4,
+    lessonsTotal: 7,
+    nextLesson: 'Drzewo decyzyjne w praktyce',
+    icon: <Brain className="w-5 h-5" />,
+    gradient: 'from-violet-500 to-purple-600',
+    relatedSkills: ['problem-solving', 'analysis']
+  },
+  {
+    id: 'track-diagnostic',
+    name: 'Detektyw usterek',
+    description: 'Znajdź przyczynę zanim wymienisz części',
+    level: 1,
+    maxLevel: 5,
+    progress: 35,
+    todayGain: 0,
+    lessonsCompleted: 2,
+    lessonsTotal: 6,
+    nextLesson: 'Objaw ≠ Przyczyna',
+    icon: <Search className="w-5 h-5" />,
+    gradient: 'from-cyan-500 to-blue-600',
+    relatedSkills: ['diagnostics', 'systems-thinking']
+  },
+  {
+    id: 'track-precision',
+    name: 'Zero błędów',
+    description: 'Procedury, które ratują życie i czas',
+    level: 3,
+    maxLevel: 5,
+    progress: 78,
+    todayGain: 5,
+    lessonsCompleted: 5,
+    lessonsTotal: 6,
+    nextLesson: 'Checklista przed podłączeniem',
+    icon: <Target className="w-5 h-5" />,
+    gradient: 'from-emerald-500 to-teal-600',
+    relatedSkills: ['precision', 'safety']
+  }
+];
+
+// ============================================================
+// DATA - Symulacje
+// ============================================================
+
+const SIMULATIONS: Record<string, Simulation> = {
+  'challenge-1': {
+    id: 'sim-1',
+    competencyId: 'problem-solving',
+    context: 'Klient: „Połowa mieszkania nie ma prądu od wczoraj". Masz telefon w ręku. Jakie pytanie zadasz NAJPIERW?',
+    stake: 'Złe pytanie = wyjazd bez właściwych narzędzi lub części',
+    decisions: [
+      {
+        id: 'a',
+        action: '„Proszę sprawdzić bezpieczniki w rozdzielnicy"',
+        result: 'Klient: „Nie znam się, boję się dotykać". Nie posunąłeś się do przodu.',
+        learning: 'Pytanie wymaga wiedzy, której klient może nie mieć',
+        score: 30
+      },
+      {
+        id: 'b',
+        action: '„Które pokoje nie mają prądu? Które mają?"',
+        result: 'Klient: „Kuchnia i łazienka działają, pokoje nie". Masz mapę problemu!',
+        learning: 'Pytania dzielące problem na części = szybka diagnoza',
+        score: 95
+      },
+      {
+        id: 'c',
+        action: '„Czy coś się wydarzyło przed awarią? Burza, remont?"',
+        result: 'Klient: „Nie wiem, chyba nic". Informacja niepewna, mało konkretna.',
+        learning: 'Pytania o przeszłość często dają rozmyte odpowiedzi',
+        score: 50
+      }
+    ],
+    mainLesson: 'Dziel problem na części, zanim szukasz przyczyny',
+    transfer: ['IT: „Który moduł nie działa?"', 'Medycyna: „Gdzie boli?"', 'Biznes: „Który proces się zacina?"']
+  },
+  'challenge-2': {
+    id: 'sim-2',
+    competencyId: 'diagnostics',
+    context: 'Bezpiecznik wyskakuje po włączeniu. Wymieniłeś na nowy – to samo. Co sprawdzasz NAJPIERW?',
+    stake: 'Wymiana części na ślepo = strata pieniędzy i czasu klienta',
+    decisions: [
+      {
+        id: 'a',
+        action: 'Wymieniam bezpiecznik na mocniejszy',
+        result: 'NIEBEZPIECZEŃSTWO! Mocniejszy bezpiecznik = przewody mogą się przegrzać. Pożar.',
+        learning: 'Obejście objawu ≠ naprawa przyczyny',
+        score: 0
+      },
+      {
+        id: 'b',
+        action: 'Odłączam odbiorniki jeden po drugim i testuję',
+        result: 'Przy lodówce bezpiecznik trzyma. Przy odkurzaczu – wyskakuje. Masz winowajcę!',
+        learning: 'Izolacja zmiennych = systematyczna diagnostyka',
+        score: 90
+      },
+      {
+        id: 'c',
+        action: 'Mierzę rezystancję izolacji całego obwodu',
+        result: 'Pomiar OK, ale problem nadal jest. Pomiar nie wykrył usterki dynamicznej.',
+        learning: 'Dobry test, ale w złym momencie – najpierw izolacja odbiorników',
+        score: 60
+      }
+    ],
+    mainLesson: 'Izoluj zmienne jedna po drugiej – nie zgaduj',
+    transfer: ['IT: Wyłącz pluginy jeden po drugim', 'Zdrowie: Eliminacyjna dieta', 'Auto: Odłączaj czujniki kolejno']
+  },
+  'challenge-3': {
+    id: 'sim-3',
+    competencyId: 'precision',
+    context: 'Podłączasz nową rozdzielnicę. Schemat masz. Narzędzia gotowe. Co robisz NAJPIERW?',
+    stake: 'Jeden pominięty krok = porażenie prądem lub niedziałająca instalacja',
+    decisions: [
+      {
+        id: 'a',
+        action: 'Zaczynam podłączać według schematu',
+        result: '⚡ PORAŻENIE! Zasilanie było włączone. Procedura bezpieczeństwa pominięta.',
+        learning: 'Schemat ≠ procedura. Bezpieczeństwo ZAWSZE najpierw.',
+        score: 0
+      },
+      {
+        id: 'b',
+        action: 'Wyłączam główny wyłącznik i weryfikuję miernikiem brak napięcia',
+        result: 'Bezpiecznie! Miernik potwierdza 0V. Możesz pracować spokojnie.',
+        learning: 'Weryfikacja po każdym kroku = zero niespodzianek',
+        score: 100
+      },
+      {
+        id: 'c',
+        action: 'Sprawdzam czy mam wszystkie narzędzia',
+        result: 'Dobre przygotowanie, ale zasilanie nadal włączone. Ryzyko!',
+        learning: 'Przygotowanie jest ważne, ale bezpieczeństwo jest NAJWAŻNIEJSZE',
+        score: 40
+      }
+    ],
+    mainLesson: 'Bezpieczeństwo → Weryfikacja → Działanie',
+    transfer: ['Chirurgia: Checklista przed operacją', 'Lotnictwo: Preflight check', 'IT: Backup przed deploy']
+  }
+};
+
+// ============================================================
+// COMPONENT
+// ============================================================
+
+interface Props {
+  onStartChallenge?: (challengeId: string) => void;
+  onStartLesson?: (lessonId: string, competencyId: string) => void;
+  onSimulationComplete?: (competencyId: string, score: number) => void;
+}
+
+export default function CompetencyTrainingGround({
+  onStartChallenge,
+  onStartLesson,
+  onSimulationComplete
+}: Props) {
+  const [activeChallenge, setActiveChallenge] = useState<string | null>(null);
+  const [selectedDecision, setSelectedDecision] = useState<string | null>(null);
+  const [showResult, setShowResult] = useState(false);
+  const [expandedTrack, setExpandedTrack] = useState<string | null>(null);
+
+  const currentChallenge = CHALLENGES.find(c => c.id === activeChallenge);
+  const currentSimulation = activeChallenge ? SIMULATIONS[activeChallenge] : null;
+
+  const handleDecision = (decisionId: string) => {
+    setSelectedDecision(decisionId);
+    setShowResult(true);
+  };
+
+  const handleNextSimulation = () => {
+    if (currentSimulation && selectedDecision) {
+      const decision = currentSimulation.decisions.find(d => d.id === selectedDecision);
+      onSimulationComplete?.(currentSimulation.competencyId, decision?.score || 0);
+    }
+    setSelectedDecision(null);
+    setShowResult(false);
+    setActiveChallenge(null);
+  };
+
+  // ============================================================
+  // HERO SECTION
+  // ============================================================
+  
+  const HeroSection = () => (
+    <div className="relative mb-8">
+      {/* Background glow */}
+      <div 
+        className="absolute inset-0 rounded-3xl opacity-30 blur-3xl"
+        style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #6366f1 50%, #8b5cf6 100%)' }}
+      />
+      
+      <div className="relative bg-gradient-to-br from-gray-900/90 via-gray-900/95 to-gray-950/90 backdrop-blur-xl rounded-3xl border border-violet-500/20 p-8">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+          {/* Left: Title */}
+          <div>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl">
+                <Flame className="w-6 h-6 text-white" />
+              </div>
+              <span className="text-violet-400 font-medium text-sm uppercase tracking-wider">
+                Trening myślenia
+              </span>
+            </div>
+            
+            <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
+              10 minut. <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-fuchsia-400">Jeden problem.</span>
+            </h1>
+            
+            <p className="text-gray-400 text-lg max-w-xl">
+              Wybierz sytuację → podejmij decyzję → sprawdź czy masz rację.
+              <span className="text-violet-400 font-medium"> Żadnej teorii.</span>
+            </p>
+          </div>
+
+          {/* Right: Today's stats */}
+          <div className="flex items-center gap-4 bg-gray-800/50 rounded-2xl p-4 border border-gray-700/50">
+            <div className="text-center px-4 border-r border-gray-700">
+              <div className="text-2xl font-bold text-white">+10</div>
+              <div className="text-xs text-gray-500">poziomów dziś</div>
+            </div>
+            <div className="text-center px-4">
+              <div className="text-2xl font-bold text-emerald-400">3</div>
+              <div className="text-xs text-gray-500">seria dni</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ============================================================
+  // CHALLENGE CARD
+  // ============================================================
+
+  const ChallengeCard = ({ challenge, index }: { challenge: ThinkingChallenge; index: number }) => (
+    <motion.button
+      initial={{ opacity: 0, y: 30 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.1 }}
+      whileHover={{ scale: 1.02, y: -4 }}
+      whileTap={{ scale: 0.98 }}
+      onClick={() => setActiveChallenge(challenge.id)}
+      className="relative w-full text-left group"
+    >
+      {/* Glow effect */}
+      <div 
+        className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-xl"
+        style={{ background: `linear-gradient(135deg, ${challenge.glowColor}, transparent)` }}
+      />
+      
+      <div className={`
+        relative overflow-hidden rounded-2xl p-6
+        bg-gradient-to-br ${challenge.gradient}
+        border border-white/10
+        shadow-2xl shadow-black/30
+        transition-all duration-300
+      `}>
+        {/* Background pattern */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-white rounded-full blur-3xl translate-x-16 -translate-y-16" />
+        </div>
+
+        {/* Content */}
+        <div className="relative z-10">
+          {/* Header */}
+          <div className="flex items-start justify-between mb-4">
+            <div className="p-3 bg-white/20 backdrop-blur rounded-xl">
+              {challenge.icon}
+            </div>
+            
+            {/* Skill badge */}
+            <div className="flex items-center gap-1 px-3 py-1.5 bg-black/30 backdrop-blur rounded-full">
+              <TrendingUp className="w-3.5 h-3.5 text-white/80" />
+              <span className="text-xs font-medium text-white/90">
+                +{challenge.skillGain} {challenge.skillName.split(' ')[0]}
+              </span>
+            </div>
+          </div>
+
+          {/* Title */}
+          <h3 className="text-xl font-bold text-white mb-2">
+            {challenge.title}
+          </h3>
+
