@@ -1,20 +1,19 @@
 'use client';
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Zap, Target, Clock, TrendingUp, Award, ChevronRight, Flame, 
-  Calendar, BookOpen, Star, Shield, X, Sparkles, Trophy
+  Zap, Target, Clock, Award, ChevronRight, Flame, 
+  Calendar, BookOpen, Star, Shield, X, Sparkles, Trophy, TrendingUp
 } from 'lucide-react';
 
 // ============================================================
 // DAILY DASHBOARD - Hero z metrykami, streak i dziennym celem
-// "Twoja dzienna aktywność" z pełnym systemem motywacyjnym
 // ============================================================
 
-// Utility: Format large numbers with spaces (Polish style)
+// Utility: Format large numbers
 const formatNumber = (num) => {
   if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
   if (num >= 1000) return `${(num / 1000).toFixed(1)}k`;
-  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  return num.toString();
 };
 
 // Utility: Calculate level from XP
@@ -39,6 +38,12 @@ const calculateLevel = (xp) => {
   };
 };
 
+// Get today's index (Monday = 0, Sunday = 6)
+const getTodayIndex = () => {
+  const day = new Date().getDay();
+  return day === 0 ? 6 : day - 1;
+};
+
 // Stat Card Component
 const StatCard = ({ 
   icon: Icon, 
@@ -50,8 +55,7 @@ const StatCard = ({
   subLabel, 
   onClick,
   isInteractive = false,
-  pulse = false,
-  tooltip
+  pulse = false
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   
@@ -63,18 +67,14 @@ const StatCard = ({
       role={isInteractive ? "button" : undefined}
       tabIndex={isInteractive ? 0 : undefined}
       onKeyDown={isInteractive ? (e) => e.key === 'Enter' && onClick?.() : undefined}
-      aria-label={tooltip || `${label}: ${value} ${subLabel}`}
       style={{
         padding: '20px',
         background: bgColor,
         border: `2px solid ${borderColor}`,
         borderRadius: '16px',
         cursor: isInteractive ? 'pointer' : 'default',
-        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-        transform: isHovered && isInteractive ? 'translateY(-4px) scale(1.02)' : 'translateY(0)',
-        boxShadow: isHovered && isInteractive 
-          ? `0 12px 24px ${borderColor.replace('0.3', '0.4')}`
-          : 'none',
+        transition: 'all 0.3s ease',
+        transform: isHovered && isInteractive ? 'translateY(-4px)' : 'translateY(0)',
         position: 'relative',
         overflow: 'hidden'
       }}
@@ -95,9 +95,7 @@ const StatCard = ({
         marginBottom: '8px',
         position: 'relative'
       }}>
-        <Icon size={20} color={iconColor} style={{
-          filter: pulse ? 'drop-shadow(0 0 8px currentColor)' : 'none'
-        }} />
+        <Icon size={20} color={iconColor} />
         <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px' }}>
           {label}
         </span>
@@ -148,7 +146,6 @@ const WeeklyDay = ({ day, activity, isToday, maxActivity }) => {
         position: 'relative'
       }}
     >
-      {/* Tooltip */}
       {isHovered && activity > 0 && (
         <div style={{
           position: 'absolute',
@@ -163,18 +160,9 @@ const WeeklyDay = ({ day, activity, isToday, maxActivity }) => {
           fontSize: '12px',
           fontWeight: 600,
           whiteSpace: 'nowrap',
-          zIndex: 10,
-          animation: 'fadeIn 0.2s ease'
+          zIndex: 10
         }}>
           {activity} XP
-          <div style={{
-            position: 'absolute',
-            top: '100%',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            border: '4px solid transparent',
-            borderTopColor: 'rgba(0,0,0,0.9)'
-          }} />
         </div>
       )}
       
@@ -193,8 +181,7 @@ const WeeklyDay = ({ day, activity, isToday, maxActivity }) => {
         justifyContent: 'center',
         padding: '4px',
         transition: 'all 0.3s ease',
-        transform: isHovered ? 'scale(1.05)' : 'scale(1)',
-        boxShadow: isToday ? '0 0 20px rgba(167, 139, 250, 0.3)' : 'none'
+        transform: isHovered ? 'scale(1.05)' : 'scale(1)'
       }}>
         {activity > 0 && (
           <div style={{
@@ -202,26 +189,15 @@ const WeeklyDay = ({ day, activity, isToday, maxActivity }) => {
             height: `${Math.max(20, normalizedHeight)}%`,
             background: 'linear-gradient(0deg, #7c3aed 0%, #a78bfa 100%)',
             borderRadius: '6px',
-            transition: 'height 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
+            transition: 'height 0.5s ease'
           }} />
         )}
       </div>
       <span style={{
         color: isToday ? '#a78bfa' : 'rgba(255,255,255,0.4)',
         fontSize: '11px',
-        fontWeight: isToday ? 700 : 400,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '2px'
+        fontWeight: isToday ? 700 : 400
       }}>
-        {isToday && <span style={{ 
-          width: '4px', 
-          height: '4px', 
-          background: '#a78bfa', 
-          borderRadius: '50%',
-          animation: 'pulse 1.5s ease-in-out infinite'
-        }} />}
         {day}
       </span>
     </div>
@@ -238,35 +214,35 @@ export default function DailyDashboard({
   weeklyProgress = [],
   onContinue,
   onViewAll,
-  userName = null,
-  isLoading = false
+  userName = null
 }) {
   const [timeOfDay, setTimeOfDay] = useState('day');
   const [showStreakDetails, setShowStreakDetails] = useState(false);
   const [animatedXP, setAnimatedXP] = useState(0);
-  const [showConfetti, setShowConfetti] = useState(false);
   const modalRef = useRef(null);
 
-  // Animate XP counter on mount
+  // Animate XP counter
   useEffect(() => {
     const duration = 1000;
     const startTime = Date.now();
-    const startValue = 0;
+    let animationFrame;
     
     const animate = () => {
       const elapsed = Date.now() - startTime;
       const progress = Math.min(elapsed / duration, 1);
       const easeOut = 1 - Math.pow(1 - progress, 3);
-      setAnimatedXP(Math.floor(startValue + (todayXP - startValue) * easeOut));
+      setAnimatedXP(Math.floor(todayXP * easeOut));
       
       if (progress < 1) {
-        requestAnimationFrame(animate);
+        animationFrame = requestAnimationFrame(animate);
       }
     };
     
-    requestAnimationFrame(animate);
+    animationFrame = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animationFrame);
   }, [todayXP]);
 
+  // Set time of day
   useEffect(() => {
     const hour = new Date().getHours();
     if (hour >= 5 && hour < 12) setTimeOfDay('morning');
@@ -275,7 +251,7 @@ export default function DailyDashboard({
     else setTimeOfDay('night');
   }, []);
 
-  // Handle escape key for modal
+  // Escape key handler
   useEffect(() => {
     const handleEscape = (e) => {
       if (e.key === 'Escape' && showStreakDetails) {
@@ -287,29 +263,21 @@ export default function DailyDashboard({
     return () => document.removeEventListener('keydown', handleEscape);
   }, [showStreakDetails]);
 
-  // Focus trap for modal
+  // Focus modal
   useEffect(() => {
     if (showStreakDetails && modalRef.current) {
       modalRef.current.focus();
     }
   }, [showStreakDetails]);
 
-  // Show confetti when daily goal is reached
-  useEffect(() => {
-    if (todayXP >= dailyGoal && !showConfetti) {
-      setShowConfetti(true);
-      setTimeout(() => setShowConfetti(false), 3000);
-    }
-  }, [todayXP, dailyGoal, showConfetti]);
-
   const getGreeting = () => {
     const name = userName ? `, ${userName}` : '';
     switch (timeOfDay) {
-      case 'morning': return { text: `Dzień dobry${name}`, emoji: '☀️', bg: 'rgba(251, 191, 36, 0.1)' };
-      case 'afternoon': return { text: `Witaj ponownie${name}`, emoji: '🌤️', bg: 'rgba(96, 165, 250, 0.1)' };
-      case 'evening': return { text: `Dobry wieczór${name}`, emoji: '🌅', bg: 'rgba(251, 146, 60, 0.1)' };
-      case 'night': return { text: `Nocna sesja${name}?`, emoji: '🌙', bg: 'rgba(167, 139, 250, 0.1)' };
-      default: return { text: `Witaj${name}`, emoji: '👋', bg: 'rgba(255,255,255,0.05)' };
+      case 'morning': return { text: `Dzień dobry${name}`, emoji: '☀️' };
+      case 'afternoon': return { text: `Witaj ponownie${name}`, emoji: '🌤️' };
+      case 'evening': return { text: `Dobry wieczór${name}`, emoji: '🌅' };
+      case 'night': return { text: `Nocna sesja${name}?`, emoji: '🌙' };
+      default: return { text: `Witaj${name}`, emoji: '👋' };
     }
   };
 
@@ -317,110 +285,87 @@ export default function DailyDashboard({
   const greeting = getGreeting();
   const levelInfo = calculateLevel(totalXP);
   const maxWeeklyActivity = Math.max(...weeklyProgress, 1);
+  const todayIndex = getTodayIndex();
 
   const getMotivationalMessage = () => {
     if (dailyProgress >= 100) return 'Cel osiągnięty! 🎯';
     if (streak.days >= 30) return 'Legendarny miesiąc! 🏆';
     if (streak.days >= 7) return 'Niesamowita passa! 🔥';
     if (streak.days >= 3) return 'Świetnie Ci idzie!';
-    if (completedToday >= 5) return 'Maszyna do nauki! 💪';
     if (completedToday >= 3) return 'Produktywny dzień!';
-    if (dailyProgress >= 75) return 'Prawie na mecie!';
     if (dailyProgress >= 50) return 'Połowa drogi za Tobą!';
-    if (dailyProgress >= 25) return 'Dobry początek!';
     return 'Każdy krok się liczy ✨';
   };
 
-  // Get today's index (Monday = 0, Sunday = 6)
-  const getTodayIndex = () => {
-    const day = new Date().getDay();
-    return day === 0 ? 6 : day - 1;
+  const getStreakIcon = () => {
+    if (streak.days >= 30) return Trophy;
+    if (streak.days >= 14) return Star;
+    if (streak.days >= 7) return Flame;
+    if (streak.days >= 3) return TrendingUp;
+    return Flame;
   };
 
-  const getStreakStatus = () => {
-    if (streak.days >= 30) return { icon: Trophy, color: '#fbbf24', label: 'Legenda' };
-    if (streak.days >= 14) return { icon: Star, color: '#f97316', label: 'Mistrz' };
-    if (streak.days >= 7) return { icon: Flame, color: '#ef4444', label: 'W ogniu' };
-    if (streak.days >= 3) return { icon: TrendingUp, color: '#22c55e', label: 'Rośnie' };
-    return { icon: Flame, color: '#fbbf24', label: 'Buduj' };
+  const getStreakColor = () => {
+    if (streak.days >= 30) return '#fbbf24';
+    if (streak.days >= 14) return '#f97316';
+    if (streak.days >= 7) return '#ef4444';
+    if (streak.days >= 3) return '#22c55e';
+    return '#fbbf24';
   };
 
-  const streakStatus = getStreakStatus();
+  const StreakIcon = getStreakIcon();
+  const streakColor = getStreakColor();
 
-  // Skeleton loading state
-  if (isLoading) {
-    return (
-      <div style={{
-        background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4c1d95 100%)',
-        borderRadius: '24px',
-        padding: '32px',
-        marginBottom: '24px'
-      }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 400px', gap: '32px' }}>
-          <div>
-            <div style={{ 
-              height: '40px', 
-              width: '200px', 
-              background: 'rgba(255,255,255,0.1)', 
-              borderRadius: '8px',
-              animation: 'shimmer 1.5s ease-in-out infinite'
-            }} />
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(3, 1fr)', 
-              gap: '16px', 
-              marginTop: '24px' 
-            }}>
-              {[1, 2, 3].map(i => (
-                <div key={i} style={{
-                  height: '120px',
-                  background: 'rgba(255,255,255,0.05)',
-                  borderRadius: '16px',
-                  animation: 'shimmer 1.5s ease-in-out infinite',
-                  animationDelay: `${i * 0.2}s`
-                }} />
-              ))}
-            </div>
-          </div>
-          <div style={{
-            height: '400px',
-            background: 'rgba(255,255,255,0.05)',
-            borderRadius: '20px',
-            animation: 'shimmer 1.5s ease-in-out infinite'
-          }} />
-        </div>
-      </div>
-    );
-  }
+  const styles = `
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-10px); }
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    
+    @keyframes scaleIn {
+      from { opacity: 0; transform: scale(0.9); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    
+    @keyframes shimmer {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+    }
+  `;
 
   return (
     <div 
       style={{
         background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4c1d95 100%)',
         borderRadius: '24px',
-        padding: 'clamp(20px, 4vw, 32px)',
+        padding: '32px',
         marginBottom: '24px',
         position: 'relative',
         overflow: 'hidden'
       }}
-      role="region"
-      aria-label="Panel dzienny - Twoje statystyki i postępy"
     >
-      {/* ANIMATED BACKGROUND */}
+      <style>{styles}</style>
+      
+      {/* Background */}
       <div style={{
         position: 'absolute',
         inset: 0,
-        background: `
-          radial-gradient(circle at 90% 10%, rgba(245, 158, 11, 0.15) 0%, transparent 40%), 
-          radial-gradient(circle at 10% 90%, rgba(16, 185, 129, 0.1) 0%, transparent 40%),
-          radial-gradient(circle at 50% 50%, ${greeting.bg} 0%, transparent 60%)
-        `,
-        pointerEvents: 'none',
-        transition: 'background 0.5s ease'
+        background: 'radial-gradient(circle at 90% 10%, rgba(245, 158, 11, 0.15) 0%, transparent 40%), radial-gradient(circle at 10% 90%, rgba(16, 185, 129, 0.1) 0%, transparent 40%)',
+        pointerEvents: 'none'
       }} />
 
-      {/* FLOATING PARTICLES */}
-      {[...Array(8)].map((_, i) => (
+      {/* Floating Particles */}
+      {[0, 1, 2, 3, 4].map((i) => (
         <div
           key={i}
           style={{
@@ -429,8 +374,8 @@ export default function DailyDashboard({
             height: `${3 + (i % 3)}px`,
             background: `rgba(255,255,255,${0.2 + (i % 3) * 0.1})`,
             borderRadius: '50%',
-            left: `${10 + i * 12}%`,
-            top: `${20 + (i % 4) * 15}%`,
+            left: `${15 + i * 15}%`,
+            top: `${25 + (i % 3) * 20}%`,
             animation: `float ${3 + i * 0.3}s ease-in-out infinite`,
             animationDelay: `${i * 0.2}s`,
             pointerEvents: 'none'
@@ -438,45 +383,16 @@ export default function DailyDashboard({
         />
       ))}
 
-      {/* CONFETTI EFFECT */}
-      {showConfetti && (
-        <div style={{
-          position: 'absolute',
-          inset: 0,
-          pointerEvents: 'none',
-          zIndex: 10
-        }}>
-          {[...Array(20)].map((_, i) => (
-            <div
-              key={i}
-              style={{
-                position: 'absolute',
-                width: '10px',
-                height: '10px',
-                background: ['#fbbf24', '#10b981', '#a78bfa', '#f472b6', '#60a5fa'][i % 5],
-                borderRadius: i % 2 === 0 ? '50%' : '2px',
-                left: `${10 + (i * 4)}%`,
-                top: '-20px',
-                animation: `confetti ${2 + Math.random()}s ease-out forwards`,
-                animationDelay: `${i * 0.05}s`
-              }}
-            />
-          ))}
-        </div>
-      )}
-
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'minmax(0, 1fr) minmax(320px, 400px)',
-        gap: 'clamp(20px, 3vw, 32px)',
+        gridTemplateColumns: '1fr minmax(300px, 380px)',
+        gap: '32px',
         position: 'relative',
         zIndex: 2
-      }}
-      className="dashboard-grid"
-      >
-        {/* LEFT SECTION - Greeting & Stats */}
+      }}>
+        {/* LEFT SECTION */}
         <div>
-          {/* GREETING */}
+          {/* Greeting */}
           <div style={{ marginBottom: '24px' }}>
             <div style={{
               display: 'flex',
@@ -485,18 +401,12 @@ export default function DailyDashboard({
               marginBottom: '8px',
               flexWrap: 'wrap'
             }}>
-              <span style={{ 
-                fontSize: '32px',
-                animation: 'bounce 1s ease-in-out'
-              }}>
-                {greeting.emoji}
-              </span>
+              <span style={{ fontSize: '32px' }}>{greeting.emoji}</span>
               <h1 style={{
                 margin: 0,
-                fontSize: 'clamp(24px, 4vw, 32px)',
+                fontSize: '32px',
                 fontWeight: 900,
-                color: 'white',
-                letterSpacing: '-0.5px'
+                color: 'white'
               }}>
                 {greeting.text}!
               </h1>
@@ -512,11 +422,7 @@ export default function DailyDashboard({
                 border: '1px solid rgba(124, 58, 237, 0.5)'
               }}>
                 <Star size={14} color="#a78bfa" fill="#a78bfa" />
-                <span style={{ 
-                  color: '#a78bfa', 
-                  fontSize: '13px', 
-                  fontWeight: 700 
-                }}>
+                <span style={{ color: '#a78bfa', fontSize: '13px', fontWeight: 700 }}>
                   Poziom {levelInfo.level}
                 </span>
               </div>
@@ -531,19 +437,16 @@ export default function DailyDashboard({
             }}>
               {getMotivationalMessage()}
               {streak.freezesAvailable > 0 && (
-                <span 
-                  title={`${streak.freezesAvailable} zamrożeń dostępnych`}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    padding: '2px 8px',
-                    background: 'rgba(96, 165, 250, 0.2)',
-                    borderRadius: '12px',
-                    fontSize: '12px',
-                    color: '#60a5fa'
-                  }}
-                >
+                <span style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '2px 8px',
+                  background: 'rgba(96, 165, 250, 0.2)',
+                  borderRadius: '12px',
+                  fontSize: '12px',
+                  color: '#60a5fa'
+                }}>
                   <Shield size={12} />
                   {streak.freezesAvailable}
                 </span>
@@ -551,17 +454,16 @@ export default function DailyDashboard({
             </p>
           </div>
 
-          {/* STATS GRID */}
+          {/* Stats Grid */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+            gridTemplateColumns: 'repeat(3, 1fr)',
             gap: '16px',
             marginBottom: '24px'
           }}>
-            {/* STREAK */}
             <StatCard
-              icon={streakStatus.icon}
-              iconColor={streakStatus.color}
+              icon={StreakIcon}
+              iconColor={streakColor}
               bgColor="rgba(245, 158, 11, 0.15)"
               borderColor="rgba(245, 158, 11, 0.3)"
               label="Streak"
@@ -570,10 +472,8 @@ export default function DailyDashboard({
               onClick={() => setShowStreakDetails(true)}
               isInteractive={true}
               pulse={streak.days >= 7}
-              tooltip={`Streak: ${streak.days} dni. Kliknij aby zobaczyć szczegóły.`}
             />
 
-            {/* TODAY XP */}
             <StatCard
               icon={Zap}
               iconColor="#a78bfa"
@@ -584,7 +484,6 @@ export default function DailyDashboard({
               subLabel="XP zdobyte"
             />
 
-            {/* TOTAL XP */}
             <StatCard
               icon={Award}
               iconColor="#34d399"
@@ -596,23 +495,20 @@ export default function DailyDashboard({
             />
           </div>
 
-          {/* DAILY GOAL PROGRESS */}
+          {/* Daily Goal Progress */}
           <div style={{
             padding: '20px',
             background: 'rgba(255,255,255,0.05)',
             borderRadius: '16px',
             border: dailyProgress >= 100 
               ? '2px solid rgba(16, 185, 129, 0.5)'
-              : '1px solid rgba(255,255,255,0.1)',
-            transition: 'border 0.3s ease'
+              : '1px solid rgba(255,255,255,0.1)'
           }}>
             <div style={{
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              marginBottom: '12px',
-              flexWrap: 'wrap',
-              gap: '8px'
+              marginBottom: '12px'
             }}>
               <div style={{
                 display: 'flex',
@@ -642,8 +538,7 @@ export default function DailyDashboard({
               </div>
               <span style={{
                 color: dailyProgress >= 100 ? '#10b981' : '#a78bfa',
-                fontWeight: 700,
-                fontSize: '15px'
+                fontWeight: 700
               }}>
                 {todayXP}/{dailyGoal} XP
               </span>
@@ -657,7 +552,6 @@ export default function DailyDashboard({
               overflow: 'hidden',
               position: 'relative'
             }}>
-              {/* Milestones */}
               {[25, 50, 75].map(milestone => (
                 <div
                   key={milestone}
@@ -677,17 +571,16 @@ export default function DailyDashboard({
                 height: '100%',
                 width: `${dailyProgress}%`,
                 background: dailyProgress >= 100 
-                  ? 'linear-gradient(90deg, #10b981 0%, #34d399 50%, #6ee7b7 100%)'
-                  : 'linear-gradient(90deg, #7c3aed 0%, #a78bfa 50%, #c4b5fd 100%)',
+                  ? 'linear-gradient(90deg, #10b981 0%, #34d399 100%)'
+                  : 'linear-gradient(90deg, #7c3aed 0%, #a78bfa 100%)',
                 borderRadius: '7px',
-                transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+                transition: 'width 0.5s ease',
                 boxShadow: dailyProgress >= 100 
                   ? '0 0 20px rgba(16, 185, 129, 0.5)'
                   : '0 0 20px rgba(124, 58, 237, 0.3)',
                 position: 'relative',
                 overflow: 'hidden'
               }}>
-                {/* Shimmer effect */}
                 <div style={{
                   position: 'absolute',
                   inset: 0,
@@ -697,7 +590,7 @@ export default function DailyDashboard({
               </div>
             </div>
             
-            {dailyProgress >= 100 && (
+            {dailyProgress >= 100 ? (
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -705,16 +598,12 @@ export default function DailyDashboard({
                 marginTop: '12px',
                 color: '#10b981',
                 fontSize: '14px',
-                fontWeight: 600,
-                animation: 'fadeIn 0.5s ease'
+                fontWeight: 600
               }}>
                 <span style={{ fontSize: '20px' }}>🎉</span>
                 Świetna robota! Cel osiągnięty!
               </div>
-            )}
-
-            {/* XP to go */}
-            {dailyProgress < 100 && (
+            ) : (
               <div style={{
                 marginTop: '8px',
                 fontSize: '12px',
@@ -725,7 +614,7 @@ export default function DailyDashboard({
             )}
           </div>
 
-          {/* WEEKLY ACTIVITY */}
+          {/* Weekly Activity */}
           <div style={{ marginTop: '16px' }}>
             <div style={{
               display: 'flex',
@@ -752,23 +641,20 @@ export default function DailyDashboard({
               </span>
             </div>
             
-            <div style={{
-              display: 'flex',
-              gap: '8px'
-            }}>
+            <div style={{ display: 'flex', gap: '8px' }}>
               {['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'Sb', 'Nd'].map((day, idx) => (
                 <WeeklyDay
                   key={day}
                   day={day}
                   activity={weeklyProgress[idx] || 0}
-                  isToday={idx === getTodayIndex()}
+                  isToday={idx === todayIndex}
                   maxActivity={maxWeeklyActivity}
                 />
               ))}
             </div>
           </div>
 
-          {/* Level Progress (mini) */}
+          {/* Level Progress */}
           <div style={{
             marginTop: '16px',
             padding: '12px 16px',
@@ -806,12 +692,12 @@ export default function DailyDashboard({
           </div>
         </div>
 
-        {/* RIGHT SECTION - Continue Learning Card */}
+        {/* RIGHT SECTION - Continue Learning */}
         <div style={{
           background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)',
           backdropFilter: 'blur(10px)',
           borderRadius: '20px',
-          padding: 'clamp(20px, 3vw, 28px)',
+          padding: '28px',
           border: '1px solid rgba(255,255,255,0.15)',
           display: 'flex',
           flexDirection: 'column',
@@ -837,11 +723,7 @@ export default function DailyDashboard({
 
           {nextTask ? (
             <>
-              <div style={{
-                fontSize: '48px',
-                marginBottom: '16px',
-                animation: 'bounce 1s ease-in-out'
-              }}>
+              <div style={{ fontSize: '48px', marginBottom: '16px' }}>
                 {nextTask.type === 'calc' ? '🧮' : 
                  nextTask.type === 'practical' ? '🔧' :
                  nextTask.type === 'safety' ? '⚠️' :
@@ -853,7 +735,7 @@ export default function DailyDashboard({
               <h3 style={{
                 margin: '0 0 12px',
                 color: 'white',
-                fontSize: 'clamp(18px, 2.5vw, 22px)',
+                fontSize: '22px',
                 fontWeight: 800,
                 lineHeight: 1.3
               }}>
@@ -909,36 +791,10 @@ export default function DailyDashboard({
                     +{nextTask.xpReward} XP
                   </span>
                 )}
-                {nextTask.difficulty && (
-                  <span style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '8px 12px',
-                    background: nextTask.difficulty === 'hard' 
-                      ? 'rgba(239, 68, 68, 0.2)' 
-                      : nextTask.difficulty === 'medium'
-                        ? 'rgba(251, 191, 36, 0.2)'
-                        : 'rgba(34, 197, 94, 0.2)',
-                    borderRadius: '8px',
-                    color: nextTask.difficulty === 'hard' 
-                      ? '#f87171' 
-                      : nextTask.difficulty === 'medium'
-                        ? '#fbbf24'
-                        : '#4ade80',
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    textTransform: 'capitalize'
-                  }}>
-                    {nextTask.difficulty === 'hard' ? '🔥' : nextTask.difficulty === 'medium' ? '⚡' : '✨'}
-                    {nextTask.difficulty}
-                  </span>
-                )}
               </div>
 
               <button
                 onClick={() => onContinue?.(nextTask)}
-                aria-label={`Rozpocznij lekcję: ${nextTask.title}`}
                 style={{
                   width: '100%',
                   padding: '16px 24px',
@@ -953,21 +809,11 @@ export default function DailyDashboard({
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '8px',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  boxShadow: '0 8px 24px rgba(124, 58, 237, 0.4)',
-                  position: 'relative',
-                  overflow: 'hidden'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 12px 32px rgba(124, 58, 237, 0.5)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 8px 24px rgba(124, 58, 237, 0.4)';
+                  transition: 'all 0.3s ease',
+                  boxShadow: '0 8px 24px rgba(124, 58, 237, 0.4)'
                 }}
               >
-                <span>Rozpocznij teraz</span>
+                Rozpocznij teraz
                 <ChevronRight size={20} />
               </button>
             </>
@@ -978,16 +824,9 @@ export default function DailyDashboard({
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              textAlign: 'center',
-              padding: '20px'
+              textAlign: 'center'
             }}>
-              <div style={{ 
-                fontSize: '64px', 
-                marginBottom: '16px',
-                animation: 'bounce 1s ease-in-out infinite'
-              }}>
-                🎉
-              </div>
+              <div style={{ fontSize: '64px', marginBottom: '16px' }}>🎉</div>
               <h3 style={{
                 margin: '0 0 8px',
                 color: 'white',
@@ -999,8 +838,7 @@ export default function DailyDashboard({
               <p style={{
                 margin: 0,
                 color: 'rgba(255,255,255,0.6)',
-                fontSize: '14px',
-                lineHeight: 1.6
+                fontSize: '14px'
               }}>
                 Świetna robota! Wracaj jutro po nowe wyzwania.
               </p>
@@ -1009,7 +847,6 @@ export default function DailyDashboard({
 
           <button
             onClick={onViewAll}
-            aria-label="Zobacz wszystkie dostępne lekcje"
             style={{
               marginTop: '12px',
               padding: '12px',
@@ -1022,27 +859,18 @@ export default function DailyDashboard({
               cursor: 'pointer',
               transition: 'all 0.2s ease'
             }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
-              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'transparent';
-              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)';
-            }}
           >
             Zobacz wszystkie lekcje
           </button>
         </div>
       </div>
 
-      {/* STREAK DETAILS MODAL */}
+      {/* Streak Modal */}
       {showStreakDetails && (
         <div
           onClick={() => setShowStreakDetails(false)}
           role="dialog"
           aria-modal="true"
-          aria-labelledby="streak-modal-title"
           style={{
             position: 'fixed',
             inset: 0,
@@ -1068,7 +896,8 @@ export default function DailyDashboard({
               width: '100%',
               border: '2px solid rgba(245, 158, 11, 0.3)',
               boxShadow: '0 24px 48px rgba(0,0,0,0.4)',
-              animation: 'scaleIn 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+              animation: 'scaleIn 0.3s ease',
+              position: 'relative'
             }}
           >
             {/* Close button */}
@@ -1088,8 +917,7 @@ export default function DailyDashboard({
                 alignItems: 'center',
                 justifyContent: 'center',
                 cursor: 'pointer',
-                color: 'rgba(255,255,255,0.6)',
-                transition: 'all 0.2s ease'
+                color: 'rgba(255,255,255,0.6)'
               }}
             >
               <X size={18} />
@@ -1101,22 +929,14 @@ export default function DailyDashboard({
               gap: '16px',
               marginBottom: '24px'
             }}>
-              <div style={{
-                fontSize: '56px',
-                animation: 'bounce 1s ease-in-out infinite'
-              }}>
-                🔥
-              </div>
+              <div style={{ fontSize: '56px' }}>🔥</div>
               <div>
-                <div 
-                  id="streak-modal-title"
-                  style={{
-                    fontSize: '40px',
-                    fontWeight: 900,
-                    color: '#fbbf24',
-                    lineHeight: 1
-                  }}
-                >
+                <div style={{
+                  fontSize: '40px',
+                  fontWeight: 900,
+                  color: '#fbbf24',
+                  lineHeight: 1
+                }}>
                   {streak.days} dni
                 </div>
                 <div style={{ 
@@ -1127,8 +947,11 @@ export default function DailyDashboard({
                   alignItems: 'center',
                   gap: '6px'
                 }}>
-                  <streakStatus.icon size={14} color={streakStatus.color} />
-                  {streakStatus.label}
+                  <StreakIcon size={14} color={streakColor} />
+                  {streak.days >= 30 ? 'Legenda' : 
+                   streak.days >= 14 ? 'Mistrz' : 
+                   streak.days >= 7 ? 'W ogniu' : 
+                   streak.days >= 3 ? 'Rośnie' : 'Buduj'}
                 </div>
               </div>
             </div>
@@ -1142,10 +965,10 @@ export default function DailyDashboard({
               {streak.days >= 30 
                 ? '🏆 Niesamowite! Miesiąc codziennej nauki! Jesteś prawdziwą legendą!'
                 : streak.days >= 7 
-                  ? '⭐ Niesamowite! Tydzień codziennej nauki. To buduje prawdziwe nawyki!'
+                  ? '⭐ Tydzień codziennej nauki. To buduje prawdziwe nawyki!'
                   : streak.days >= 3
-                    ? '💪 Świetnie! Utrzymujesz regularność. Jeszcze kilka dni do tygodniowej passy!'
-                    : '🌱 Każdy dzień się liczy. Ucz się codziennie, aby zbudować streak!'}
+                    ? '💪 Świetnie! Utrzymujesz regularność!'
+                    : '🌱 Każdy dzień się liczy. Ucz się codziennie!'}
             </p>
 
             {/* Stats */}
@@ -1238,8 +1061,7 @@ export default function DailyDashboard({
                     height: '100%',
                     width: `${(streak.days / (streak.days < 7 ? 7 : streak.days < 14 ? 14 : 30)) * 100}%`,
                     background: 'linear-gradient(90deg, #7c3aed, #a78bfa)',
-                    borderRadius: '4px',
-                    transition: 'width 0.3s ease'
+                    borderRadius: '4px'
                   }} />
                 </div>
               </div>
@@ -1257,14 +1079,7 @@ export default function DailyDashboard({
                 fontSize: '16px',
                 fontWeight: 700,
                 cursor: 'pointer',
-                transition: 'all 0.3s ease',
                 boxShadow: '0 8px 24px rgba(245, 158, 11, 0.3)'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-2px)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
               }}
             >
               Kontynuuj naukę 🚀
@@ -1272,68 +1087,6 @@ export default function DailyDashboard({
           </div>
         </div>
       )}
-
-      <style>{`
-        @keyframes float {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-10px); }
-        }
-        
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.5; }
-        }
-        
-        @keyframes bounce {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-5px); }
-        }
-        
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        
-        @keyframes scaleIn {
-          from { 
-            opacity: 0;
-            transform: scale(0.9);
-          }
-          to { 
-            opacity: 1;
-            transform: scale(1);
-          }
-        }
-        
-        @keyframes shimmer {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(100%); }
-        }
-        
-        @keyframes confetti {
-          0% {
-            transform: translateY(0) rotate(0deg);
-            opacity: 1;
-          }
-          100% {
-            transform: translateY(400px) rotate(720deg);
-            opacity: 0;
-          }
-        }
-        
-        /* Responsive styles */
-        @media (max-width: 900px) {
-          .dashboard-grid {
-            grid-template-columns: 1fr !important;
-          }
-        }
-        
-        @media (max-width: 480px) {
-          .dashboard-grid > div:first-child > div:nth-child(2) {
-            grid-template-columns: 1fr !important;
-          }
-        }
-      `}</style>
     </div>
   );
 }
