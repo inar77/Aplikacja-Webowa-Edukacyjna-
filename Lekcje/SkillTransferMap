@@ -1,0 +1,346 @@
+'use client';
+
+import React, { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  ArrowRight,
+  Zap,
+  Clock,
+  TrendingUp,
+  Briefcase,
+  ChevronDown,
+  Sparkles,
+  Target,
+  BookOpen,
+  GraduationCap,
+  ArrowLeftRight,
+  Check
+} from 'lucide-react';
+
+interface Career {
+  id: string;
+  name: string;
+  icon: string;
+  avgSalary: string;
+  demand: 'high' | 'medium' | 'low';
+}
+
+interface SkillTransfer {
+  skill: string;
+  transferPercent: number;
+  additionalTraining?: string;
+}
+
+interface TransferPath {
+  from: Career;
+  to: Career;
+  overallTransfer: number;
+  timeToTransition: string;
+  skills: SkillTransfer[];
+  bridgingCourses: string[];
+}
+
+// Sample careers
+const CAREERS: Career[] = [
+  { id: 'elektryk', name: 'Elektryk', icon: '⚡', avgSalary: '5-12k PLN', demand: 'high' },
+  { id: 'automatyk', name: 'Automatyk', icon: '🤖', avgSalary: '8-18k PLN', demand: 'high' },
+  { id: 'technik-it', name: 'Technik IT', icon: '💻', avgSalary: '6-14k PLN', demand: 'high' },
+  { id: 'serwisant', name: 'Serwisant urządzeń', icon: '🔧', avgSalary: '5-10k PLN', demand: 'medium' },
+  { id: 'instalator-pv', name: 'Instalator PV', icon: '☀️', avgSalary: '7-15k PLN', demand: 'high' },
+  { id: 'projektant', name: 'Projektant instalacji', icon: '📐', avgSalary: '10-20k PLN', demand: 'medium' },
+];
+
+// Transfer paths from elektryk
+const TRANSFER_PATHS: Record<string, TransferPath> = {
+  'elektryk-automatyk': {
+    from: CAREERS[0],
+    to: CAREERS[1],
+    overallTransfer: 78,
+    timeToTransition: '4-6 miesięcy',
+    skills: [
+      { skill: 'Rozwiązywanie problemów', transferPercent: 100, additionalTraining: undefined },
+      { skill: 'Praca z narzędziami', transferPercent: 85, additionalTraining: 'Narzędzia do PLC' },
+      { skill: 'Obliczenia elektryczne', transferPercent: 90, additionalTraining: undefined },
+      { skill: 'Diagnostyka', transferPercent: 95, additionalTraining: undefined },
+      { skill: 'Programowanie PLC', transferPercent: 20, additionalTraining: 'Kurs PLC (80h)' },
+      { skill: 'Systemy SCADA', transferPercent: 0, additionalTraining: 'Kurs SCADA (40h)' },
+    ],
+    bridgingCourses: ['Podstawy automatyki', 'Programowanie PLC Siemens', 'Systemy SCADA']
+  },
+  'elektryk-technik-it': {
+    from: CAREERS[0],
+    to: CAREERS[2],
+    overallTransfer: 62,
+    timeToTransition: '6-9 miesięcy',
+    skills: [
+      { skill: 'Rozwiązywanie problemów', transferPercent: 100, additionalTraining: undefined },
+      { skill: 'Diagnostyka', transferPercent: 80, additionalTraining: 'Diagnostyka sieci' },
+      { skill: 'Praca z dokumentacją', transferPercent: 90, additionalTraining: undefined },
+      { skill: 'Sieci komputerowe', transferPercent: 30, additionalTraining: 'CCNA (100h)' },
+      { skill: 'Systemy operacyjne', transferPercent: 40, additionalTraining: 'Linux/Windows Admin' },
+    ],
+    bridgingCourses: ['Podstawy sieci', 'Administracja Windows/Linux', 'Bezpieczeństwo IT']
+  },
+  'elektryk-instalator-pv': {
+    from: CAREERS[0],
+    to: CAREERS[4],
+    overallTransfer: 85,
+    timeToTransition: '2-3 miesiące',
+    skills: [
+      { skill: 'Instalacje elektryczne', transferPercent: 95, additionalTraining: undefined },
+      { skill: 'BHP', transferPercent: 100, additionalTraining: 'BHP praca na wysokości' },
+      { skill: 'Praca z narzędziami', transferPercent: 90, additionalTraining: undefined },
+      { skill: 'Systemy PV', transferPercent: 30, additionalTraining: 'Kurs instalatora PV (40h)' },
+      { skill: 'Przepisy OZE', transferPercent: 20, additionalTraining: 'Certyfikacja UDT' },
+    ],
+    bridgingCourses: ['Instalator PV', 'Przepisy OZE', 'Praca na wysokości']
+  },
+  'elektryk-projektant': {
+    from: CAREERS[0],
+    to: CAREERS[5],
+    overallTransfer: 55,
+    timeToTransition: '12-18 miesięcy',
+    skills: [
+      { skill: 'Znajomość norm', transferPercent: 70, additionalTraining: 'Normy projektowe' },
+      { skill: 'Obliczenia elektryczne', transferPercent: 100, additionalTraining: undefined },
+      { skill: 'CAD', transferPercent: 20, additionalTraining: 'AutoCAD Electrical (60h)' },
+      { skill: 'Kosztorysowanie', transferPercent: 30, additionalTraining: 'Kosztorysowanie (40h)' },
+      { skill: 'Dokumentacja projektowa', transferPercent: 40, additionalTraining: 'Normy dokumentacji' },
+    ],
+    bridgingCourses: ['AutoCAD Electrical', 'Projektowanie instalacji', 'Kosztorysowanie', 'Studia podyplomowe']
+  },
+};
+
+interface Props {
+  currentCareer?: string;
+  onSelectPath?: (path: TransferPath) => void;
+}
+
+export default function SkillTransferMap({ currentCareer = 'elektryk', onSelectPath }: Props) {
+  const [selectedTarget, setSelectedTarget] = useState<string | null>('automatyk');
+  const [showDetails, setShowDetails] = useState(false);
+
+  const currentPath = selectedTarget 
+    ? TRANSFER_PATHS[`${currentCareer}-${selectedTarget}`] 
+    : null;
+
+  const availableTargets = Object.keys(TRANSFER_PATHS)
+    .filter(key => key.startsWith(currentCareer))
+    .map(key => {
+      const targetId = key.replace(`${currentCareer}-`, '');
+      return CAREERS.find(c => c.id === targetId)!;
+    });
+
+  return (
+    <div className="bg-gradient-to-br from-gray-900 via-gray-900 to-gray-800 rounded-2xl p-6 border border-gray-800">
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-6">
+        <div className="p-2 bg-gradient-to-br from-emerald-500/20 to-teal-500/20 rounded-xl">
+          <ArrowLeftRight className="w-6 h-6 text-emerald-400" />
+        </div>
+        <div>
+          <h2 className="text-xl font-bold text-white">Transfer Umiejętności</h2>
+          <p className="text-sm text-gray-400">
+            Zobacz jak Twoje obecne umiejętności przenoszą się do innych zawodów
+          </p>
+        </div>
+      </div>
+
+      {/* Career Selection */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        {/* Current Career */}
+        <div className="p-4 bg-gray-800/50 rounded-xl border border-gray-700">
+          <span className="text-xs text-gray-500 uppercase tracking-wider">Twój obecny zawód</span>
+          <div className="flex items-center gap-3 mt-2">
+            <span className="text-3xl">{CAREERS.find(c => c.id === currentCareer)?.icon}</span>
+            <div>
+              <h3 className="text-lg font-semibold text-white">
+                {CAREERS.find(c => c.id === currentCareer)?.name}
+              </h3>
+              <p className="text-sm text-gray-400">
+                {CAREERS.find(c => c.id === currentCareer)?.avgSalary}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Target Career Selector */}
+        <div className="p-4 bg-gray-800/50 rounded-xl border border-gray-700">
+          <span className="text-xs text-gray-500 uppercase tracking-wider">Możliwe przejścia</span>
+          <div className="flex flex-wrap gap-2 mt-2">
+            {availableTargets.map((career) => {
+              const path = TRANSFER_PATHS[`${currentCareer}-${career.id}`];
+              return (
+                <button
+                  key={career.id}
+                  onClick={() => setSelectedTarget(career.id)}
+                  className={`
+                    flex items-center gap-2 px-3 py-2 rounded-lg transition-all
+                    ${selectedTarget === career.id 
+                      ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300' 
+                      : 'bg-gray-700/50 border-gray-600/50 text-gray-300 hover:bg-gray-700'}
+                    border
+                  `}
+                >
+                  <span>{career.icon}</span>
+                  <span className="text-sm font-medium">{career.name}</span>
+                  <span className={`text-xs px-1.5 py-0.5 rounded ${
+                    path.overallTransfer >= 75 ? 'bg-emerald-500/20 text-emerald-400' :
+                    path.overallTransfer >= 50 ? 'bg-amber-500/20 text-amber-400' :
+                    'bg-red-500/20 text-red-400'
+                  }`}>
+                    {path.overallTransfer}%
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Transfer Visualization */}
+      {currentPath && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-6 bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-xl border border-gray-700"
+        >
+          {/* Transfer Header */}
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">{currentPath.from.icon}</span>
+                <ArrowRight className="w-5 h-5 text-emerald-400" />
+                <span className="text-2xl">{currentPath.to.icon}</span>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-white">
+                  {currentPath.from.name} → {currentPath.to.name}
+                </h3>
+                <div className="flex items-center gap-3 mt-1">
+                  <span className="flex items-center gap-1 text-sm text-gray-400">
+                    <Clock className="w-4 h-4" />
+                    {currentPath.timeToTransition}
+                  </span>
+                  <span className={`flex items-center gap-1 text-sm ${
+                    currentPath.to.demand === 'high' ? 'text-emerald-400' :
+                    currentPath.to.demand === 'medium' ? 'text-amber-400' : 'text-red-400'
+                  }`}>
+                    <TrendingUp className="w-4 h-4" />
+                    {currentPath.to.demand === 'high' ? 'Wysokie' :
+                     currentPath.to.demand === 'medium' ? 'Średnie' : 'Niskie'} zapotrzebowanie
+                  </span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Overall Transfer Score */}
+            <div className="text-center">
+              <div className={`text-3xl font-bold ${
+                currentPath.overallTransfer >= 75 ? 'text-emerald-400' :
+                currentPath.overallTransfer >= 50 ? 'text-amber-400' : 'text-red-400'
+              }`}>
+                {currentPath.overallTransfer}%
+              </div>
+              <span className="text-xs text-gray-500">transferowalność</span>
+            </div>
+          </div>
+
+          {/* Skills Transfer Bars */}
+          <div className="space-y-3 mb-6">
+            <h4 className="text-sm font-medium text-gray-400 flex items-center gap-2">
+              <Zap className="w-4 h-4" />
+              Przenoszenie umiejętności
+            </h4>
+            {currentPath.skills.map((skill, index) => (
+              <motion.div
+                key={skill.skill}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: index * 0.1 }}
+                className="relative"
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm text-gray-300">{skill.skill}</span>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-sm font-medium ${
+                      skill.transferPercent >= 80 ? 'text-emerald-400' :
+                      skill.transferPercent >= 50 ? 'text-amber-400' : 'text-red-400'
+                    }`}>
+                      {skill.transferPercent}%
+                    </span>
+                    {skill.additionalTraining && (
+                      <span className="text-xs px-2 py-0.5 bg-violet-500/20 text-violet-300 rounded">
+                        +{skill.additionalTraining}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${skill.transferPercent}%` }}
+                    transition={{ delay: 0.3 + index * 0.1, duration: 0.5 }}
+                    className={`h-full rounded-full ${
+                      skill.transferPercent >= 80 ? 'bg-gradient-to-r from-emerald-500 to-teal-500' :
+                      skill.transferPercent >= 50 ? 'bg-gradient-to-r from-amber-500 to-orange-500' :
+                      'bg-gradient-to-r from-red-500 to-rose-500'
+                    }`}
+                  />
+                </div>
+              </motion.div>
+            ))}
+          </div>
+
+          {/* Bridging Courses */}
+          <div className="p-4 bg-violet-500/10 rounded-xl border border-violet-500/20">
+            <h4 className="text-sm font-medium text-violet-300 flex items-center gap-2 mb-3">
+              <GraduationCap className="w-4 h-4" />
+              Kursy łączące (co musisz douczyć)
+            </h4>
+            <div className="flex flex-wrap gap-2">
+              {currentPath.bridgingCourses.map((course, index) => (
+                <motion.span
+                  key={course}
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.5 + index * 0.1 }}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-violet-500/20 text-violet-200 rounded-lg text-sm"
+                >
+                  <BookOpen className="w-3 h-3" />
+                  {course}
+                </motion.span>
+              ))}
+            </div>
+          </div>
+
+          {/* Action Button */}
+          <button
+            onClick={() => onSelectPath?.(currentPath)}
+            className="mt-4 w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-medium rounded-xl hover:opacity-90 transition-opacity"
+          >
+            <Target className="w-5 h-5" />
+            Zaplanuj przejście do {currentPath.to.name}
+          </button>
+        </motion.div>
+      )}
+
+      {/* Quick Stats */}
+      <div className="grid grid-cols-3 gap-4 mt-6">
+        <div className="p-4 bg-gray-800/50 rounded-xl text-center">
+          <div className="text-2xl font-bold text-emerald-400">85%</div>
+          <span className="text-xs text-gray-500">Twoich umiejętności przenosi się</span>
+        </div>
+        <div className="p-4 bg-gray-800/50 rounded-xl text-center">
+          <div className="text-2xl font-bold text-amber-400">4</div>
+          <span className="text-xs text-gray-500">Dostępne ścieżki kariery</span>
+        </div>
+        <div className="p-4 bg-gray-800/50 rounded-xl text-center">
+          <div className="text-2xl font-bold text-violet-400">2-3 mies.</div>
+          <span className="text-xs text-gray-500">Najszybsze przejście</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
