@@ -1,0 +1,446 @@
+'use client';
+
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Sparkles,
+  Lightbulb,
+  Target,
+  Clock,
+  TrendingUp,
+  BookOpen,
+  Play,
+  X,
+  ThumbsUp,
+  ThumbsDown,
+  ChevronRight,
+  Zap,
+  Brain,
+  Eye,
+  MessageSquare,
+  HelpCircle,
+  RefreshCw
+} from 'lucide-react';
+
+// Recommendation types
+interface Recommendation {
+  id: string;
+  type: 'skill' | 'task' | 'career' | 'insight';
+  title: string;
+  description: string;
+  reason: string; // WHY - transparency is key
+  reasonDetails: string[];
+  confidence: number;
+  urgency: 'low' | 'medium' | 'high';
+  format?: {
+    type: 'lesson' | 'minigame' | 'video' | 'quiz' | 'practice';
+    duration: string;
+    xp: number;
+  };
+  tags: string[];
+  dismissed: boolean;
+}
+
+// Sample recommendations with REASONS
+const SAMPLE_RECOMMENDATIONS: Recommendation[] = [
+  {
+    id: 'rec-1',
+    type: 'skill',
+    title: 'Diagnostyka multimetrem - poziom 2',
+    description: 'Zaawansowane techniki pomiaru i interpretacji wyników',
+    reason: 'Ponieważ ukończyłeś podstawy diagnostyki z wynikiem 92%',
+    reasonDetails: [
+      'Świetnie radzisz sobie z podstawami pomiarów',
+      'Ten krok naturalnie rozwija Twoje umiejętności',
+      'Jest wykorzystywany w 78% ofert pracy dla elektryków'
+    ],
+    confidence: 95,
+    urgency: 'medium',
+    format: {
+      type: 'lesson',
+      duration: '25 min',
+      xp: 150
+    },
+    tags: ['diagnostyka', 'multimetr', 'pomiary'],
+    dismissed: false
+  },
+  {
+    id: 'rec-2',
+    type: 'task',
+    title: 'Obliczenia: Dobór przekroju przewodu',
+    description: 'Praktyczne zadanie z obliczeniami elektrycznymi',
+    reason: 'Zauważyliśmy, że lubisz zadania obliczeniowe',
+    reasonDetails: [
+      'Spędzasz średnio 40% więcej czasu na zadaniach z obliczeń',
+      'Twoja dokładność w obliczeniach: 88%',
+      'To kluczowa umiejętność dla praktyki zawodowej'
+    ],
+    confidence: 87,
+    urgency: 'low',
+    format: {
+      type: 'practice',
+      duration: '15 min',
+      xp: 100
+    },
+    tags: ['obliczenia', 'przekroje', 'praktyka'],
+    dismissed: false
+  },
+  {
+    id: 'rec-3',
+    type: 'insight',
+    title: 'Twój styl nauki',
+    description: 'Odkryliśmy, że uczysz się najlepiej przez praktykę',
+    reason: 'Na podstawie Twojej aktywności w ostatnich 2 tygodniach',
+    reasonDetails: [
+      'Minigry kończysz 3x szybciej niż lekcje tekstowe',
+      'Twoja retencja z praktycznych zadań: 94%',
+      'Sugerujemy więcej interaktywnych formatów'
+    ],
+    confidence: 92,
+    urgency: 'low',
+    tags: ['insight', 'learning-style'],
+    dismissed: false
+  },
+  {
+    id: 'rec-4',
+    type: 'career',
+    title: 'Rozważ: Automatyk przemysłowy',
+    description: '78% Twoich umiejętności przenosi się do tego zawodu',
+    reason: 'Pasuje do Twojego profilu i ma rosnący popyt',
+    reasonDetails: [
+      'Zarobki: 8-18k PLN (wyższe niż przeciętna)',
+      'Popyt rośnie +25% rocznie',
+      'Wymaga tylko 4-6 miesięcy donauki'
+    ],
+    confidence: 78,
+    urgency: 'low',
+    tags: ['kariera', 'automatyka', 'rozwój'],
+    dismissed: false
+  }
+];
+
+interface Props {
+  onAcceptRecommendation?: (rec: Recommendation) => void;
+  onDismissRecommendation?: (rec: Recommendation, reason: string) => void;
+  onFeedback?: (rec: Recommendation, helpful: boolean) => void;
+}
+
+export default function AdaptiveRecommendations({
+  onAcceptRecommendation,
+  onDismissRecommendation,
+  onFeedback
+}: Props) {
+  const [recommendations, setRecommendations] = useState(SAMPLE_RECOMMENDATIONS);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [dismissingId, setDismissingId] = useState<string | null>(null);
+  const [dismissReason, setDismissReason] = useState('');
+
+  const handleDismiss = (rec: Recommendation) => {
+    setRecommendations(prev => prev.filter(r => r.id !== rec.id));
+    onDismissRecommendation?.(rec, dismissReason);
+    setDismissingId(null);
+    setDismissReason('');
+  };
+
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case 'skill': return <Zap className="w-4 h-4" />;
+      case 'task': return <Target className="w-4 h-4" />;
+      case 'career': return <TrendingUp className="w-4 h-4" />;
+      case 'insight': return <Lightbulb className="w-4 h-4" />;
+      default: return <Sparkles className="w-4 h-4" />;
+    }
+  };
+
+  const getTypeColor = (type: string) => {
+    switch (type) {
+      case 'skill': return 'from-violet-500/20 to-purple-500/20 border-violet-500/30 text-violet-400';
+      case 'task': return 'from-blue-500/20 to-cyan-500/20 border-blue-500/30 text-blue-400';
+      case 'career': return 'from-emerald-500/20 to-teal-500/20 border-emerald-500/30 text-emerald-400';
+      case 'insight': return 'from-amber-500/20 to-orange-500/20 border-amber-500/30 text-amber-400';
+      default: return 'from-gray-500/20 to-gray-600/20 border-gray-500/30 text-gray-400';
+    }
+  };
+
+  const getUrgencyBadge = (urgency: string) => {
+    switch (urgency) {
+      case 'high': return 'bg-red-500/20 text-red-400';
+      case 'medium': return 'bg-amber-500/20 text-amber-400';
+      default: return 'bg-gray-500/20 text-gray-400';
+    }
+  };
+
+  const activeRecommendations = recommendations.filter(r => !r.dismissed);
+
+  return (
+    <div className="bg-gradient-to-br from-gray-900 via-gray-900 to-gray-800 rounded-2xl p-6 border border-gray-800">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-gradient-to-br from-violet-500/20 to-purple-500/20 rounded-xl">
+            <Brain className="w-6 h-6 text-violet-400" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-white">Inteligentne Rekomendacje</h2>
+            <p className="text-sm text-gray-400">
+              Propozycje dopasowane do Twojego stylu nauki i celów
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button className="flex items-center gap-2 px-3 py-1.5 bg-gray-800/50 hover:bg-gray-700/50 text-gray-400 rounded-lg text-sm transition-colors">
+            <RefreshCw className="w-4 h-4" />
+            Odśwież
+          </button>
+          <button className="flex items-center gap-2 px-3 py-1.5 bg-gray-800/50 hover:bg-gray-700/50 text-gray-400 rounded-lg text-sm transition-colors">
+            <HelpCircle className="w-4 h-4" />
+            Jak to działa?
+          </button>
+        </div>
+      </div>
+
+      {/* Transparency Notice */}
+      <div className="mb-6 p-3 bg-violet-500/10 rounded-xl border border-violet-500/20">
+        <div className="flex items-start gap-2">
+          <Eye className="w-4 h-4 text-violet-400 flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-gray-400">
+            <span className="text-violet-400 font-medium">Dlaczego to widzisz?</span> Każda rekomendacja ma wyjaśnienie. 
+            Kliknij "Dlaczego?" żeby zobaczyć powody. Możesz odrzucić rekomendacje, które Ci nie odpowiadają - 
+            system się nauczy Twoich preferencji.
+          </p>
+        </div>
+      </div>
+
+      {/* Recommendations List */}
+      <div className="space-y-4">
+        {activeRecommendations.map((rec, index) => {
+          const isExpanded = expandedId === rec.id;
+          const isDismissing = dismissingId === rec.id;
+          const colors = getTypeColor(rec.type);
+
+          return (
+            <motion.div
+              key={rec.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, x: -100 }}
+              transition={{ delay: index * 0.1 }}
+              className={`
+                p-4 rounded-xl border transition-all
+                bg-gradient-to-br ${colors}
+                ${isExpanded ? 'ring-2 ring-violet-500/50' : ''}
+              `}
+            >
+              {/* Main Content */}
+              <div className="flex items-start justify-between">
+                <div className="flex items-start gap-3 flex-1">
+                  <div className={`p-2 rounded-lg bg-gray-900/50 ${colors.split(' ')[3]}`}>
+                    {getTypeIcon(rec.type)}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-semibold text-white">{rec.title}</h3>
+                      {rec.urgency !== 'low' && (
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${getUrgencyBadge(rec.urgency)}`}>
+                          {rec.urgency === 'high' ? 'Pilne' : 'Sugerowane'}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-400 mb-2">{rec.description}</p>
+                    
+                    {/* Reason Preview */}
+                    <div className="flex items-center gap-2 text-xs">
+                      <Lightbulb className="w-3 h-3 text-amber-400" />
+                      <span className="text-amber-300/80">{rec.reason}</span>
+                      <button 
+                        onClick={() => setExpandedId(isExpanded ? null : rec.id)}
+                        className="text-violet-400 hover:text-violet-300 underline"
+                      >
+                        {isExpanded ? 'Ukryj' : 'Dlaczego?'}
+                      </button>
+                    </div>
+
+                    {/* Format Info */}
+                    {rec.format && (
+                      <div className="flex items-center gap-3 mt-3">
+                        <span className="flex items-center gap-1 text-xs text-gray-500">
+                          <Clock className="w-3 h-3" />
+                          {rec.format.duration}
+                        </span>
+                        <span className="flex items-center gap-1 text-xs text-gray-500">
+                          <Sparkles className="w-3 h-3" />
+                          +{rec.format.xp} XP
+                        </span>
+                        <span className="text-xs px-2 py-0.5 bg-gray-900/50 text-gray-400 rounded">
+                          {rec.format.type === 'lesson' ? '📚 Lekcja' :
+                           rec.format.type === 'minigame' ? '🎮 Minigra' :
+                           rec.format.type === 'video' ? '🎥 Wideo' :
+                           rec.format.type === 'quiz' ? '❓ Quiz' : '🔧 Praktyka'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setDismissingId(rec.id)}
+                    className="p-2 hover:bg-gray-700/50 rounded-lg text-gray-500 hover:text-gray-300 transition-colors"
+                    title="Nie interesuje mnie"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => onAcceptRecommendation?.(rec)}
+                    className="flex items-center gap-1 px-3 py-2 bg-violet-500/20 hover:bg-violet-500/30 text-violet-300 rounded-lg text-sm transition-colors"
+                  >
+                    <Play className="w-4 h-4" />
+                    Rozpocznij
+                  </button>
+                </div>
+              </div>
+
+              {/* Expanded Details */}
+              <AnimatePresence>
+                {isExpanded && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="mt-4 pt-4 border-t border-gray-700/50"
+                  >
+                    <h4 className="text-xs font-medium text-gray-400 mb-2">Dlaczego to polecamy:</h4>
+                    <ul className="space-y-2">
+                      {rec.reasonDetails.map((detail, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm text-gray-300">
+                          <ChevronRight className="w-4 h-4 text-violet-400 flex-shrink-0 mt-0.5" />
+                          {detail}
+                        </li>
+                      ))}
+                    </ul>
+                    
+                    {/* Confidence Score */}
+                    <div className="mt-4 flex items-center gap-2">
+                      <span className="text-xs text-gray-500">Pewność rekomendacji:</span>
+                      <div className="flex-1 h-1.5 bg-gray-700 rounded-full overflow-hidden max-w-[100px]">
+                        <div 
+                          className="h-full bg-violet-500 rounded-full"
+                          style={{ width: `${rec.confidence}%` }}
+                        />
+                      </div>
+                      <span className="text-xs text-violet-400">{rec.confidence}%</span>
+                    </div>
+
+                    {/* Feedback */}
+                    <div className="mt-4 flex items-center gap-4">
+                      <span className="text-xs text-gray-500">Ta rekomendacja była pomocna?</span>
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => onFeedback?.(rec, true)}
+                          className="flex items-center gap-1 px-2 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded text-xs transition-colors"
+                        >
+                          <ThumbsUp className="w-3 h-3" />
+                          Tak
+                        </button>
+                        <button 
+                          onClick={() => onFeedback?.(rec, false)}
+                          className="flex items-center gap-1 px-2 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded text-xs transition-colors"
+                        >
+                          <ThumbsDown className="w-3 h-3" />
+                          Nie
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Dismiss Modal */}
+              <AnimatePresence>
+                {isDismissing && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="mt-4 pt-4 border-t border-gray-700/50"
+                  >
+                    <p className="text-sm text-gray-400 mb-3">Dlaczego odrzucasz tę rekomendację?</p>
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {[
+                        'Już to umiem',
+                        'Nie interesuje mnie ten temat',
+                        'Za trudne',
+                        'Za łatwe',
+                        'Nie mam teraz czasu',
+                        'Inne'
+                      ].map((reason) => (
+                        <button
+                          key={reason}
+                          onClick={() => setDismissReason(reason)}
+                          className={`px-3 py-1 rounded-lg text-xs transition-colors ${
+                            dismissReason === reason
+                              ? 'bg-violet-500/30 text-violet-300'
+                              : 'bg-gray-700/50 text-gray-400 hover:bg-gray-700'
+                          }`}
+                        >
+                          {reason}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setDismissingId(null)}
+                        className="px-4 py-2 bg-gray-700/50 hover:bg-gray-700 text-gray-300 rounded-lg text-sm transition-colors"
+                      >
+                        Anuluj
+                      </button>
+                      <button
+                        onClick={() => handleDismiss(rec)}
+                        className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded-lg text-sm transition-colors"
+                      >
+                        Odrzuć
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          );
+        })}
+      </div>
+
+      {/* Empty State */}
+      {activeRecommendations.length === 0 && (
+        <div className="text-center py-12">
+          <Sparkles className="w-12 h-12 text-gray-600 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-400 mb-2">Brak aktywnych rekomendacji</h3>
+          <p className="text-sm text-gray-500 mb-4">
+            Kontynuuj naukę, a system przygotuje nowe propozycje
+          </p>
+          <button className="flex items-center gap-2 mx-auto px-4 py-2 bg-violet-500/20 hover:bg-violet-500/30 text-violet-300 rounded-lg transition-colors">
+            <RefreshCw className="w-4 h-4" />
+            Wygeneruj nowe
+          </button>
+        </div>
+      )}
+
+      {/* Stats */}
+      <div className="mt-6 grid grid-cols-3 gap-4">
+        <div className="p-3 bg-gray-800/50 rounded-xl text-center">
+          <div className="text-lg font-bold text-emerald-400">87%</div>
+          <span className="text-xs text-gray-500">Trafność rekomendacji</span>
+        </div>
+        <div className="p-3 bg-gray-800/50 rounded-xl text-center">
+          <div className="text-lg font-bold text-violet-400">24</div>
+          <span className="text-xs text-gray-500">Zaakceptowane propozycje</span>
+        </div>
+        <div className="p-3 bg-gray-800/50 rounded-xl text-center">
+          <div className="text-lg font-bold text-amber-400">+15%</div>
+          <span className="text-xs text-gray-500">Szybsza nauka</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
