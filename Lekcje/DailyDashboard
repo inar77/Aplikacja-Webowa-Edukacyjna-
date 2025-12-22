@@ -1,14 +1,235 @@
 'use client';
-import React, { useState, useEffect } from 'react';
-import { Zap, Target, Clock, TrendingUp, Award, ChevronRight, Flame, Calendar, BookOpen } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { 
+  Zap, Target, Clock, TrendingUp, Award, ChevronRight, Flame, 
+  Calendar, BookOpen, Star, Shield, X, Sparkles, Trophy
+} from 'lucide-react';
 
 // ============================================================
 // DAILY DASHBOARD - Hero z metrykami, streak i dziennym celem
-// "Twoja dzienna aktywnosc" zamiast nudnego naglowka
+// "Twoja dzienna aktywność" z pełnym systemem motywacyjnym
 // ============================================================
 
+// Utility: Format large numbers with spaces (Polish style)
+const formatNumber = (num) => {
+  if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
+  if (num >= 1000) return `${(num / 1000).toFixed(1)}k`;
+  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+};
+
+// Utility: Calculate level from XP
+const calculateLevel = (xp) => {
+  const baseXP = 100;
+  const multiplier = 1.5;
+  let level = 1;
+  let xpForNextLevel = baseXP;
+  let totalXPNeeded = 0;
+  
+  while (xp >= totalXPNeeded + xpForNextLevel) {
+    totalXPNeeded += xpForNextLevel;
+    level++;
+    xpForNextLevel = Math.floor(baseXP * Math.pow(multiplier, level - 1));
+  }
+  
+  return {
+    level,
+    currentLevelXP: xp - totalXPNeeded,
+    xpForNextLevel,
+    progress: ((xp - totalXPNeeded) / xpForNextLevel) * 100
+  };
+};
+
+// Stat Card Component
+const StatCard = ({ 
+  icon: Icon, 
+  iconColor, 
+  bgColor, 
+  borderColor, 
+  label, 
+  value, 
+  subLabel, 
+  onClick,
+  isInteractive = false,
+  pulse = false,
+  tooltip
+}) => {
+  const [isHovered, setIsHovered] = useState(false);
+  
+  return (
+    <div
+      onClick={onClick}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      role={isInteractive ? "button" : undefined}
+      tabIndex={isInteractive ? 0 : undefined}
+      onKeyDown={isInteractive ? (e) => e.key === 'Enter' && onClick?.() : undefined}
+      aria-label={tooltip || `${label}: ${value} ${subLabel}`}
+      style={{
+        padding: '20px',
+        background: bgColor,
+        border: `2px solid ${borderColor}`,
+        borderRadius: '16px',
+        cursor: isInteractive ? 'pointer' : 'default',
+        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        transform: isHovered && isInteractive ? 'translateY(-4px) scale(1.02)' : 'translateY(0)',
+        boxShadow: isHovered && isInteractive 
+          ? `0 12px 24px ${borderColor.replace('0.3', '0.4')}`
+          : 'none',
+        position: 'relative',
+        overflow: 'hidden'
+      }}
+    >
+      {pulse && (
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          background: borderColor.replace('0.3', '0.1'),
+          animation: 'pulse 2s ease-in-out infinite'
+        }} />
+      )}
+      
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        marginBottom: '8px',
+        position: 'relative'
+      }}>
+        <Icon size={20} color={iconColor} style={{
+          filter: pulse ? 'drop-shadow(0 0 8px currentColor)' : 'none'
+        }} />
+        <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px' }}>
+          {label}
+        </span>
+        {isInteractive && (
+          <ChevronRight 
+            size={14} 
+            color="rgba(255,255,255,0.4)" 
+            style={{
+              marginLeft: 'auto',
+              transform: isHovered ? 'translateX(4px)' : 'translateX(0)',
+              transition: 'transform 0.2s ease'
+            }}
+          />
+        )}
+      </div>
+      <div style={{
+        fontSize: '32px',
+        fontWeight: 900,
+        color: iconColor,
+        lineHeight: 1,
+        position: 'relative'
+      }}>
+        {value}
+      </div>
+      <div style={{
+        color: 'rgba(255,255,255,0.5)',
+        fontSize: '12px',
+        marginTop: '4px'
+      }}>
+        {subLabel}
+      </div>
+    </div>
+  );
+};
+
+// Weekly Day Component
+const WeeklyDay = ({ day, activity, isToday, maxActivity }) => {
+  const [isHovered, setIsHovered] = useState(false);
+  const normalizedHeight = maxActivity > 0 ? (activity / maxActivity) * 100 : 0;
+  
+  return (
+    <div
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      style={{
+        flex: 1,
+        textAlign: 'center',
+        position: 'relative'
+      }}
+    >
+      {/* Tooltip */}
+      {isHovered && activity > 0 && (
+        <div style={{
+          position: 'absolute',
+          bottom: '100%',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          marginBottom: '8px',
+          padding: '6px 10px',
+          background: 'rgba(0,0,0,0.9)',
+          borderRadius: '8px',
+          color: 'white',
+          fontSize: '12px',
+          fontWeight: 600,
+          whiteSpace: 'nowrap',
+          zIndex: 10,
+          animation: 'fadeIn 0.2s ease'
+        }}>
+          {activity} XP
+          <div style={{
+            position: 'absolute',
+            top: '100%',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            border: '4px solid transparent',
+            borderTopColor: 'rgba(0,0,0,0.9)'
+          }} />
+        </div>
+      )}
+      
+      <div style={{
+        height: '48px',
+        background: activity > 0 
+          ? `rgba(124, 58, 237, ${0.2 + (normalizedHeight / 100) * 0.6})`
+          : 'rgba(255,255,255,0.05)',
+        borderRadius: '10px',
+        border: isToday 
+          ? '2px solid #a78bfa' 
+          : '1px solid rgba(255,255,255,0.1)',
+        marginBottom: '8px',
+        display: 'flex',
+        alignItems: 'flex-end',
+        justifyContent: 'center',
+        padding: '4px',
+        transition: 'all 0.3s ease',
+        transform: isHovered ? 'scale(1.05)' : 'scale(1)',
+        boxShadow: isToday ? '0 0 20px rgba(167, 139, 250, 0.3)' : 'none'
+      }}>
+        {activity > 0 && (
+          <div style={{
+            width: '100%',
+            height: `${Math.max(20, normalizedHeight)}%`,
+            background: 'linear-gradient(0deg, #7c3aed 0%, #a78bfa 100%)',
+            borderRadius: '6px',
+            transition: 'height 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
+          }} />
+        )}
+      </div>
+      <span style={{
+        color: isToday ? '#a78bfa' : 'rgba(255,255,255,0.4)',
+        fontSize: '11px',
+        fontWeight: isToday ? 700 : 400,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '2px'
+      }}>
+        {isToday && <span style={{ 
+          width: '4px', 
+          height: '4px', 
+          background: '#a78bfa', 
+          borderRadius: '50%',
+          animation: 'pulse 1.5s ease-in-out infinite'
+        }} />}
+        {day}
+      </span>
+    </div>
+  );
+};
+
 export default function DailyDashboard({
-  streak = { days: 0, lastDate: null },
+  streak = { days: 0, lastDate: null, record: 0, freezesAvailable: 0 },
   totalXP = 0,
   todayXP = 0,
   dailyGoal = 100,
@@ -16,10 +237,35 @@ export default function DailyDashboard({
   nextTask = null,
   weeklyProgress = [],
   onContinue,
-  onViewAll
+  onViewAll,
+  userName = null,
+  isLoading = false
 }) {
   const [timeOfDay, setTimeOfDay] = useState('day');
   const [showStreakDetails, setShowStreakDetails] = useState(false);
+  const [animatedXP, setAnimatedXP] = useState(0);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const modalRef = useRef(null);
+
+  // Animate XP counter on mount
+  useEffect(() => {
+    const duration = 1000;
+    const startTime = Date.now();
+    const startValue = 0;
+    
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const easeOut = 1 - Math.pow(1 - progress, 3);
+      setAnimatedXP(Math.floor(startValue + (todayXP - startValue) * easeOut));
+      
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      }
+    };
+    
+    requestAnimationFrame(animate);
+  }, [todayXP]);
 
   useEffect(() => {
     const hour = new Date().getHours();
@@ -29,69 +275,205 @@ export default function DailyDashboard({
     else setTimeOfDay('night');
   }, []);
 
+  // Handle escape key for modal
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape' && showStreakDetails) {
+        setShowStreakDetails(false);
+      }
+    };
+    
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [showStreakDetails]);
+
+  // Focus trap for modal
+  useEffect(() => {
+    if (showStreakDetails && modalRef.current) {
+      modalRef.current.focus();
+    }
+  }, [showStreakDetails]);
+
+  // Show confetti when daily goal is reached
+  useEffect(() => {
+    if (todayXP >= dailyGoal && !showConfetti) {
+      setShowConfetti(true);
+      setTimeout(() => setShowConfetti(false), 3000);
+    }
+  }, [todayXP, dailyGoal, showConfetti]);
+
   const getGreeting = () => {
+    const name = userName ? `, ${userName}` : '';
     switch (timeOfDay) {
-      case 'morning': return { text: 'Dzien dobry', emoji: '☀️' };
-      case 'afternoon': return { text: 'Witaj ponownie', emoji: '🌤️' };
-      case 'evening': return { text: 'Dobry wieczor', emoji: '🌅' };
-      case 'night': return { text: 'Nocna sesja?', emoji: '🌙' };
-      default: return { text: 'Witaj', emoji: '👋' };
+      case 'morning': return { text: `Dzień dobry${name}`, emoji: '☀️', bg: 'rgba(251, 191, 36, 0.1)' };
+      case 'afternoon': return { text: `Witaj ponownie${name}`, emoji: '🌤️', bg: 'rgba(96, 165, 250, 0.1)' };
+      case 'evening': return { text: `Dobry wieczór${name}`, emoji: '🌅', bg: 'rgba(251, 146, 60, 0.1)' };
+      case 'night': return { text: `Nocna sesja${name}?`, emoji: '🌙', bg: 'rgba(167, 139, 250, 0.1)' };
+      default: return { text: `Witaj${name}`, emoji: '👋', bg: 'rgba(255,255,255,0.05)' };
     }
   };
 
   const dailyProgress = Math.min(100, Math.round((todayXP / dailyGoal) * 100));
   const greeting = getGreeting();
+  const levelInfo = calculateLevel(totalXP);
+  const maxWeeklyActivity = Math.max(...weeklyProgress, 1);
 
   const getMotivationalMessage = () => {
+    if (dailyProgress >= 100) return 'Cel osiągnięty! 🎯';
+    if (streak.days >= 30) return 'Legendarny miesiąc! 🏆';
     if (streak.days >= 7) return 'Niesamowita passa! 🔥';
-    if (streak.days >= 3) return 'Swietnie Ci idzie!';
-    if (completedToday >= 3) return 'Produktywny dzien!';
-    if (dailyProgress >= 50) return 'Polowa drogi za Toba!';
-    return 'Kazdy krok sie liczy';
+    if (streak.days >= 3) return 'Świetnie Ci idzie!';
+    if (completedToday >= 5) return 'Maszyna do nauki! 💪';
+    if (completedToday >= 3) return 'Produktywny dzień!';
+    if (dailyProgress >= 75) return 'Prawie na mecie!';
+    if (dailyProgress >= 50) return 'Połowa drogi za Tobą!';
+    if (dailyProgress >= 25) return 'Dobry początek!';
+    return 'Każdy krok się liczy ✨';
   };
 
+  // Get today's index (Monday = 0, Sunday = 6)
+  const getTodayIndex = () => {
+    const day = new Date().getDay();
+    return day === 0 ? 6 : day - 1;
+  };
+
+  const getStreakStatus = () => {
+    if (streak.days >= 30) return { icon: Trophy, color: '#fbbf24', label: 'Legenda' };
+    if (streak.days >= 14) return { icon: Star, color: '#f97316', label: 'Mistrz' };
+    if (streak.days >= 7) return { icon: Flame, color: '#ef4444', label: 'W ogniu' };
+    if (streak.days >= 3) return { icon: TrendingUp, color: '#22c55e', label: 'Rośnie' };
+    return { icon: Flame, color: '#fbbf24', label: 'Buduj' };
+  };
+
+  const streakStatus = getStreakStatus();
+
+  // Skeleton loading state
+  if (isLoading) {
+    return (
+      <div style={{
+        background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4c1d95 100%)',
+        borderRadius: '24px',
+        padding: '32px',
+        marginBottom: '24px'
+      }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 400px', gap: '32px' }}>
+          <div>
+            <div style={{ 
+              height: '40px', 
+              width: '200px', 
+              background: 'rgba(255,255,255,0.1)', 
+              borderRadius: '8px',
+              animation: 'shimmer 1.5s ease-in-out infinite'
+            }} />
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(3, 1fr)', 
+              gap: '16px', 
+              marginTop: '24px' 
+            }}>
+              {[1, 2, 3].map(i => (
+                <div key={i} style={{
+                  height: '120px',
+                  background: 'rgba(255,255,255,0.05)',
+                  borderRadius: '16px',
+                  animation: 'shimmer 1.5s ease-in-out infinite',
+                  animationDelay: `${i * 0.2}s`
+                }} />
+              ))}
+            </div>
+          </div>
+          <div style={{
+            height: '400px',
+            background: 'rgba(255,255,255,0.05)',
+            borderRadius: '20px',
+            animation: 'shimmer 1.5s ease-in-out infinite'
+          }} />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div style={{
-      background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4c1d95 100%)',
-      borderRadius: '24px',
-      padding: '32px',
-      marginBottom: '24px',
-      position: 'relative',
-      overflow: 'hidden'
-    }}>
+    <div 
+      style={{
+        background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4c1d95 100%)',
+        borderRadius: '24px',
+        padding: 'clamp(20px, 4vw, 32px)',
+        marginBottom: '24px',
+        position: 'relative',
+        overflow: 'hidden'
+      }}
+      role="region"
+      aria-label="Panel dzienny - Twoje statystyki i postępy"
+    >
       {/* ANIMATED BACKGROUND */}
       <div style={{
         position: 'absolute',
         inset: 0,
-        background: 'radial-gradient(circle at 90% 10%, rgba(245, 158, 11, 0.15) 0%, transparent 40%), radial-gradient(circle at 10% 90%, rgba(16, 185, 129, 0.1) 0%, transparent 40%)',
-        pointerEvents: 'none'
+        background: `
+          radial-gradient(circle at 90% 10%, rgba(245, 158, 11, 0.15) 0%, transparent 40%), 
+          radial-gradient(circle at 10% 90%, rgba(16, 185, 129, 0.1) 0%, transparent 40%),
+          radial-gradient(circle at 50% 50%, ${greeting.bg} 0%, transparent 60%)
+        `,
+        pointerEvents: 'none',
+        transition: 'background 0.5s ease'
       }} />
 
       {/* FLOATING PARTICLES */}
-      {[...Array(5)].map((_, i) => (
+      {[...Array(8)].map((_, i) => (
         <div
           key={i}
           style={{
             position: 'absolute',
-            width: '4px',
-            height: '4px',
-            background: 'rgba(255,255,255,0.3)',
+            width: `${3 + (i % 3)}px`,
+            height: `${3 + (i % 3)}px`,
+            background: `rgba(255,255,255,${0.2 + (i % 3) * 0.1})`,
             borderRadius: '50%',
-            left: `${20 + i * 15}%`,
-            top: `${30 + (i % 3) * 20}%`,
-            animation: `float ${3 + i * 0.5}s ease-in-out infinite`,
-            animationDelay: `${i * 0.3}s`
+            left: `${10 + i * 12}%`,
+            top: `${20 + (i % 4) * 15}%`,
+            animation: `float ${3 + i * 0.3}s ease-in-out infinite`,
+            animationDelay: `${i * 0.2}s`,
+            pointerEvents: 'none'
           }}
         />
       ))}
 
+      {/* CONFETTI EFFECT */}
+      {showConfetti && (
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          pointerEvents: 'none',
+          zIndex: 10
+        }}>
+          {[...Array(20)].map((_, i) => (
+            <div
+              key={i}
+              style={{
+                position: 'absolute',
+                width: '10px',
+                height: '10px',
+                background: ['#fbbf24', '#10b981', '#a78bfa', '#f472b6', '#60a5fa'][i % 5],
+                borderRadius: i % 2 === 0 ? '50%' : '2px',
+                left: `${10 + (i * 4)}%`,
+                top: '-20px',
+                animation: `confetti ${2 + Math.random()}s ease-out forwards`,
+                animationDelay: `${i * 0.05}s`
+              }}
+            />
+          ))}
+        </div>
+      )}
+
       <div style={{
         display: 'grid',
-        gridTemplateColumns: '1fr 400px',
-        gap: '32px',
+        gridTemplateColumns: 'minmax(0, 1fr) minmax(320px, 400px)',
+        gap: 'clamp(20px, 3vw, 32px)',
         position: 'relative',
         zIndex: 2
-      }}>
+      }}
+      className="dashboard-grid"
+      >
         {/* LEFT SECTION - Greeting & Stats */}
         <div>
           {/* GREETING */}
@@ -100,143 +482,118 @@ export default function DailyDashboard({
               display: 'flex',
               alignItems: 'center',
               gap: '12px',
-              marginBottom: '8px'
+              marginBottom: '8px',
+              flexWrap: 'wrap'
             }}>
-              <span style={{ fontSize: '32px' }}>{greeting.emoji}</span>
+              <span style={{ 
+                fontSize: '32px',
+                animation: 'bounce 1s ease-in-out'
+              }}>
+                {greeting.emoji}
+              </span>
               <h1 style={{
                 margin: 0,
-                fontSize: '32px',
+                fontSize: 'clamp(24px, 4vw, 32px)',
                 fontWeight: 900,
-                color: 'white'
+                color: 'white',
+                letterSpacing: '-0.5px'
               }}>
                 {greeting.text}!
               </h1>
+              
+              {/* Level Badge */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                background: 'rgba(124, 58, 237, 0.3)',
+                borderRadius: '20px',
+                border: '1px solid rgba(124, 58, 237, 0.5)'
+              }}>
+                <Star size={14} color="#a78bfa" fill="#a78bfa" />
+                <span style={{ 
+                  color: '#a78bfa', 
+                  fontSize: '13px', 
+                  fontWeight: 700 
+                }}>
+                  Poziom {levelInfo.level}
+                </span>
+              </div>
             </div>
             <p style={{
               margin: 0,
               color: 'rgba(255,255,255,0.7)',
-              fontSize: '16px'
+              fontSize: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
             }}>
               {getMotivationalMessage()}
+              {streak.freezesAvailable > 0 && (
+                <span 
+                  title={`${streak.freezesAvailable} zamrożeń dostępnych`}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '2px 8px',
+                    background: 'rgba(96, 165, 250, 0.2)',
+                    borderRadius: '12px',
+                    fontSize: '12px',
+                    color: '#60a5fa'
+                  }}
+                >
+                  <Shield size={12} />
+                  {streak.freezesAvailable}
+                </span>
+              )}
             </p>
           </div>
 
           {/* STATS GRID */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
             gap: '16px',
             marginBottom: '24px'
           }}>
             {/* STREAK */}
-            <div
-              onClick={() => setShowStreakDetails(!showStreakDetails)}
-              style={{
-                padding: '20px',
-                background: 'rgba(245, 158, 11, 0.15)',
-                border: '2px solid rgba(245, 158, 11, 0.3)',
-                borderRadius: '16px',
-                cursor: 'pointer',
-                transition: 'all 0.3s ease'
-              }}
-            >
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                marginBottom: '8px'
-              }}>
-                <Flame size={20} color="#fbbf24" />
-                <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px' }}>
-                  Streak
-                </span>
-              </div>
-              <div style={{
-                fontSize: '32px',
-                fontWeight: 900,
-                color: '#fbbf24',
-                lineHeight: 1
-              }}>
-                {streak.days}
-              </div>
-              <div style={{
-                color: 'rgba(255,255,255,0.5)',
-                fontSize: '12px',
-                marginTop: '4px'
-              }}>
-                dni z rzedu
-              </div>
-            </div>
+            <StatCard
+              icon={streakStatus.icon}
+              iconColor={streakStatus.color}
+              bgColor="rgba(245, 158, 11, 0.15)"
+              borderColor="rgba(245, 158, 11, 0.3)"
+              label="Streak"
+              value={streak.days}
+              subLabel="dni z rzędu"
+              onClick={() => setShowStreakDetails(true)}
+              isInteractive={true}
+              pulse={streak.days >= 7}
+              tooltip={`Streak: ${streak.days} dni. Kliknij aby zobaczyć szczegóły.`}
+            />
 
             {/* TODAY XP */}
-            <div style={{
-              padding: '20px',
-              background: 'rgba(124, 58, 237, 0.15)',
-              border: '2px solid rgba(124, 58, 237, 0.3)',
-              borderRadius: '16px'
-            }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                marginBottom: '8px'
-              }}>
-                <Zap size={20} color="#a78bfa" />
-                <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px' }}>
-                  Dzisiaj
-                </span>
-              </div>
-              <div style={{
-                fontSize: '32px',
-                fontWeight: 900,
-                color: '#a78bfa',
-                lineHeight: 1
-              }}>
-                {todayXP}
-              </div>
-              <div style={{
-                color: 'rgba(255,255,255,0.5)',
-                fontSize: '12px',
-                marginTop: '4px'
-              }}>
-                XP zdobyte
-              </div>
-            </div>
+            <StatCard
+              icon={Zap}
+              iconColor="#a78bfa"
+              bgColor="rgba(124, 58, 237, 0.15)"
+              borderColor="rgba(124, 58, 237, 0.3)"
+              label="Dzisiaj"
+              value={formatNumber(animatedXP)}
+              subLabel="XP zdobyte"
+            />
 
             {/* TOTAL XP */}
-            <div style={{
-              padding: '20px',
-              background: 'rgba(16, 185, 129, 0.15)',
-              border: '2px solid rgba(16, 185, 129, 0.3)',
-              borderRadius: '16px'
-            }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                marginBottom: '8px'
-              }}>
-                <Award size={20} color="#34d399" />
-                <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px' }}>
-                  Lacznie
-                </span>
-              </div>
-              <div style={{
-                fontSize: '32px',
-                fontWeight: 900,
-                color: '#34d399',
-                lineHeight: 1
-              }}>
-                {totalXP}
-              </div>
-              <div style={{
-                color: 'rgba(255,255,255,0.5)',
-                fontSize: '12px',
-                marginTop: '4px'
-              }}>
-                calkowite XP
-              </div>
-            </div>
+            <StatCard
+              icon={Award}
+              iconColor="#34d399"
+              bgColor="rgba(16, 185, 129, 0.15)"
+              borderColor="rgba(16, 185, 129, 0.3)"
+              label="Łącznie"
+              value={formatNumber(totalXP)}
+              subLabel="całkowite XP"
+            />
           </div>
 
           {/* DAILY GOAL PROGRESS */}
@@ -244,13 +601,18 @@ export default function DailyDashboard({
             padding: '20px',
             background: 'rgba(255,255,255,0.05)',
             borderRadius: '16px',
-            border: '1px solid rgba(255,255,255,0.1)'
+            border: dailyProgress >= 100 
+              ? '2px solid rgba(16, 185, 129, 0.5)'
+              : '1px solid rgba(255,255,255,0.1)',
+            transition: 'border 0.3s ease'
           }}>
             <div style={{
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              marginBottom: '12px'
+              marginBottom: '12px',
+              flexWrap: 'wrap',
+              gap: '8px'
             }}>
               <div style={{
                 display: 'flex',
@@ -261,33 +623,80 @@ export default function DailyDashboard({
               }}>
                 <Target size={18} />
                 Cel dzienny
+                {dailyProgress >= 100 && (
+                  <span style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '2px 8px',
+                    background: 'rgba(16, 185, 129, 0.2)',
+                    borderRadius: '12px',
+                    fontSize: '11px',
+                    color: '#10b981',
+                    fontWeight: 700
+                  }}>
+                    <Sparkles size={12} />
+                    OSIĄGNIĘTY
+                  </span>
+                )}
               </div>
               <span style={{
                 color: dailyProgress >= 100 ? '#10b981' : '#a78bfa',
-                fontWeight: 700
+                fontWeight: 700,
+                fontSize: '15px'
               }}>
                 {todayXP}/{dailyGoal} XP
               </span>
             </div>
+            
+            {/* Progress Bar */}
             <div style={{
-              height: '12px',
+              height: '14px',
               background: 'rgba(255,255,255,0.1)',
-              borderRadius: '6px',
-              overflow: 'hidden'
+              borderRadius: '7px',
+              overflow: 'hidden',
+              position: 'relative'
             }}>
+              {/* Milestones */}
+              {[25, 50, 75].map(milestone => (
+                <div
+                  key={milestone}
+                  style={{
+                    position: 'absolute',
+                    left: `${milestone}%`,
+                    top: 0,
+                    bottom: 0,
+                    width: '2px',
+                    background: 'rgba(255,255,255,0.2)',
+                    zIndex: 1
+                  }}
+                />
+              ))}
+              
               <div style={{
                 height: '100%',
                 width: `${dailyProgress}%`,
                 background: dailyProgress >= 100 
-                  ? 'linear-gradient(90deg, #10b981 0%, #34d399 100%)'
-                  : 'linear-gradient(90deg, #7c3aed 0%, #a78bfa 100%)',
-                borderRadius: '6px',
-                transition: 'width 0.5s ease',
+                  ? 'linear-gradient(90deg, #10b981 0%, #34d399 50%, #6ee7b7 100%)'
+                  : 'linear-gradient(90deg, #7c3aed 0%, #a78bfa 50%, #c4b5fd 100%)',
+                borderRadius: '7px',
+                transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
                 boxShadow: dailyProgress >= 100 
                   ? '0 0 20px rgba(16, 185, 129, 0.5)'
-                  : '0 0 20px rgba(124, 58, 237, 0.3)'
-              }} />
+                  : '0 0 20px rgba(124, 58, 237, 0.3)',
+                position: 'relative',
+                overflow: 'hidden'
+              }}>
+                {/* Shimmer effect */}
+                <div style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%)',
+                  animation: 'shimmer 2s ease-in-out infinite'
+                }} />
+              </div>
             </div>
+            
             {dailyProgress >= 100 && (
               <div style={{
                 display: 'flex',
@@ -296,64 +705,104 @@ export default function DailyDashboard({
                 marginTop: '12px',
                 color: '#10b981',
                 fontSize: '14px',
-                fontWeight: 600
+                fontWeight: 600,
+                animation: 'fadeIn 0.5s ease'
               }}>
                 <span style={{ fontSize: '20px' }}>🎉</span>
-                Cel osiagniety! Brawo!
+                Świetna robota! Cel osiągnięty!
+              </div>
+            )}
+
+            {/* XP to go */}
+            {dailyProgress < 100 && (
+              <div style={{
+                marginTop: '8px',
+                fontSize: '12px',
+                color: 'rgba(255,255,255,0.5)'
+              }}>
+                Jeszcze {dailyGoal - todayXP} XP do celu
               </div>
             )}
           </div>
 
           {/* WEEKLY ACTIVITY */}
+          <div style={{ marginTop: '16px' }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '12px'
+            }}>
+              <span style={{ 
+                color: 'rgba(255,255,255,0.6)', 
+                fontSize: '13px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                <Calendar size={14} />
+                Aktywność w tym tygodniu
+              </span>
+              <span style={{
+                color: '#a78bfa',
+                fontSize: '12px',
+                fontWeight: 600
+              }}>
+                {weeklyProgress.reduce((a, b) => a + b, 0)} XP
+              </span>
+            </div>
+            
+            <div style={{
+              display: 'flex',
+              gap: '8px'
+            }}>
+              {['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'Sb', 'Nd'].map((day, idx) => (
+                <WeeklyDay
+                  key={day}
+                  day={day}
+                  activity={weeklyProgress[idx] || 0}
+                  isToday={idx === getTodayIndex()}
+                  maxActivity={maxWeeklyActivity}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Level Progress (mini) */}
           <div style={{
             marginTop: '16px',
-            display: 'flex',
-            gap: '8px'
+            padding: '12px 16px',
+            background: 'rgba(124, 58, 237, 0.1)',
+            borderRadius: '12px',
+            border: '1px solid rgba(124, 58, 237, 0.2)'
           }}>
-            {['Pn', 'Wt', 'Sr', 'Cz', 'Pt', 'Sb', 'Nd'].map((day, idx) => {
-              const activity = weeklyProgress[idx] || 0;
-              const isToday = idx === new Date().getDay() - 1 || (new Date().getDay() === 0 && idx === 6);
-              
-              return (
-                <div
-                  key={day}
-                  style={{
-                    flex: 1,
-                    textAlign: 'center'
-                  }}
-                >
-                  <div style={{
-                    height: '40px',
-                    background: activity > 0 
-                      ? `rgba(124, 58, 237, ${0.3 + (activity / 100) * 0.7})`
-                      : 'rgba(255,255,255,0.05)',
-                    borderRadius: '8px',
-                    border: isToday ? '2px solid #a78bfa' : '1px solid rgba(255,255,255,0.1)',
-                    marginBottom: '8px',
-                    display: 'flex',
-                    alignItems: 'flex-end',
-                    justifyContent: 'center',
-                    padding: '4px'
-                  }}>
-                    {activity > 0 && (
-                      <div style={{
-                        width: '100%',
-                        height: `${Math.min(100, activity)}%`,
-                        background: 'linear-gradient(0deg, #7c3aed 0%, #a78bfa 100%)',
-                        borderRadius: '4px'
-                      }} />
-                    )}
-                  </div>
-                  <span style={{
-                    color: isToday ? '#a78bfa' : 'rgba(255,255,255,0.4)',
-                    fontSize: '11px',
-                    fontWeight: isToday ? 700 : 400
-                  }}>
-                    {day}
-                  </span>
-                </div>
-              );
-            })}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '8px'
+            }}>
+              <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>
+                Postęp do poziomu {levelInfo.level + 1}
+              </span>
+              <span style={{ color: '#a78bfa', fontSize: '12px', fontWeight: 600 }}>
+                {levelInfo.currentLevelXP}/{levelInfo.xpForNextLevel} XP
+              </span>
+            </div>
+            <div style={{
+              height: '6px',
+              background: 'rgba(255,255,255,0.1)',
+              borderRadius: '3px',
+              overflow: 'hidden'
+            }}>
+              <div style={{
+                height: '100%',
+                width: `${levelInfo.progress}%`,
+                background: 'linear-gradient(90deg, #7c3aed, #a78bfa)',
+                borderRadius: '3px',
+                transition: 'width 0.5s ease'
+              }} />
+            </div>
           </div>
         </div>
 
@@ -362,10 +811,11 @@ export default function DailyDashboard({
           background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)',
           backdropFilter: 'blur(10px)',
           borderRadius: '20px',
-          padding: '28px',
+          padding: 'clamp(20px, 3vw, 28px)',
           border: '1px solid rgba(255,255,255,0.15)',
           display: 'flex',
-          flexDirection: 'column'
+          flexDirection: 'column',
+          minHeight: '400px'
         }}>
           <div style={{
             display: 'flex',
@@ -381,7 +831,7 @@ export default function DailyDashboard({
               textTransform: 'uppercase',
               letterSpacing: '0.5px'
             }}>
-              Kontynuuj nauke
+              Kontynuuj naukę
             </span>
           </div>
 
@@ -389,18 +839,21 @@ export default function DailyDashboard({
             <>
               <div style={{
                 fontSize: '48px',
-                marginBottom: '16px'
+                marginBottom: '16px',
+                animation: 'bounce 1s ease-in-out'
               }}>
                 {nextTask.type === 'calc' ? '🧮' : 
                  nextTask.type === 'practical' ? '🔧' :
                  nextTask.type === 'safety' ? '⚠️' :
-                 nextTask.type === 'theory' ? '📚' : '📝'}
+                 nextTask.type === 'theory' ? '📚' :
+                 nextTask.type === 'quiz' ? '❓' :
+                 nextTask.type === 'video' ? '🎬' : '📝'}
               </div>
 
               <h3 style={{
                 margin: '0 0 12px',
                 color: 'white',
-                fontSize: '22px',
+                fontSize: 'clamp(18px, 2.5vw, 22px)',
                 fontWeight: 800,
                 lineHeight: 1.3
               }}>
@@ -414,45 +867,78 @@ export default function DailyDashboard({
                 lineHeight: 1.6,
                 flex: 1
               }}>
-                {nextTask.description?.slice(0, 120)}...
+                {nextTask.description?.length > 120 
+                  ? `${nextTask.description.slice(0, 120)}...`
+                  : nextTask.description || 'Kliknij aby rozpocząć tę lekcję.'}
               </p>
 
               <div style={{
                 display: 'flex',
                 gap: '12px',
-                marginBottom: '20px'
+                marginBottom: '20px',
+                flexWrap: 'wrap'
               }}>
-                <span style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '8px 12px',
-                  background: 'rgba(255,255,255,0.1)',
-                  borderRadius: '8px',
-                  color: 'rgba(255,255,255,0.7)',
-                  fontSize: '13px'
-                }}>
-                  <Clock size={14} />
-                  {nextTask.estimatedTime}
-                </span>
-                <span style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '8px 12px',
-                  background: 'rgba(245, 158, 11, 0.2)',
-                  borderRadius: '8px',
-                  color: '#fbbf24',
-                  fontSize: '13px',
-                  fontWeight: 600
-                }}>
-                  <Zap size={14} />
-                  +{nextTask.xpReward} XP
-                </span>
+                {nextTask.estimatedTime && (
+                  <span style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '8px 12px',
+                    background: 'rgba(255,255,255,0.1)',
+                    borderRadius: '8px',
+                    color: 'rgba(255,255,255,0.7)',
+                    fontSize: '13px'
+                  }}>
+                    <Clock size={14} />
+                    {nextTask.estimatedTime}
+                  </span>
+                )}
+                {nextTask.xpReward && (
+                  <span style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '8px 12px',
+                    background: 'rgba(245, 158, 11, 0.2)',
+                    borderRadius: '8px',
+                    color: '#fbbf24',
+                    fontSize: '13px',
+                    fontWeight: 600
+                  }}>
+                    <Zap size={14} />
+                    +{nextTask.xpReward} XP
+                  </span>
+                )}
+                {nextTask.difficulty && (
+                  <span style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '8px 12px',
+                    background: nextTask.difficulty === 'hard' 
+                      ? 'rgba(239, 68, 68, 0.2)' 
+                      : nextTask.difficulty === 'medium'
+                        ? 'rgba(251, 191, 36, 0.2)'
+                        : 'rgba(34, 197, 94, 0.2)',
+                    borderRadius: '8px',
+                    color: nextTask.difficulty === 'hard' 
+                      ? '#f87171' 
+                      : nextTask.difficulty === 'medium'
+                        ? '#fbbf24'
+                        : '#4ade80',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    textTransform: 'capitalize'
+                  }}>
+                    {nextTask.difficulty === 'hard' ? '🔥' : nextTask.difficulty === 'medium' ? '⚡' : '✨'}
+                    {nextTask.difficulty}
+                  </span>
+                )}
               </div>
 
               <button
                 onClick={() => onContinue?.(nextTask)}
+                aria-label={`Rozpocznij lekcję: ${nextTask.title}`}
                 style={{
                   width: '100%',
                   padding: '16px 24px',
@@ -467,11 +953,21 @@ export default function DailyDashboard({
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '8px',
-                  transition: 'all 0.3s ease',
-                  boxShadow: '0 8px 24px rgba(124, 58, 237, 0.4)'
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  boxShadow: '0 8px 24px rgba(124, 58, 237, 0.4)',
+                  position: 'relative',
+                  overflow: 'hidden'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 12px 32px rgba(124, 58, 237, 0.5)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 8px 24px rgba(124, 58, 237, 0.4)';
                 }}
               >
-                Rozpocznij teraz
+                <span>Rozpocznij teraz</span>
                 <ChevronRight size={20} />
               </button>
             </>
@@ -482,29 +978,38 @@ export default function DailyDashboard({
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              textAlign: 'center'
+              textAlign: 'center',
+              padding: '20px'
             }}>
-              <div style={{ fontSize: '64px', marginBottom: '16px' }}>🎉</div>
+              <div style={{ 
+                fontSize: '64px', 
+                marginBottom: '16px',
+                animation: 'bounce 1s ease-in-out infinite'
+              }}>
+                🎉
+              </div>
               <h3 style={{
                 margin: '0 0 8px',
                 color: 'white',
                 fontSize: '20px',
                 fontWeight: 700
               }}>
-                Wszystko ukonczone!
+                Wszystko ukończone!
               </h3>
               <p style={{
                 margin: 0,
                 color: 'rgba(255,255,255,0.6)',
-                fontSize: '14px'
+                fontSize: '14px',
+                lineHeight: 1.6
               }}>
-                Swietna robota! Wracaj jutro po nowe wyzwania.
+                Świetna robota! Wracaj jutro po nowe wyzwania.
               </p>
             </div>
           )}
 
           <button
             onClick={onViewAll}
+            aria-label="Zobacz wszystkie dostępne lekcje"
             style={{
               marginTop: '12px',
               padding: '12px',
@@ -517,6 +1022,14 @@ export default function DailyDashboard({
               cursor: 'pointer',
               transition: 'all 0.2s ease'
             }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)';
+            }}
           >
             Zobacz wszystkie lekcje
           </button>
@@ -527,44 +1040,95 @@ export default function DailyDashboard({
       {showStreakDetails && (
         <div
           onClick={() => setShowStreakDetails(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="streak-modal-title"
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            backdropFilter: 'blur(4px)',
+            background: 'rgba(0,0,0,0.6)',
+            backdropFilter: 'blur(8px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 1000
+            zIndex: 1000,
+            padding: '20px',
+            animation: 'fadeIn 0.2s ease'
           }}
         >
           <div
+            ref={modalRef}
+            tabIndex={-1}
             onClick={(e) => e.stopPropagation()}
             style={{
               background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)',
               borderRadius: '24px',
               padding: '32px',
-              maxWidth: '400px',
-              border: '2px solid rgba(245, 158, 11, 0.3)'
+              maxWidth: '420px',
+              width: '100%',
+              border: '2px solid rgba(245, 158, 11, 0.3)',
+              boxShadow: '0 24px 48px rgba(0,0,0,0.4)',
+              animation: 'scaleIn 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
             }}
           >
+            {/* Close button */}
+            <button
+              onClick={() => setShowStreakDetails(false)}
+              aria-label="Zamknij"
+              style={{
+                position: 'absolute',
+                top: '16px',
+                right: '16px',
+                background: 'rgba(255,255,255,0.1)',
+                border: 'none',
+                borderRadius: '50%',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: 'rgba(255,255,255,0.6)',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <X size={18} />
+            </button>
+
             <div style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '12px',
+              gap: '16px',
               marginBottom: '24px'
             }}>
-              <span style={{ fontSize: '48px' }}>🔥</span>
+              <div style={{
+                fontSize: '56px',
+                animation: 'bounce 1s ease-in-out infinite'
+              }}>
+                🔥
+              </div>
               <div>
-                <div style={{
-                  fontSize: '36px',
-                  fontWeight: 900,
-                  color: '#fbbf24'
-                }}>
+                <div 
+                  id="streak-modal-title"
+                  style={{
+                    fontSize: '40px',
+                    fontWeight: 900,
+                    color: '#fbbf24',
+                    lineHeight: 1
+                  }}
+                >
                   {streak.days} dni
                 </div>
-                <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '14px' }}>
-                  Twoj aktualny streak
+                <div style={{ 
+                  color: 'rgba(255,255,255,0.6)', 
+                  fontSize: '14px',
+                  marginTop: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}>
+                  <streakStatus.icon size={14} color={streakStatus.color} />
+                  {streakStatus.label}
                 </div>
               </div>
             </div>
@@ -572,50 +1136,138 @@ export default function DailyDashboard({
             <p style={{
               color: 'rgba(255,255,255,0.8)',
               fontSize: '15px',
-              lineHeight: 1.6,
+              lineHeight: 1.7,
               marginBottom: '24px'
             }}>
-              {streak.days >= 7 
-                ? 'Niesamowite! Tydzien codziennej nauki. To buduje prawdziwe nawyki!'
-                : streak.days >= 3
-                  ? 'Swietnie! Utrzymujesz regularnosc. Jeszcze kilka dni do tygodniowej passy!'
-                  : 'Kazdy dzien sie liczy. Ucz sie codziennie, aby zbudowac streak!'}
+              {streak.days >= 30 
+                ? '🏆 Niesamowite! Miesiąc codziennej nauki! Jesteś prawdziwą legendą!'
+                : streak.days >= 7 
+                  ? '⭐ Niesamowite! Tydzień codziennej nauki. To buduje prawdziwe nawyki!'
+                  : streak.days >= 3
+                    ? '💪 Świetnie! Utrzymujesz regularność. Jeszcze kilka dni do tygodniowej passy!'
+                    : '🌱 Każdy dzień się liczy. Ucz się codziennie, aby zbudować streak!'}
             </p>
 
+            {/* Stats */}
             <div style={{
-              padding: '16px',
-              background: 'rgba(255,255,255,0.05)',
-              borderRadius: '12px',
-              marginBottom: '16px'
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '12px',
+              marginBottom: '20px'
             }}>
               <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                color: 'rgba(255,255,255,0.7)',
-                fontSize: '14px'
+                padding: '16px',
+                background: 'rgba(255,255,255,0.05)',
+                borderRadius: '12px'
               }}>
-                <span>Rekord:</span>
-                <span style={{ color: '#fbbf24', fontWeight: 700 }}>
-                  {Math.max(streak.days, 7)} dni
-                </span>
+                <div style={{
+                  color: 'rgba(255,255,255,0.5)',
+                  fontSize: '12px',
+                  marginBottom: '4px'
+                }}>
+                  Rekord
+                </div>
+                <div style={{ 
+                  color: '#fbbf24', 
+                  fontWeight: 700,
+                  fontSize: '20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}>
+                  <Trophy size={16} />
+                  {Math.max(streak.days, streak.record || 0)} dni
+                </div>
+              </div>
+              
+              <div style={{
+                padding: '16px',
+                background: 'rgba(255,255,255,0.05)',
+                borderRadius: '12px'
+              }}>
+                <div style={{
+                  color: 'rgba(255,255,255,0.5)',
+                  fontSize: '12px',
+                  marginBottom: '4px'
+                }}>
+                  Zamrożenia
+                </div>
+                <div style={{ 
+                  color: '#60a5fa', 
+                  fontWeight: 700,
+                  fontSize: '20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}>
+                  <Shield size={16} />
+                  {streak.freezesAvailable || 0}
+                </div>
               </div>
             </div>
+
+            {/* Next milestone */}
+            {streak.days < 30 && (
+              <div style={{
+                padding: '16px',
+                background: 'rgba(124, 58, 237, 0.1)',
+                borderRadius: '12px',
+                marginBottom: '20px',
+                border: '1px solid rgba(124, 58, 237, 0.2)'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '8px'
+                }}>
+                  <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px' }}>
+                    Następny cel
+                  </span>
+                  <span style={{ color: '#a78bfa', fontWeight: 700, fontSize: '14px' }}>
+                    {streak.days < 7 ? '7 dni' : streak.days < 14 ? '14 dni' : '30 dni'}
+                  </span>
+                </div>
+                <div style={{
+                  height: '8px',
+                  background: 'rgba(255,255,255,0.1)',
+                  borderRadius: '4px',
+                  overflow: 'hidden'
+                }}>
+                  <div style={{
+                    height: '100%',
+                    width: `${(streak.days / (streak.days < 7 ? 7 : streak.days < 14 ? 14 : 30)) * 100}%`,
+                    background: 'linear-gradient(90deg, #7c3aed, #a78bfa)',
+                    borderRadius: '4px',
+                    transition: 'width 0.3s ease'
+                  }} />
+                </div>
+              </div>
+            )}
 
             <button
               onClick={() => setShowStreakDetails(false)}
               style={{
                 width: '100%',
-                padding: '14px',
+                padding: '16px',
                 background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
                 border: 'none',
-                borderRadius: '12px',
+                borderRadius: '14px',
                 color: 'white',
-                fontSize: '15px',
+                fontSize: '16px',
                 fontWeight: 700,
-                cursor: 'pointer'
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                boxShadow: '0 8px 24px rgba(245, 158, 11, 0.3)'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
               }}
             >
-              Kontynuuj nauke
+              Kontynuuj naukę 🚀
             </button>
           </div>
         </div>
@@ -625,6 +1277,61 @@ export default function DailyDashboard({
         @keyframes float {
           0%, 100% { transform: translateY(0px); }
           50% { transform: translateY(-10px); }
+        }
+        
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
+        }
+        
+        @keyframes bounce {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-5px); }
+        }
+        
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        
+        @keyframes scaleIn {
+          from { 
+            opacity: 0;
+            transform: scale(0.9);
+          }
+          to { 
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+        
+        @keyframes shimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+        
+        @keyframes confetti {
+          0% {
+            transform: translateY(0) rotate(0deg);
+            opacity: 1;
+          }
+          100% {
+            transform: translateY(400px) rotate(720deg);
+            opacity: 0;
+          }
+        }
+        
+        /* Responsive styles */
+        @media (max-width: 900px) {
+          .dashboard-grid {
+            grid-template-columns: 1fr !important;
+          }
+        }
+        
+        @media (max-width: 480px) {
+          .dashboard-grid > div:first-child > div:nth-child(2) {
+            grid-template-columns: 1fr !important;
+          }
         }
       `}</style>
     </div>
