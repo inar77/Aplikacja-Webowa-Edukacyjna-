@@ -1,0 +1,603 @@
+'use client';
+import React, { useState } from 'react';
+import { Zap, ChevronRight, Shuffle, Target, TrendingUp, Lightbulb } from 'lucide-react';
+
+// ============================================================
+// CROSS-SKILLS SYSTEM - System kompetencji uniwersalnych
+// "Te same umiejetnosci, rozne konteksty zawodowe"
+// ============================================================
+
+const UNIVERSAL_SKILLS = {
+  'problem-solving': {
+    name: 'Rozwiazywanie problemow',
+    icon: '🧩',
+    color: '#8b5cf6',
+    description: 'Analiza sytuacji, identyfikacja przyczyn, znajdowanie rozwiazan',
+    usedIn: ['IT', 'Automatyka', 'Logistyka', 'Medycyna', 'Inzynieria']
+  },
+  'analysis': {
+    name: 'Analiza i diagnostyka',
+    icon: '🔍',
+    color: '#3b82f6',
+    description: 'Zbieranie danych, interpretacja wynikow, wyciaganie wnioskow',
+    usedIn: ['Data Science', 'QA', 'Medycyna', 'Finanse', 'Badania']
+  },
+  'safety': {
+    name: 'Bezpieczenstwo',
+    icon: '🛡️',
+    color: '#10b981',
+    description: 'Ocena ryzyka, procedury bezpieczenstwa, zapobieganie wypadkom',
+    usedIn: ['IT Security', 'BHP', 'Medycyna', 'Produkcja', 'Lotnictwo']
+  },
+  'precision': {
+    name: 'Precyzja i dokladnosc',
+    icon: '🎯',
+    color: '#f59e0b',
+    description: 'Dbalosc o detale, standardy jakosci, minimalizacja bledow',
+    usedIn: ['Chirurgia', 'Programowanie', 'Mechanika', 'Jubilerstwo', 'Architektura']
+  },
+  'systems-thinking': {
+    name: 'Myslenie systemowe',
+    icon: '🔄',
+    color: '#ec4899',
+    description: 'Rozumienie polaczen miedzy elementami, widzenie calego obrazu',
+    usedIn: ['Architektura IT', 'Zarzadzanie', 'Ekologia', 'Urbanistyka', 'Biologia']
+  },
+  'calculation': {
+    name: 'Obliczenia praktyczne',
+    icon: '🧮',
+    color: '#6366f1',
+    description: 'Stosowanie wzorow, szacowanie, przeliczanie jednostek',
+    usedIn: ['Finanse', 'Inzynieria', 'Farmacja', 'Budownictwo', 'Fizyka']
+  },
+  'tools': {
+    name: 'Praca z narzedziami',
+    icon: '🔧',
+    color: '#14b8a6',
+    description: 'Dobor narzedzi, ergonomia, konserwacja sprzetu',
+    usedIn: ['Chirurgia', 'Rzemioslo', 'Sztuka', 'Laboratoria', 'Sport']
+  },
+  'communication': {
+    name: 'Komunikacja techniczna',
+    icon: '💬',
+    color: '#f97316',
+    description: 'Dokumentacja, tlumaczenie zlozonosci, wspolpraca',
+    usedIn: ['Tech Writing', 'Konsulting', 'Edukacja', 'Sprzedaz', 'Management']
+  }
+};
+
+const CROSS_DOMAIN_EXAMPLES = [
+  {
+    skill: 'problem-solving',
+    scenarios: [
+      { domain: 'Elektryk', task: 'Diagnoza zwarcia w instalacji', icon: '⚡' },
+      { domain: 'IT', task: 'Debugowanie kodu aplikacji', icon: '💻' },
+      { domain: 'Mechanik', task: 'Znalezienie przyczyny awarii silnika', icon: '🔩' },
+      { domain: 'Lekarz', task: 'Diagnostyka objawow pacjenta', icon: '🩺' }
+    ]
+  },
+  {
+    skill: 'calculation',
+    scenarios: [
+      { domain: 'Elektryk', task: 'Obliczenie przekroju przewodu', icon: '⚡' },
+      { domain: 'Farmaceuta', task: 'Dawkowanie leku na mase ciala', icon: '💊' },
+      { domain: 'Budownictwo', task: 'Obliczenie nosnosci belki', icon: '🏗️' },
+      { domain: 'Finanse', task: 'Kalkulacja zwrotu z inwestycji', icon: '📊' }
+    ]
+  },
+  {
+    skill: 'safety',
+    scenarios: [
+      { domain: 'Elektryk', task: 'Procedury pracy pod napieciem', icon: '⚡' },
+      { domain: 'IT', task: 'Zabezpieczenie przed cyberatakiem', icon: '🔐' },
+      { domain: 'Chemik', task: 'Obsluga substancji niebezpiecznych', icon: '🧪' },
+      { domain: 'Pilot', task: 'Procedury awaryjne w locie', icon: '✈️' }
+    ]
+  }
+];
+
+export default function CrossSkillsSystem({
+  userSkills = {},
+  onExploreSkill,
+  onTryDifferentDomain
+}) {
+  const [activeSkill, setActiveSkill] = useState(null);
+  const [showTransferDemo, setShowTransferDemo] = useState(false);
+  const [currentExample, setCurrentExample] = useState(0);
+
+  const getSkillLevel = (skillId) => {
+    const level = userSkills[skillId] || 0;
+    if (level >= 80) return { label: 'Ekspert', color: '#8b5cf6' };
+    if (level >= 60) return { label: 'Zaawansowany', color: '#3b82f6' };
+    if (level >= 40) return { label: 'Sredni', color: '#10b981' };
+    if (level >= 20) return { label: 'Podstawowy', color: '#f59e0b' };
+    return { label: 'Nowy', color: '#6b7280' };
+  };
+
+  return (
+    <div style={{
+      background: 'linear-gradient(135deg, #0c0a1d 0%, #1a1833 100%)',
+      borderRadius: '24px',
+      padding: '32px',
+      marginBottom: '24px',
+      position: 'relative',
+      overflow: 'hidden'
+    }}>
+      {/* HEADER */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: '32px'
+      }}>
+        <div>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            marginBottom: '8px'
+          }}>
+            <span style={{ fontSize: '28px' }}>🎯</span>
+            <h2 style={{
+              margin: 0,
+              fontSize: '24px',
+              fontWeight: 900,
+              color: 'white'
+            }}>
+              Kompetencje Uniwersalne
+            </h2>
+          </div>
+          <p style={{
+            margin: 0,
+            color: 'rgba(255,255,255,0.6)',
+            fontSize: '14px',
+            maxWidth: '500px'
+          }}>
+            Te umiejetnosci przenosza sie miedzy zawodami. Ucz sie raz - stosuj wszedzie.
+          </p>
+        </div>
+
+        <button
+          onClick={() => setShowTransferDemo(true)}
+          style={{
+            padding: '12px 20px',
+            background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
+            border: 'none',
+            borderRadius: '12px',
+            color: 'white',
+            fontSize: '14px',
+            fontWeight: 700,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
+          <Shuffle size={18} />
+          Zobacz transfer umiejetnosci
+        </button>
+      </div>
+
+      {/* SKILLS GRID */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+        gap: '16px',
+        marginBottom: '32px'
+      }}>
+        {Object.entries(UNIVERSAL_SKILLS).map(([skillId, skill]) => {
+          const level = userSkills[skillId] || 0;
+          const levelInfo = getSkillLevel(skillId);
+          const isActive = activeSkill === skillId;
+
+          return (
+            <div
+              key={skillId}
+              onClick={() => setActiveSkill(isActive ? null : skillId)}
+              style={{
+                padding: '20px',
+                background: isActive 
+                  ? `linear-gradient(135deg, ${skill.color}20 0%, ${skill.color}10 100%)`
+                  : 'rgba(255,255,255,0.03)',
+                border: `2px solid ${isActive ? skill.color : 'rgba(255,255,255,0.1)'}`,
+                borderRadius: '16px',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                transform: isActive ? 'scale(1.02)' : 'scale(1)'
+              }}
+            >
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                marginBottom: '12px'
+              }}>
+                <div style={{
+                  width: '48px',
+                  height: '48px',
+                  background: `${skill.color}20`,
+                  borderRadius: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '24px'
+                }}>
+                  {skill.icon}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <h4 style={{
+                    margin: 0,
+                    color: 'white',
+                    fontSize: '15px',
+                    fontWeight: 700
+                  }}>
+                    {skill.name}
+                  </h4>
+                  <span style={{
+                    fontSize: '12px',
+                    color: levelInfo.color,
+                    fontWeight: 600
+                  }}>
+                    {levelInfo.label}
+                  </span>
+                </div>
+              </div>
+
+              {/* PROGRESS BAR */}
+              <div style={{
+                height: '6px',
+                background: 'rgba(255,255,255,0.1)',
+                borderRadius: '3px',
+                overflow: 'hidden',
+                marginBottom: '12px'
+              }}>
+                <div style={{
+                  height: '100%',
+                  width: `${level}%`,
+                  background: `linear-gradient(90deg, ${skill.color} 0%, ${skill.color}aa 100%)`,
+                  borderRadius: '3px',
+                  transition: 'width 0.5s ease'
+                }} />
+              </div>
+
+              <p style={{
+                margin: '0 0 12px',
+                color: 'rgba(255,255,255,0.5)',
+                fontSize: '13px',
+                lineHeight: 1.5
+              }}>
+                {skill.description}
+              </p>
+
+              {/* USED IN */}
+              <div style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '6px'
+              }}>
+                {skill.usedIn.slice(0, 3).map((domain) => (
+                  <span
+                    key={domain}
+                    style={{
+                      padding: '4px 10px',
+                      background: 'rgba(255,255,255,0.05)',
+                      borderRadius: '999px',
+                      fontSize: '11px',
+                      color: 'rgba(255,255,255,0.6)'
+                    }}
+                  >
+                    {domain}
+                  </span>
+                ))}
+                {skill.usedIn.length > 3 && (
+                  <span style={{
+                    padding: '4px 10px',
+                    fontSize: '11px',
+                    color: skill.color
+                  }}>
+                    +{skill.usedIn.length - 3}
+                  </span>
+                )}
+              </div>
+
+              {/* EXPANDED CONTENT */}
+              {isActive && (
+                <div style={{
+                  marginTop: '16px',
+                  paddingTop: '16px',
+                  borderTop: '1px solid rgba(255,255,255,0.1)'
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    gap: '8px',
+                    marginBottom: '12px'
+                  }}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onExploreSkill?.(skillId);
+                      }}
+                      style={{
+                        flex: 1,
+                        padding: '10px',
+                        background: skill.color,
+                        border: 'none',
+                        borderRadius: '8px',
+                        color: 'white',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Rozwijaj te kompetencje
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onTryDifferentDomain?.(skillId);
+                      }}
+                      style={{
+                        padding: '10px 16px',
+                        background: 'rgba(255,255,255,0.1)',
+                        border: 'none',
+                        borderRadius: '8px',
+                        color: 'white',
+                        fontSize: '13px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <Shuffle size={16} />
+                    </button>
+                  </div>
+                  <p style={{
+                    margin: 0,
+                    color: 'rgba(255,255,255,0.5)',
+                    fontSize: '12px',
+                    textAlign: 'center'
+                  }}>
+                    💡 Sprobuj tej umiejetnosci w innym kontekscie zawodowym
+                  </p>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* TRANSFER INSIGHT */}
+      <div style={{
+        padding: '24px',
+        background: 'linear-gradient(135deg, rgba(124, 58, 237, 0.1) 0%, rgba(245, 158, 11, 0.1) 100%)',
+        borderRadius: '16px',
+        border: '1px solid rgba(255,255,255,0.1)'
+      }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          marginBottom: '16px'
+        }}>
+          <Lightbulb size={24} color="#fbbf24" />
+          <h3 style={{
+            margin: 0,
+            color: 'white',
+            fontSize: '18px',
+            fontWeight: 700
+          }}>
+            Dlaczego to wazne?
+          </h3>
+        </div>
+        <p style={{
+          margin: '0 0 16px',
+          color: 'rgba(255,255,255,0.7)',
+          fontSize: '15px',
+          lineHeight: 1.7
+        }}>
+          W przyszlosci ludzie beda zmieniac zawod srednio <strong style={{ color: '#fbbf24' }}>5-7 razy</strong> w ciagu zycia. 
+          Kluczem do sukcesu nie jest nauka jednego zawodu, ale budowanie <strong style={{ color: '#a78bfa' }}>uniwersalnej bazy umiejetnosci</strong>, 
+          ktore mozna szybko adaptowac do nowych domen.
+        </p>
+        <div style={{
+          display: 'flex',
+          gap: '16px',
+          flexWrap: 'wrap'
+        }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            color: 'rgba(255,255,255,0.6)',
+            fontSize: '13px'
+          }}>
+            <TrendingUp size={16} color="#10b981" />
+            Uczysz sie szybciej w nowych dziedzinach
+          </div>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            color: 'rgba(255,255,255,0.6)',
+            fontSize: '13px'
+          }}>
+            <Target size={16} color="#3b82f6" />
+            Widzisz polaczenia miedzy branżami
+          </div>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            color: 'rgba(255,255,255,0.6)',
+            fontSize: '13px'
+          }}>
+            <Zap size={16} color="#f59e0b" />
+            Stajesz sie bardziej konkurencyjny
+          </div>
+        </div>
+      </div>
+
+      {/* TRANSFER DEMO MODAL */}
+      {showTransferDemo && (
+        <div
+          onClick={() => setShowTransferDemo(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.8)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '24px'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)',
+              borderRadius: '24px',
+              padding: '32px',
+              maxWidth: '600px',
+              width: '100%',
+              border: '2px solid rgba(124, 58, 237, 0.3)'
+            }}
+          >
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              marginBottom: '24px'
+            }}>
+              <Shuffle size={28} color="#a78bfa" />
+              <h2 style={{
+                margin: 0,
+                color: 'white',
+                fontSize: '24px',
+                fontWeight: 800
+              }}>
+                Transfer Umiejetnosci
+              </h2>
+            </div>
+
+            <p style={{
+              color: 'rgba(255,255,255,0.7)',
+              fontSize: '15px',
+              marginBottom: '24px',
+              lineHeight: 1.6
+            }}>
+              Ta sama kompetencja - rozne zawody. Zobacz jak umiejetnosc 
+              <strong style={{ color: '#fbbf24' }}> "{UNIVERSAL_SKILLS[CROSS_DOMAIN_EXAMPLES[currentExample].skill]?.name}"</strong> 
+              {' '}jest wykorzystywana w roznych dziedzinach:
+            </p>
+
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(2, 1fr)',
+              gap: '12px',
+              marginBottom: '24px'
+            }}>
+              {CROSS_DOMAIN_EXAMPLES[currentExample].scenarios.map((scenario, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    padding: '16px',
+                    background: 'rgba(255,255,255,0.05)',
+                    borderRadius: '12px',
+                    border: '1px solid rgba(255,255,255,0.1)'
+                  }}
+                >
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    marginBottom: '8px'
+                  }}>
+                    <span style={{ fontSize: '24px' }}>{scenario.icon}</span>
+                    <span style={{
+                      color: '#a78bfa',
+                      fontSize: '13px',
+                      fontWeight: 700
+                    }}>
+                      {scenario.domain}
+                    </span>
+                  </div>
+                  <p style={{
+                    margin: 0,
+                    color: 'rgba(255,255,255,0.8)',
+                    fontSize: '14px'
+                  }}>
+                    {scenario.task}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            <div style={{
+              display: 'flex',
+              gap: '8px',
+              marginBottom: '24px'
+            }}>
+              {CROSS_DOMAIN_EXAMPLES.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setCurrentExample(idx)}
+                  style={{
+                    width: '40px',
+                    height: '6px',
+                    background: currentExample === idx ? '#a78bfa' : 'rgba(255,255,255,0.2)',
+                    border: 'none',
+                    borderRadius: '3px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                />
+              ))}
+            </div>
+
+            <div style={{
+              display: 'flex',
+              gap: '12px'
+            }}>
+              <button
+                onClick={() => setCurrentExample((prev) => (prev + 1) % CROSS_DOMAIN_EXAMPLES.length)}
+                style={{
+                  flex: 1,
+                  padding: '14px',
+                  background: 'rgba(255,255,255,0.1)',
+                  border: 'none',
+                  borderRadius: '12px',
+                  color: 'white',
+                  fontSize: '15px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}
+              >
+                <Shuffle size={18} />
+                Nastepna kompetencja
+              </button>
+              <button
+                onClick={() => setShowTransferDemo(false)}
+                style={{
+                  padding: '14px 24px',
+                  background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
+                  border: 'none',
+                  borderRadius: '12px',
+                  color: 'white',
+                  fontSize: '15px',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                Rozumiem
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
