@@ -1,0 +1,546 @@
+'use client';
+
+import React, { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Compass,
+  Sparkles,
+  Clock,
+  TrendingUp,
+  Star,
+  Bookmark,
+  BookmarkCheck,
+  Play,
+  ChevronRight,
+  Filter,
+  Search,
+  Zap,
+  Users,
+  DollarSign,
+  GraduationCap,
+  Map,
+  Shuffle,
+  Heart,
+  Eye,
+  Lock,
+  Unlock
+} from 'lucide-react';
+
+// Discovery Zones - thematic areas to explore
+const DISCOVERY_ZONES = [
+  {
+    id: 'energy',
+    name: 'Energia i OZE',
+    description: 'Fotowoltaika, pompy ciepła, smart grid',
+    icon: '⚡',
+    color: 'from-amber-500/20 to-orange-500/20',
+    borderColor: 'border-amber-500/30',
+    careers: ['instalator-pv', 'technik-pomp-ciepla', 'smart-grid-specialist'],
+    explorationProgress: 45,
+    unlocked: true
+  },
+  {
+    id: 'automation',
+    name: 'Automatyka i Robotyka',
+    description: 'PLC, roboty przemysłowe, Industry 4.0',
+    icon: '🤖',
+    color: 'from-violet-500/20 to-purple-500/20',
+    borderColor: 'border-violet-500/30',
+    careers: ['automatyk', 'programista-plc', 'technik-robotyki'],
+    explorationProgress: 20,
+    unlocked: true
+  },
+  {
+    id: 'it',
+    name: 'IT i Sieci',
+    description: 'Infrastruktura, cybersecurity, IoT',
+    icon: '💻',
+    color: 'from-blue-500/20 to-cyan-500/20',
+    borderColor: 'border-blue-500/30',
+    careers: ['technik-it', 'administrator-sieci', 'iot-specialist'],
+    explorationProgress: 10,
+    unlocked: true
+  },
+  {
+    id: 'design',
+    name: 'Projektowanie',
+    description: 'CAD, BIM, projekty elektryczne',
+    icon: '📐',
+    color: 'from-emerald-500/20 to-teal-500/20',
+    borderColor: 'border-emerald-500/30',
+    careers: ['projektant-instalacji', 'specjalista-bim', 'kosztorysant'],
+    explorationProgress: 0,
+    unlocked: false
+  },
+  {
+    id: 'management',
+    name: 'Zarządzanie',
+    description: 'Kierowanie zespołem, projekty, własna firma',
+    icon: '👔',
+    color: 'from-rose-500/20 to-pink-500/20',
+    borderColor: 'border-rose-500/30',
+    careers: ['kierownik-robót', 'pm', 'wlasciciel-firmy'],
+    explorationProgress: 0,
+    unlocked: false
+  }
+];
+
+// Sample careers to explore
+const EXPLORABLE_CAREERS = [
+  {
+    id: 'instalator-pv',
+    name: 'Instalator fotowoltaiki',
+    zone: 'energy',
+    description: 'Montaż i serwis systemów fotowoltaicznych',
+    icon: '☀️',
+    salary: { min: 7000, max: 15000 },
+    demand: 'very-high' as const,
+    demandChange: '+35%',
+    timeToEntry: '2-3 miesiące',
+    matchScore: 85,
+    explored: true,
+    bookmarked: true,
+    skills: ['Instalacje elektryczne', 'Praca na wysokości', 'Systemy DC'],
+    dailyWork: 'Montaż paneli, podłączanie falowników, diagnostyka'
+  },
+  {
+    id: 'automatyk',
+    name: 'Automatyk przemysłowy',
+    zone: 'automation',
+    description: 'Programowanie i serwis systemów automatyki',
+    icon: '🤖',
+    salary: { min: 8000, max: 18000 },
+    demand: 'high' as const,
+    demandChange: '+25%',
+    timeToEntry: '4-6 miesięcy',
+    matchScore: 78,
+    explored: true,
+    bookmarked: false,
+    skills: ['PLC', 'Diagnostyka', 'Czytanie schematów'],
+    dailyWork: 'Programowanie PLC, uruchamianie linii, troubleshooting'
+  },
+  {
+    id: 'technik-it',
+    name: 'Technik IT / Helpdesk',
+    zone: 'it',
+    description: 'Wsparcie użytkowników, administracja sieci',
+    icon: '💻',
+    salary: { min: 5000, max: 12000 },
+    demand: 'high' as const,
+    demandChange: '+15%',
+    timeToEntry: '3-6 miesięcy',
+    matchScore: 62,
+    explored: false,
+    bookmarked: false,
+    skills: ['Sieci', 'Windows/Linux', 'Troubleshooting'],
+    dailyWork: 'Rozwiązywanie problemów, konfiguracja sprzętu, wsparcie użytkowników'
+  },
+  {
+    id: 'technik-pomp-ciepla',
+    name: 'Technik pomp ciepła',
+    zone: 'energy',
+    description: 'Montaż i serwis pomp ciepła',
+    icon: '🌡️',
+    salary: { min: 8000, max: 16000 },
+    demand: 'very-high' as const,
+    demandChange: '+45%',
+    timeToEntry: '3-4 miesiące',
+    matchScore: 72,
+    explored: false,
+    bookmarked: false,
+    skills: ['Chłodnictwo', 'Instalacje grzewcze', 'Certyfikat F-gazowy'],
+    dailyWork: 'Montaż pomp ciepła, regulacja, serwisowanie'
+  },
+  {
+    id: 'smart-grid-specialist',
+    name: 'Specjalista Smart Grid',
+    zone: 'energy',
+    description: 'Inteligentne sieci energetyczne',
+    icon: '🔌',
+    salary: { min: 10000, max: 20000 },
+    demand: 'high' as const,
+    demandChange: '+30%',
+    timeToEntry: '6-12 miesięcy',
+    matchScore: 55,
+    explored: false,
+    bookmarked: false,
+    skills: ['Sieci elektroenergetyczne', 'IoT', 'Analiza danych'],
+    dailyWork: 'Projektowanie smart grid, analiza danych, optymalizacja'
+  }
+];
+
+interface Props {
+  onExploreCareer?: (careerId: string) => void;
+  onBookmark?: (careerId: string) => void;
+  onStartLearning?: (careerId: string) => void;
+}
+
+export default function DiscoveryMode({ onExploreCareer, onBookmark, onStartLearning }: Props) {
+  const [selectedZone, setSelectedZone] = useState<string | null>('energy');
+  const [viewMode, setViewMode] = useState<'zones' | 'all' | 'bookmarked'>('zones');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<'match' | 'salary' | 'demand' | 'time'>('match');
+
+  const filteredCareers = useMemo(() => {
+    let careers = EXPLORABLE_CAREERS;
+    
+    if (viewMode === 'zones' && selectedZone) {
+      careers = careers.filter(c => c.zone === selectedZone);
+    } else if (viewMode === 'bookmarked') {
+      careers = careers.filter(c => c.bookmarked);
+    }
+
+    if (searchQuery) {
+      careers = careers.filter(c => 
+        c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        c.description.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    // Sort
+    switch (sortBy) {
+      case 'match':
+        careers = [...careers].sort((a, b) => b.matchScore - a.matchScore);
+        break;
+      case 'salary':
+        careers = [...careers].sort((a, b) => b.salary.max - a.salary.max);
+        break;
+      case 'demand':
+        const demandOrder = { 'very-high': 4, 'high': 3, 'medium': 2, 'low': 1 };
+        careers = [...careers].sort((a, b) => demandOrder[b.demand] - demandOrder[a.demand]);
+        break;
+      case 'time':
+        careers = [...careers].sort((a, b) => {
+          const getMonths = (t: string) => parseInt(t.split('-')[0]);
+          return getMonths(a.timeToEntry) - getMonths(b.timeToEntry);
+        });
+        break;
+    }
+
+    return careers;
+  }, [selectedZone, viewMode, searchQuery, sortBy]);
+
+  const [localBookmarks, setLocalBookmarks] = useState<Set<string>>(
+    new Set(EXPLORABLE_CAREERS.filter(c => c.bookmarked).map(c => c.id))
+  );
+
+  const toggleBookmark = (careerId: string) => {
+    setLocalBookmarks(prev => {
+      const next = new Set(prev);
+      if (next.has(careerId)) {
+        next.delete(careerId);
+      } else {
+        next.add(careerId);
+      }
+      return next;
+    });
+    onBookmark?.(careerId);
+  };
+
+  const getDemandColor = (demand: string) => {
+    switch (demand) {
+      case 'very-high': return 'text-emerald-400 bg-emerald-500/20';
+      case 'high': return 'text-amber-400 bg-amber-500/20';
+      case 'medium': return 'text-blue-400 bg-blue-500/20';
+      default: return 'text-gray-400 bg-gray-500/20';
+    }
+  };
+
+  const getDemandLabel = (demand: string) => {
+    switch (demand) {
+      case 'very-high': return 'Bardzo wysokie';
+      case 'high': return 'Wysokie';
+      case 'medium': return 'Średnie';
+      default: return 'Niskie';
+    }
+  };
+
+  return (
+    <div className="bg-gradient-to-br from-gray-900 via-gray-900 to-gray-800 rounded-2xl p-6 border border-gray-800">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-xl">
+            <Compass className="w-6 h-6 text-cyan-400" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-white">Tryb Eksploracji</h2>
+            <p className="text-sm text-gray-400">
+              Odkrywaj zawody bez presji. To Ty decydujesz, co Cię interesuje.
+            </p>
+          </div>
+        </div>
+        <button className="flex items-center gap-2 px-4 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 rounded-lg transition-colors">
+          <Shuffle className="w-4 h-4" />
+          <span className="text-sm font-medium">Losowy zawód</span>
+        </button>
+      </div>
+
+      {/* View Mode Tabs */}
+      <div className="flex items-center gap-2 mb-4">
+        {[
+          { id: 'zones', label: 'Według kategorii', icon: Map },
+          { id: 'all', label: 'Wszystkie', icon: Eye },
+          { id: 'bookmarked', label: 'Zapisane', icon: BookmarkCheck }
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setViewMode(tab.id as any)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+              viewMode === tab.id 
+                ? 'bg-cyan-500/20 text-cyan-300' 
+                : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50'
+            }`}
+          >
+            <tab.icon className="w-4 h-4" />
+            <span className="text-sm font-medium">{tab.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Search and Filters */}
+      <div className="flex items-center gap-4 mb-6">
+        <div className="flex-1 relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+          <input
+            type="text"
+            placeholder="Szukaj zawodu..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-cyan-500/50 focus:outline-none"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-500">Sortuj:</span>
+          {[
+            { id: 'match', label: 'Dopasowanie' },
+            { id: 'salary', label: 'Zarobki' },
+            { id: 'demand', label: 'Popyt' },
+            { id: 'time', label: 'Czas wejścia' }
+          ].map(sort => (
+            <button
+              key={sort.id}
+              onClick={() => setSortBy(sort.id as any)}
+              className={`px-3 py-1 rounded-lg text-xs transition-colors ${
+                sortBy === sort.id 
+                  ? 'bg-cyan-500/20 text-cyan-300' 
+                  : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/50'
+              }`}
+            >
+              {sort.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Discovery Zones */}
+      {viewMode === 'zones' && (
+        <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+          {DISCOVERY_ZONES.map((zone) => (
+            <button
+              key={zone.id}
+              onClick={() => zone.unlocked && setSelectedZone(zone.id)}
+              disabled={!zone.unlocked}
+              className={`
+                relative flex-shrink-0 p-3 rounded-xl border transition-all
+                ${selectedZone === zone.id 
+                  ? `bg-gradient-to-br ${zone.color} ${zone.borderColor} ring-2 ring-cyan-500/50` 
+                  : zone.unlocked 
+                    ? `bg-gray-800/50 border-gray-700 hover:border-gray-600`
+                    : `bg-gray-900/50 border-gray-800 opacity-50 cursor-not-allowed`
+                }
+              `}
+            >
+              {!zone.unlocked && (
+                <div className="absolute inset-0 flex items-center justify-center bg-gray-900/80 rounded-xl">
+                  <Lock className="w-5 h-5 text-gray-600" />
+                </div>
+              )}
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xl">{zone.icon}</span>
+                <span className="text-sm font-medium text-white">{zone.name}</span>
+              </div>
+              <p className="text-xs text-gray-400 mb-2">{zone.description}</p>
+              {zone.unlocked && (
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-1 bg-gray-700 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-cyan-500 rounded-full"
+                      style={{ width: `${zone.explorationProgress}%` }}
+                    />
+                  </div>
+                  <span className="text-xs text-gray-500">{zone.explorationProgress}%</span>
+                </div>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Careers Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {filteredCareers.map((career, index) => (
+          <motion.div
+            key={career.id}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.05 }}
+            className="group p-4 bg-gray-800/50 rounded-xl border border-gray-700 hover:border-cyan-500/30 transition-all hover:shadow-lg hover:shadow-cyan-500/5"
+          >
+            {/* Header */}
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">{career.icon}</span>
+                <div>
+                  <h3 className="font-semibold text-white">{career.name}</h3>
+                  <p className="text-xs text-gray-400">{career.description}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => toggleBookmark(career.id)}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  localBookmarks.has(career.id)
+                    ? 'bg-amber-500/20 text-amber-400'
+                    : 'bg-gray-700/50 text-gray-500 hover:text-gray-300'
+                }`}
+              >
+                {localBookmarks.has(career.id) ? (
+                  <BookmarkCheck className="w-4 h-4" />
+                ) : (
+                  <Bookmark className="w-4 h-4" />
+                )}
+              </button>
+            </div>
+
+            {/* Match Score */}
+            <div className="flex items-center gap-2 mb-3">
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs text-gray-500">Dopasowanie do Ciebie</span>
+                  <span className={`text-sm font-bold ${
+                    career.matchScore >= 75 ? 'text-emerald-400' :
+                    career.matchScore >= 50 ? 'text-amber-400' : 'text-gray-400'
+                  }`}>{career.matchScore}%</span>
+                </div>
+                <div className="h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${career.matchScore}%` }}
+                    transition={{ delay: 0.3 }}
+                    className={`h-full rounded-full ${
+                      career.matchScore >= 75 ? 'bg-emerald-500' :
+                      career.matchScore >= 50 ? 'bg-amber-500' : 'bg-gray-500'
+                    }`}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Stats Grid */}
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              <div className="p-2 bg-gray-900/50 rounded-lg">
+                <div className="flex items-center gap-1 text-gray-500 mb-0.5">
+                  <DollarSign className="w-3 h-3" />
+                  <span className="text-[10px]">Zarobki</span>
+                </div>
+                <span className="text-xs font-medium text-white">
+                  {career.salary.min/1000}-{career.salary.max/1000}k PLN
+                </span>
+              </div>
+              <div className="p-2 bg-gray-900/50 rounded-lg">
+                <div className="flex items-center gap-1 text-gray-500 mb-0.5">
+                  <TrendingUp className="w-3 h-3" />
+                  <span className="text-[10px]">Popyt</span>
+                </div>
+                <span className={`text-xs font-medium ${getDemandColor(career.demand).split(' ')[0]}`}>
+                  {getDemandLabel(career.demand)} {career.demandChange}
+                </span>
+              </div>
+              <div className="p-2 bg-gray-900/50 rounded-lg">
+                <div className="flex items-center gap-1 text-gray-500 mb-0.5">
+                  <Clock className="w-3 h-3" />
+                  <span className="text-[10px]">Czas wejścia</span>
+                </div>
+                <span className="text-xs font-medium text-white">{career.timeToEntry}</span>
+              </div>
+              <div className="p-2 bg-gray-900/50 rounded-lg">
+                <div className="flex items-center gap-1 text-gray-500 mb-0.5">
+                  <Zap className="w-3 h-3" />
+                  <span className="text-[10px]">Umiejętności</span>
+                </div>
+                <span className="text-xs font-medium text-white">{career.skills.length} wymagane</span>
+              </div>
+            </div>
+
+            {/* Skills Preview */}
+            <div className="flex flex-wrap gap-1 mb-3">
+              {career.skills.slice(0, 3).map((skill) => (
+                <span 
+                  key={skill}
+                  className="text-[10px] px-2 py-0.5 bg-gray-700/50 text-gray-400 rounded-full"
+                >
+                  {skill}
+                </span>
+              ))}
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => onExploreCareer?.(career.id)}
+                className="flex-1 flex items-center justify-center gap-1 py-2 bg-gray-700/50 hover:bg-gray-700 text-gray-300 rounded-lg text-xs transition-colors"
+              >
+                <Eye className="w-3 h-3" />
+                Szczegóły
+              </button>
+              <button
+                onClick={() => onStartLearning?.(career.id)}
+                className="flex-1 flex items-center justify-center gap-1 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 rounded-lg text-xs transition-colors"
+              >
+                <Play className="w-3 h-3" />
+                Rozpocznij
+              </button>
+            </div>
+
+            {/* Explored Badge */}
+            {career.explored && (
+              <div className="mt-2 flex items-center gap-1 text-[10px] text-cyan-400">
+                <Eye className="w-3 h-3" />
+                Już eksplorowałeś
+              </div>
+            )}
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Empty State */}
+      {filteredCareers.length === 0 && (
+        <div className="text-center py-12">
+          <Compass className="w-12 h-12 text-gray-600 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-400 mb-2">
+            Brak wyników
+          </h3>
+          <p className="text-sm text-gray-500">
+            Spróbuj zmienić filtry lub wyszukaj inny zawód
+          </p>
+        </div>
+      )}
+
+      {/* Bottom Hint */}
+      <div className="mt-6 p-4 bg-cyan-500/10 rounded-xl border border-cyan-500/20">
+        <div className="flex items-start gap-3">
+          <Sparkles className="w-5 h-5 text-cyan-400 flex-shrink-0 mt-0.5" />
+          <div>
+            <h4 className="text-sm font-medium text-white mb-1">Tryb eksploracji = Twoja przestrzeń</h4>
+            <p className="text-xs text-gray-400">
+              Nie ma tutaj presji. Przeglądaj zawody, zapisuj te które Cię interesują, 
+              wracaj do nich kiedy chcesz. System <span className="text-cyan-400">nie będzie Ci niczego "wciskać"</span> – 
+              to Ty decydujesz, co chcesz dalej zgłębiać.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
