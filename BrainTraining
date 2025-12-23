@@ -1,0 +1,865 @@
+'use client';
+
+import React, { useState, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+
+// ============================================================
+// TYPES - Funkcje poznawcze, nie zawodowe!
+// ============================================================
+
+type CognitiveSkill = 'attention' | 'memory' | 'speed' | 'flexibility' | 'reasoning';
+
+interface CognitiveGame {
+  id: string;
+  title: string;
+  emoji: string;
+  tagline: string;
+  estimatedTime: string;
+  primarySkill: CognitiveSkill;
+  secondarySkill?: CognitiveSkill;
+  difficulty: 1 | 2 | 3;
+  color: string;
+  gradient: string;
+}
+
+interface CognitiveSkillInfo {
+  id: CognitiveSkill;
+  name: string;
+  emoji: string;
+  description: string;
+  color: string;
+}
+
+interface GameSession {
+  gameId: string;
+  score: number;
+  streak: number;
+  skillGains: Record<CognitiveSkill, number>;
+}
+
+// ============================================================
+// DATA - Funkcje poznawcze
+// ============================================================
+
+const COGNITIVE_SKILLS: Record<CognitiveSkill, CognitiveSkillInfo> = {
+  attention: {
+    id: 'attention',
+    name: 'Uwaga',
+    emoji: '🎯',
+    description: 'Koncentracja i szybkość reagowania',
+    color: '#f59e0b'
+  },
+  memory: {
+    id: 'memory',
+    name: 'Pamięć',
+    emoji: '🧠',
+    description: 'Zapamiętywanie i manipulowanie informacją',
+    color: '#8b5cf6'
+  },
+  speed: {
+    id: 'speed',
+    name: 'Szybkość',
+    emoji: '⚡',
+    description: 'Szybkie przetwarzanie i reakcja',
+    color: '#06b6d4'
+  },
+  flexibility: {
+    id: 'flexibility',
+    name: 'Elastyczność',
+    emoji: '🔄',
+    description: 'Przełączanie między zadaniami',
+    color: '#10b981'
+  },
+  reasoning: {
+    id: 'reasoning',
+    name: 'Logika',
+    emoji: '🧩',
+    description: 'Rozwiązywanie problemów i wzorce',
+    color: '#ec4899'
+  }
+};
+
+// ============================================================
+// DATA - Gry kognitywne (NIE zawodowe!)
+// ============================================================
+
+const COGNITIVE_GAMES: CognitiveGame[] = [
+  {
+    id: 'sequence-flash',
+    title: 'Sekwencja',
+    emoji: '🔢',
+    tagline: 'Zapamiętaj kolejność',
+    estimatedTime: '2 min',
+    primarySkill: 'memory',
+    secondarySkill: 'attention',
+    difficulty: 1,
+    color: '#8b5cf6',
+    gradient: 'linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%)'
+  },
+  {
+    id: 'speed-match',
+    title: 'Szybki match',
+    emoji: '⚡',
+    tagline: 'Czy to samo co poprzednie?',
+    estimatedTime: '90 sek',
+    primarySkill: 'speed',
+    secondarySkill: 'memory',
+    difficulty: 2,
+    color: '#06b6d4',
+    gradient: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)'
+  },
+  {
+    id: 'pattern-finder',
+    title: 'Znajdź wzór',
+    emoji: '🧩',
+    tagline: 'Co pasuje do serii?',
+    estimatedTime: '3 min',
+    primarySkill: 'reasoning',
+    secondarySkill: 'flexibility',
+    difficulty: 2,
+    color: '#ec4899',
+    gradient: 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)'
+  },
+  {
+    id: 'dual-task',
+    title: 'Podwójne zadanie',
+    emoji: '🔄',
+    tagline: 'Rób dwie rzeczy naraz',
+    estimatedTime: '2 min',
+    primarySkill: 'flexibility',
+    secondarySkill: 'attention',
+    difficulty: 3,
+    color: '#10b981',
+    gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+  },
+  {
+    id: 'reaction-tap',
+    title: 'Tap!',
+    emoji: '👆',
+    tagline: 'Kliknij gdy zmieni kolor',
+    estimatedTime: '1 min',
+    primarySkill: 'attention',
+    secondarySkill: 'speed',
+    difficulty: 1,
+    color: '#f59e0b',
+    gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
+  }
+];
+
+// ============================================================
+// MINI-GAME: Sequence Flash (Memory)
+// ============================================================
+
+interface SequenceGameProps {
+  onComplete: (score: number) => void;
+  onExit: () => void;
+}
+
+const SequenceGame: React.FC<SequenceGameProps> = ({ onComplete, onExit }) => {
+  const [sequence, setSequence] = useState<number[]>([]);
+  const [userSequence, setUserSequence] = useState<number[]>([]);
+  const [isShowingSequence, setIsShowingSequence] = useState(true);
+  const [currentShowIndex, setCurrentShowIndex] = useState(0);
+  const [round, setRound] = useState(1);
+  const [score, setScore] = useState(0);
+  const [gameOver, setGameOver] = useState(false);
+
+  const colors = ['#ef4444', '#22c55e', '#3b82f6', '#f59e0b'];
+
+  // Generate new sequence
+  useEffect(() => {
+    const newSequence = Array.from({ length: round + 2 }, () => 
+      Math.floor(Math.random() * 4)
+    );
+    setSequence(newSequence);
+    setUserSequence([]);
+    setIsShowingSequence(true);
+    setCurrentShowIndex(0);
+  }, [round]);
+
+  // Show sequence animation
+  useEffect(() => {
+    if (isShowingSequence && currentShowIndex < sequence.length) {
+      const timer = setTimeout(() => {
+        setCurrentShowIndex(prev => prev + 1);
+      }, 600);
+      return () => clearTimeout(timer);
+    } else if (currentShowIndex >= sequence.length && sequence.length > 0) {
+      setTimeout(() => setIsShowingSequence(false), 300);
+    }
+  }, [isShowingSequence, currentShowIndex, sequence.length]);
+
+  const handleColorClick = (colorIndex: number) => {
+    if (isShowingSequence || gameOver) return;
+
+    const newUserSequence = [...userSequence, colorIndex];
+    setUserSequence(newUserSequence);
+
+    // Check if correct
+    if (sequence[newUserSequence.length - 1] !== colorIndex) {
+      setGameOver(true);
+      setTimeout(() => onComplete(score), 1500);
+      return;
+    }
+
+    // Check if round complete
+    if (newUserSequence.length === sequence.length) {
+      setScore(prev => prev + round * 10);
+      setRound(prev => prev + 1);
+    }
+  };
+
+  return (
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(180deg, #1e1b4b 0%, #0f0a1e 100%)',
+      padding: '24px',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center'
+    }}>
+      {/* Header */}
+      <div style={{ 
+        position: 'absolute', 
+        top: '24px', 
+        left: '24px', 
+        right: '24px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+      }}>
+        <button
+          onClick={onExit}
+          style={{
+            padding: '8px 16px',
+            background: 'rgba(255,255,255,0.1)',
+            border: 'none',
+            borderRadius: '8px',
+            color: 'white',
+            cursor: 'pointer'
+          }}
+        >
+          ← Wyjdź
+        </button>
+        <div style={{ display: 'flex', gap: '24px', color: 'white' }}>
+          <span>Runda: <strong>{round}</strong></span>
+          <span>Wynik: <strong>{score}</strong></span>
+        </div>
+      </div>
+
+      {/* Game area */}
+      <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+        <h2 style={{ 
+          fontSize: '28px', 
+          fontWeight: 'bold', 
+          color: 'white',
+          marginBottom: '8px'
+        }}>
+          {gameOver ? '💥 Koniec!' : isShowingSequence ? '👀 Zapamiętaj!' : '👆 Twoja kolej!'}
+        </h2>
+        <p style={{ color: 'rgba(255,255,255,0.6)' }}>
+          {gameOver 
+            ? `Twój wynik: ${score} punktów` 
+            : isShowingSequence 
+              ? 'Obserwuj sekwencję kolorów' 
+              : `Powtórz sekwencję (${userSequence.length}/${sequence.length})`
+          }
+        </p>
+      </div>
+
+      {/* Color buttons */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(2, 1fr)',
+        gap: '16px',
+        maxWidth: '300px'
+      }}>
+        {colors.map((color, index) => (
+          <motion.button
+            key={index}
+            whileHover={{ scale: gameOver ? 1 : 1.05 }}
+            whileTap={{ scale: gameOver ? 1 : 0.95 }}
+            animate={{
+              scale: isShowingSequence && sequence[currentShowIndex - 1] === index ? 1.1 : 1,
+              boxShadow: isShowingSequence && sequence[currentShowIndex - 1] === index 
+                ? `0 0 40px ${color}` 
+                : '0 4px 20px rgba(0,0,0,0.3)'
+            }}
+            onClick={() => handleColorClick(index)}
+            style={{
+              width: '120px',
+              height: '120px',
+              borderRadius: '24px',
+              border: 'none',
+              background: color,
+              cursor: gameOver || isShowingSequence ? 'default' : 'pointer',
+              opacity: gameOver ? 0.5 : 1
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ============================================================
+// MINI-GAME: Reaction Tap (Attention + Speed)
+// ============================================================
+
+const ReactionGame: React.FC<SequenceGameProps> = ({ onComplete, onExit }) => {
+  const [gameState, setGameState] = useState<'waiting' | 'ready' | 'tap' | 'early' | 'done'>('waiting');
+  const [reactionTime, setReactionTime] = useState<number | null>(null);
+  const [tapStartTime, setTapStartTime] = useState<number>(0);
+  const [round, setRound] = useState(0);
+  const [times, setTimes] = useState<number[]>([]);
+  const totalRounds = 5;
+
+  useEffect(() => {
+    if (gameState === 'waiting') {
+      const delay = 1000 + Math.random() * 3000;
+      const timer = setTimeout(() => {
+        setGameState('ready');
+        setTimeout(() => {
+          setGameState('tap');
+          setTapStartTime(Date.now());
+        }, delay);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [gameState, round]);
+
+  const handleTap = () => {
+    if (gameState === 'ready') {
+      setGameState('early');
+      setTimeout(() => {
+        setRound(prev => prev + 1);
+        if (round + 1 >= totalRounds) {
+          setGameState('done');
+          const avgTime = times.length > 0 ? times.reduce((a, b) => a + b, 0) / times.length : 999;
+          onComplete(Math.max(0, Math.round(1000 - avgTime)));
+        } else {
+          setGameState('waiting');
+        }
+      }, 1000);
+    } else if (gameState === 'tap') {
+      const time = Date.now() - tapStartTime;
+      setReactionTime(time);
+      setTimes(prev => [...prev, time]);
+      setTimeout(() => {
+        setRound(prev => prev + 1);
+        if (round + 1 >= totalRounds) {
+          setGameState('done');
+          const newTimes = [...times, time];
+          const avgTime = newTimes.reduce((a, b) => a + b, 0) / newTimes.length;
+          onComplete(Math.max(0, Math.round(1000 - avgTime)));
+        } else {
+          setGameState('waiting');
+          setReactionTime(null);
+        }
+      }, 1000);
+    }
+  };
+
+  const getColor = () => {
+    switch (gameState) {
+      case 'waiting': return '#374151';
+      case 'ready': return '#dc2626';
+      case 'tap': return '#22c55e';
+      case 'early': return '#f59e0b';
+      case 'done': return '#8b5cf6';
+    }
+  };
+
+  const avgTime = times.length > 0 ? Math.round(times.reduce((a, b) => a + b, 0) / times.length) : null;
+
+  return (
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(180deg, #1a1a2e 0%, #0f0f1a 100%)',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '24px'
+    }}>
+      {/* Header */}
+      <div style={{ 
+        position: 'absolute', 
+        top: '24px', 
+        left: '24px', 
+        right: '24px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+      }}>
+        <button
+          onClick={onExit}
+          style={{
+            padding: '8px 16px',
+            background: 'rgba(255,255,255,0.1)',
+            border: 'none',
+            borderRadius: '8px',
+            color: 'white',
+            cursor: 'pointer'
+          }}
+        >
+          ← Wyjdź
+        </button>
+        <div style={{ color: 'white' }}>
+          Runda: <strong>{round + 1}/{totalRounds}</strong>
+          {avgTime && <span style={{ marginLeft: '16px' }}>Średnia: <strong>{avgTime}ms</strong></span>}
+        </div>
+      </div>
+
+      {/* Main tap area */}
+      <motion.button
+        onClick={handleTap}
+        animate={{ backgroundColor: getColor() }}
+        whileTap={{ scale: 0.95 }}
+        style={{
+          width: '280px',
+          height: '280px',
+          borderRadius: '50%',
+          border: 'none',
+          cursor: gameState === 'done' ? 'default' : 'pointer',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: `0 0 60px ${getColor()}40`
+        }}
+      >
+        <span style={{ fontSize: '48px', marginBottom: '8px' }}>
+          {gameState === 'waiting' && '⏳'}
+          {gameState === 'ready' && '🛑'}
+          {gameState === 'tap' && '👆'}
+          {gameState === 'early' && '😅'}
+          {gameState === 'done' && '🎉'}
+        </span>
+        <span style={{ color: 'white', fontWeight: 'bold', fontSize: '20px' }}>
+          {gameState === 'waiting' && 'Czekaj...'}
+          {gameState === 'ready' && 'CZEKAJ!'}
+          {gameState === 'tap' && 'TAP!'}
+          {gameState === 'early' && 'Za wcześnie!'}
+          {gameState === 'done' && 'Koniec!'}
+        </span>
+        {reactionTime && gameState !== 'done' && (
+          <span style={{ color: 'white', marginTop: '8px' }}>
+            {reactionTime}ms
+          </span>
+        )}
+      </motion.button>
+
+      {gameState === 'done' && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          style={{ marginTop: '32px', textAlign: 'center', color: 'white' }}
+        >
+          <p style={{ fontSize: '24px', fontWeight: 'bold' }}>
+            Średni czas: {avgTime}ms
+          </p>
+          <p style={{ color: 'rgba(255,255,255,0.6)' }}>
+            {avgTime && avgTime < 250 ? '🔥 Błyskawiczny!' : avgTime && avgTime < 350 ? '👍 Dobry wynik!' : '💪 Trenuj dalej!'}
+          </p>
+        </motion.div>
+      )}
+    </div>
+  );
+};
+
+// ============================================================
+// MAIN COMPONENT
+// ============================================================
+
+interface Props {
+  onSessionComplete?: (session: GameSession) => void;
+}
+
+export default function CognitiveGamesSystem({ onSessionComplete }: Props) {
+  const [activeGame, setActiveGame] = useState<string | null>(null);
+  const [todayStats, setTodayStats] = useState({
+    gamesPlayed: 2,
+    streak: 5,
+    totalScore: 340,
+    skillGains: {
+      attention: 8,
+      memory: 12,
+      speed: 5,
+      flexibility: 3,
+      reasoning: 7
+    } as Record<CognitiveSkill, number>
+  });
+
+  const handleGameComplete = (gameId: string, score: number) => {
+    const game = COGNITIVE_GAMES.find(g => g.id === gameId);
+    if (!game) return;
+
+    const skillGains: Record<CognitiveSkill, number> = {
+      attention: 0,
+      memory: 0,
+      speed: 0,
+      flexibility: 0,
+      reasoning: 0
+    };
+    
+    const points = Math.floor(score / 10);
+    skillGains[game.primarySkill] = points;
+    if (game.secondarySkill) {
+      skillGains[game.secondarySkill] = Math.floor(points / 2);
+    }
+
+    setTodayStats(prev => ({
+      gamesPlayed: prev.gamesPlayed + 1,
+      streak: prev.streak + 1,
+      totalScore: prev.totalScore + score,
+      skillGains: {
+        attention: prev.skillGains.attention + skillGains.attention,
+        memory: prev.skillGains.memory + skillGains.memory,
+        speed: prev.skillGains.speed + skillGains.speed,
+        flexibility: prev.skillGains.flexibility + skillGains.flexibility,
+        reasoning: prev.skillGains.reasoning + skillGains.reasoning
+      }
+    }));
+
+    setActiveGame(null);
+  };
+
+  // Render active game
+  if (activeGame === 'sequence-flash') {
+    return (
+      <SequenceGame
+        onComplete={(score) => handleGameComplete('sequence-flash', score)}
+        onExit={() => setActiveGame(null)}
+      />
+    );
+  }
+
+  if (activeGame === 'reaction-tap') {
+    return (
+      <ReactionGame
+        onComplete={(score) => handleGameComplete('reaction-tap', score)}
+        onExit={() => setActiveGame(null)}
+      />
+    );
+  }
+
+  // Main screen
+  return (
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(180deg, #1e1b4b 0%, #0f0a1e 100%)',
+      padding: '24px'
+    }}>
+      <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+        
+        {/* ============================================= */}
+        {/* HERO - Playful, arcade style */}
+        {/* ============================================= */}
+        
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          style={{
+            textAlign: 'center',
+            padding: '48px 24px',
+            marginBottom: '32px',
+            background: 'radial-gradient(ellipse at top, rgba(139, 92, 246, 0.2) 0%, transparent 60%)',
+            borderRadius: '32px'
+          }}
+        >
+          <motion.div
+            animate={{ 
+              rotate: [0, 10, -10, 0],
+              scale: [1, 1.1, 1]
+            }}
+            transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
+            style={{ fontSize: '64px', marginBottom: '16px' }}
+          >
+            🧠
+          </motion.div>
+          
+          <h1 style={{
+            fontSize: '36px',
+            fontWeight: 'bold',
+            color: 'white',
+            marginBottom: '8px'
+          }}>
+            Rozgrzej <span style={{ color: '#a855f7' }}>mózg</span>
+          </h1>
+          
+          <p style={{
+            fontSize: '18px',
+            color: 'rgba(255,255,255,0.6)',
+            marginBottom: '24px'
+          }}>
+            Szybkie gry • Zero sprawdzianów • Tylko fun
+          </p>
+
+          {/* Stats row */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            gap: '32px',
+            flexWrap: 'wrap'
+          }}>
+            {[
+              { emoji: '🔥', value: todayStats.streak, label: 'streak' },
+              { emoji: '🎮', value: todayStats.gamesPlayed, label: 'gier dziś' },
+              { emoji: '⭐', value: todayStats.totalScore, label: 'punktów' }
+            ].map((stat, i) => (
+              <div key={i} style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '32px', marginBottom: '4px' }}>{stat.emoji}</div>
+                <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'white' }}>{stat.value}</div>
+                <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>{stat.label}</div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+
+        {/* ============================================= */}
+        {/* QUICK START */}
+        {/* ============================================= */}
+        
+        <motion.button
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => {
+            const randomGame = COGNITIVE_GAMES[Math.floor(Math.random() * COGNITIVE_GAMES.length)];
+            setActiveGame(randomGame.id);
+          }}
+          style={{
+            width: '100%',
+            padding: '20px 32px',
+            marginBottom: '32px',
+            background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
+            border: 'none',
+            borderRadius: '20px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '12px',
+            boxShadow: '0 8px 32px rgba(139, 92, 246, 0.4)'
+          }}
+        >
+          <span style={{ fontSize: '28px' }}>🎲</span>
+          <span style={{ fontSize: '20px', fontWeight: 'bold', color: 'white' }}>
+            Losuj grę!
+          </span>
+        </motion.button>
+
+        {/* ============================================= */}
+        {/* GAMES GRID */}
+        {/* ============================================= */}
+        
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+          gap: '16px',
+          marginBottom: '32px'
+        }}>
+          {COGNITIVE_GAMES.map((game, index) => (
+            <motion.button
+              key={game.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
+              whileHover={{ scale: 1.03, y: -4 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={() => setActiveGame(game.id)}
+              style={{
+                padding: '24px',
+                background: game.gradient,
+                border: 'none',
+                borderRadius: '24px',
+                cursor: 'pointer',
+                textAlign: 'left',
+                position: 'relative',
+                overflow: 'hidden',
+                boxShadow: `0 8px 32px ${game.color}30`
+              }}
+            >
+              {/* Decorative circle */}
+              <div style={{
+                position: 'absolute',
+                top: '-20px',
+                right: '-20px',
+                width: '100px',
+                height: '100px',
+                background: 'rgba(255,255,255,0.1)',
+                borderRadius: '50%'
+              }} />
+
+              {/* Emoji */}
+              <div style={{ fontSize: '40px', marginBottom: '12px' }}>
+                {game.emoji}
+              </div>
+
+              {/* Title */}
+              <h3 style={{
+                fontSize: '20px',
+                fontWeight: 'bold',
+                color: 'white',
+                marginBottom: '4px'
+              }}>
+                {game.title}
+              </h3>
+
+              {/* Tagline */}
+              <p style={{
+                fontSize: '14px',
+                color: 'rgba(255,255,255,0.8)',
+                marginBottom: '16px'
+              }}>
+                {game.tagline}
+              </p>
+
+              {/* Footer */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '6px 12px',
+                  background: 'rgba(0,0,0,0.2)',
+                  borderRadius: '20px'
+                }}>
+                  <span>{COGNITIVE_SKILLS[game.primarySkill].emoji}</span>
+                  <span style={{ fontSize: '12px', color: 'white' }}>
+                    {COGNITIVE_SKILLS[game.primarySkill].name}
+                  </span>
+                </div>
+                <span style={{
+                  fontSize: '12px',
+                  color: 'rgba(255,255,255,0.7)'
+                }}>
+                  {game.estimatedTime}
+                </span>
+              </div>
+
+              {/* Difficulty */}
+              <div style={{
+                position: 'absolute',
+                top: '16px',
+                right: '16px',
+                display: 'flex',
+                gap: '4px'
+              }}>
+                {[1, 2, 3].map(level => (
+                  <div
+                    key={level}
+                    style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: level <= game.difficulty 
+                        ? 'white' 
+                        : 'rgba(255,255,255,0.3)'
+                    }}
+                  />
+                ))}
+              </div>
+            </motion.button>
+          ))}
+        </div>
+
+        {/* ============================================= */}
+        {/* COGNITIVE SKILLS PROGRESS */}
+        {/* ============================================= */}
+        
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          style={{
+            padding: '24px',
+            background: 'rgba(255,255,255,0.05)',
+            borderRadius: '24px',
+            border: '1px solid rgba(255,255,255,0.1)'
+          }}
+        >
+          <h3 style={{
+            fontSize: '18px',
+            fontWeight: 'bold',
+            color: 'white',
+            marginBottom: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <span>📊</span> Twój postęp dziś
+          </h3>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {Object.values(COGNITIVE_SKILLS).map((skill) => (
+              <div key={skill.id}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '8px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>{skill.emoji}</span>
+                    <span style={{ color: 'white', fontSize: '14px' }}>{skill.name}</span>
+                  </div>
+                  <span style={{ 
+                    color: skill.color, 
+                    fontSize: '14px',
+                    fontWeight: 'bold' 
+                  }}>
+                    +{todayStats.skillGains[skill.id]}
+                  </span>
+                </div>
+                <div style={{
+                  height: '8px',
+                  background: 'rgba(255,255,255,0.1)',
+                  borderRadius: '4px',
+                  overflow: 'hidden'
+                }}>
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${Math.min(100, todayStats.skillGains[skill.id] * 5)}%` }}
+                    transition={{ duration: 0.8, delay: 0.2 }}
+                    style={{
+                      height: '100%',
+                      background: skill.color,
+                      borderRadius: '4px'
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+
+        {/* ============================================= */}
+        {/* FOOTER MESSAGE */}
+        {/* ============================================= */}
+        
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.7 }}
+          style={{
+            textAlign: 'center',
+            marginTop: '32px',
+            color: 'rgba(255,255,255,0.4)',
+            fontSize: '14px'
+          }}
+        >
+          💡 Trenuj codziennie 10 minut, a po miesiącu zauważysz różnicę
+        </motion.p>
+      </div>
+    </div>
+  );
+}
+
