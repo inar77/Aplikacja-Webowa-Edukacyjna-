@@ -1,0 +1,381 @@
+'use client';
+
+import React, { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Brain,
+  Wrench,
+  Users,
+  Target,
+  ChevronRight,
+  Sparkles,
+  TrendingUp,
+  Shield,
+  Zap,
+  Eye,
+  Calculator,
+  MessageSquare,
+  ArrowRight,
+  Check,
+  Lock,
+  Info
+} from 'lucide-react';
+import type { UniversalCompetency, Career } from './types';
+
+// Mock data - Universal Competencies that transfer between careers
+const UNIVERSAL_COMPETENCIES: UniversalCompetency[] = [
+  {
+    id: 'problem-solving',
+    name: 'Rozwiązywanie problemów',
+    nameEn: 'Problem Solving',
+    description: 'Analiza sytuacji, identyfikacja przyczyn, znajdowanie rozwiązań',
+    icon: 'brain',
+    category: 'cognitive',
+    transferability: 95,
+    relatedCareers: ['elektryk', 'programista', 'mechanik', 'technik-it', 'automatyk', 'logistyk'],
+    subSkills: [
+      { id: 'ps-1', name: 'Analiza przyczyn źródłowych', description: 'Docieranie do sedna problemu', mastered: true },
+      { id: 'ps-2', name: 'Myślenie krytyczne', description: 'Ocena informacji i argumentów', mastered: true },
+      { id: 'ps-3', name: 'Kreatywne rozwiązania', description: 'Nieszablonowe podejście', mastered: false },
+      { id: 'ps-4', name: 'Priorytetyzacja', description: 'Ustalanie kolejności działań', mastered: false }
+    ],
+    userLevel: 'intermediate',
+    userProgress: 65
+  },
+  {
+    id: 'diagnostics',
+    name: 'Analiza i diagnostyka',
+    nameEn: 'Analysis & Diagnostics',
+    description: 'Zbieranie danych, interpretacja wyników, wyciąganie wniosków',
+    icon: 'eye',
+    category: 'cognitive',
+    transferability: 90,
+    relatedCareers: ['elektryk', 'mechanik', 'data-scientist', 'lekarz', 'technik-serwisowy', 'kontroler-jakosci', 'qa-tester', 'medycyna'],
+    subSkills: [
+      { id: 'diag-1', name: 'Pomiary i odczyty', description: 'Precyzyjne wykonywanie pomiarów', mastered: true },
+      { id: 'diag-2', name: 'Interpretacja danych', description: 'Rozumienie wyników', mastered: false },
+      { id: 'diag-3', name: 'Dokumentacja', description: 'Zapisywanie i raportowanie', mastered: false }
+    ],
+    userLevel: 'beginner',
+    userProgress: 35
+  },
+  {
+    id: 'safety',
+    name: 'Bezpieczeństwo',
+    nameEn: 'Safety & Security',
+    description: 'Ocena ryzyka, procedury bezpieczeństwa, zapobieganie wypadkom',
+    icon: 'shield',
+    category: 'organizational',
+    transferability: 85,
+    relatedCareers: ['elektryk', 'spawacz', 'budowlaniec', 'operator-maszyn', 'ratownik', 'it-security', 'bhp-specjalista', 'medycyna'],
+    subSkills: [
+      { id: 'saf-1', name: 'Ocena ryzyka', description: 'Identyfikacja zagrożeń', mastered: true },
+      { id: 'saf-2', name: 'Procedury BHP', description: 'Znajomość przepisów', mastered: true },
+      { id: 'saf-3', name: 'Pierwsza pomoc', description: 'Reakcja w sytuacjach awaryjnych', mastered: false }
+    ],
+    userLevel: 'intermediate',
+    userProgress: 70
+  },
+  {
+    id: 'precision',
+    name: 'Precyzja i dokładność',
+    nameEn: 'Precision & Accuracy',
+    description: 'Dbałość o detale, standardy jakości, minimalizacja błędów',
+    icon: 'target',
+    category: 'technical',
+    transferability: 88,
+    relatedCareers: ['elektryk', 'chirurg', 'zegarmistrz', 'grafik', 'programista', 'kontroler-jakosci', 'mechanik'],
+    subSkills: [
+      { id: 'prec-1', name: 'Praca według specyfikacji', description: 'Dokładne wykonywanie instrukcji', mastered: true },
+      { id: 'prec-2', name: 'Kontrola jakości', description: 'Weryfikacja efektów pracy', mastered: false },
+      { id: 'prec-3', name: 'Powtarzalność', description: 'Stałe utrzymanie standardów', mastered: false }
+    ],
+    userLevel: 'beginner',
+    userProgress: 40
+  },
+  {
+    id: 'systems-thinking',
+    name: 'Myślenie systemowe',
+    nameEn: 'Systems Thinking',
+    description: 'Rozumienie połączeń między elementami, widzenie całego obrazu',
+    icon: 'zap',
+    category: 'cognitive',
+    transferability: 92,
+    relatedCareers: ['elektryk', 'architekt-it', 'inżynier', 'manager', 'urbanista', 'ekolog', 'zarzadzanie'],
+    subSkills: [
+      { id: 'sys-1', name: 'Mapowanie procesów', description: 'Wizualizacja przepływów', mastered: false },
+      { id: 'sys-2', name: 'Analiza zależności', description: 'Rozumienie wpływów', mastered: false },
+      { id: 'sys-3', name: 'Optymalizacja', description: 'Usprawnianie systemów', mastered: false }
+    ],
+    userLevel: 'none',
+    userProgress: 10
+  },
+  {
+    id: 'calculations',
+    name: 'Obliczenia praktyczne',
+    nameEn: 'Practical Calculations',
+    description: 'Stosowanie wzorów, szacowanie, przeliczanie jednostek',
+    icon: 'calculator',
+    category: 'technical',
+    transferability: 80,
+    relatedCareers: ['elektryk', 'księgowy', 'inżynier', 'technik', 'budowlaniec', 'farmaceuta', 'finanse', 'inzynieria'],
+    subSkills: [
+      { id: 'calc-1', name: 'Obliczenia elektryczne', description: 'Prawo Ohma, moc, przekroje', mastered: true },
+      { id: 'calc-2', name: 'Jednostki i przeliczenia', description: 'Konwersje, skale', mastered: true },
+      { id: 'calc-3', name: 'Szacowanie', description: 'Przybliżone kalkulacje', mastered: false }
+    ],
+    userLevel: 'intermediate',
+    userProgress: 55
+  },
+  {
+    id: 'tool-mastery',
+    name: 'Praca z narzędziami',
+    nameEn: 'Tool Mastery',
+    description: 'Dobór narzędzi, ergonomia, konserwacja sprzętu',
+    icon: 'wrench',
+    category: 'technical',
+    transferability: 70,
+    relatedCareers: ['elektryk', 'stolarz', 'mechanik', 'chirurg', 'dentysta', 'rzemioslo', 'sztuka'],
+    subSkills: [
+      { id: 'tool-1', name: 'Dobór narzędzi', description: 'Właściwe narzędzie do zadania', mastered: true },
+      { id: 'tool-2', name: 'Techniki pracy', description: 'Bezpieczne i efektywne użycie', mastered: true },
+      { id: 'tool-3', name: 'Konserwacja', description: 'Utrzymanie sprzętu', mastered: false }
+    ],
+    userLevel: 'intermediate',
+    userProgress: 60
+  },
+  {
+    id: 'communication',
+    name: 'Komunikacja techniczna',
+    nameEn: 'Technical Communication',
+    description: 'Dokumentacja, tłumaczenie złożoności, współpraca',
+    icon: 'message-square',
+    category: 'interpersonal',
+    transferability: 95,
+    relatedCareers: ['elektryk', 'konsultant', 'nauczyciel', 'support-techniczny', 'pm', 'tech-writing', 'edukacja', 'konsulting'],
+    subSkills: [
+      { id: 'comm-1', name: 'Dokumentacja techniczna', description: 'Tworzenie instrukcji', mastered: false },
+      { id: 'comm-2', name: 'Wyjaśnianie laikom', description: 'Prostowanie skomplikowanych tematów', mastered: false },
+      { id: 'comm-3', name: 'Raportowanie', description: 'Przekazywanie statusu prac', mastered: true }
+    ],
+    userLevel: 'beginner',
+    userProgress: 25
+  }
+];
+
+const ICON_MAP: Record<string, React.ReactNode> = {
+  'brain': <Brain className="w-6 h-6" />,
+  'eye': <Eye className="w-6 h-6" />,
+  'shield': <Shield className="w-6 h-6" />,
+  'target': <Target className="w-6 h-6" />,
+  'zap': <Zap className="w-6 h-6" />,
+  'calculator': <Calculator className="w-6 h-6" />,
+  'wrench': <Wrench className="w-6 h-6" />,
+  'message-square': <MessageSquare className="w-6 h-6" />
+};
+
+const CATEGORY_COLORS = {
+  cognitive: { bg: 'from-violet-500/20 to-purple-500/20', border: 'border-violet-500/30', text: 'text-violet-400' },
+  technical: { bg: 'from-blue-500/20 to-cyan-500/20', border: 'border-blue-500/30', text: 'text-blue-400' },
+  interpersonal: { bg: 'from-emerald-500/20 to-teal-500/20', border: 'border-emerald-500/30', text: 'text-emerald-400' },
+  organizational: { bg: 'from-amber-500/20 to-orange-500/20', border: 'border-amber-500/30', text: 'text-amber-400' }
+};
+
+interface Props {
+  onCompetencySelect?: (competency: UniversalCompetency) => void;
+  onTransferView?: (competency: UniversalCompetency) => void;
+}
+
+export default function UniversalCompetencies({ onCompetencySelect, onTransferView }: Props) {
+  const [selectedCompetency, setSelectedCompetency] = useState<UniversalCompetency | null>(null);
+  const [showTransferModal, setShowTransferModal] = useState(false);
+
+  const handleCompetencyClick = (competency: UniversalCompetency) => {
+    setSelectedCompetency(selectedCompetency?.id === competency.id ? null : competency);
+    onCompetencySelect?.(competency);
+  };
+
+  const handleShowTransfer = (competency: UniversalCompetency, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowTransferModal(true);
+    onTransferView?.(competency);
+  };
+
+  return (
+    <div className="bg-gradient-to-br from-gray-900 via-gray-900 to-gray-800 rounded-2xl p-6 border border-gray-800">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-gradient-to-br from-violet-500/20 to-purple-500/20 rounded-xl">
+            <Sparkles className="w-6 h-6 text-violet-400" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-white">Kompetencje Uniwersalne</h2>
+            <p className="text-sm text-gray-400">
+              Te umiejętności przenoszą się między zawodami. Ucz się raz - stosuj wszędzie.
+            </p>
+          </div>
+        </div>
+        <button 
+          className="flex items-center gap-2 px-4 py-2 bg-violet-500/20 hover:bg-violet-500/30 text-violet-300 rounded-lg transition-colors"
+          onClick={() => setShowTransferModal(true)}
+        >
+          <TrendingUp className="w-4 h-4" />
+          <span className="text-sm font-medium">Zobacz transfer umiejętności</span>
+        </button>
+      </div>
+
+      {/* Competencies Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {UNIVERSAL_COMPETENCIES.map((competency, index) => {
+          const colors = CATEGORY_COLORS[competency.category];
+          const isSelected = selectedCompetency?.id === competency.id;
+          const masteredCount = competency.subSkills.filter(s => s.mastered).length;
+          
+          return (
+            <motion.div
+              key={competency.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.05 }}
+              onClick={() => handleCompetencyClick(competency)}
+              className={`
+                relative p-4 rounded-xl cursor-pointer transition-all duration-300
+                bg-gradient-to-br ${colors.bg} border ${colors.border}
+                hover:scale-[1.02] hover:shadow-lg hover:shadow-violet-500/10
+                ${isSelected ? 'ring-2 ring-violet-500 shadow-lg shadow-violet-500/20' : ''}
+              `}
+            >
+              {/* Icon & Title */}
+              <div className="flex items-start justify-between mb-3">
+                <div className={`p-2 rounded-lg bg-gray-900/50 ${colors.text}`}>
+                  {ICON_MAP[competency.icon]}
+                </div>
+                <span className="text-xs px-2 py-1 rounded-full bg-gray-900/50 text-gray-400">
+                  {competency.userLevel === 'none' ? 'Nowy' : 
+                   competency.userLevel === 'beginner' ? 'Początkujący' :
+                   competency.userLevel === 'intermediate' ? 'Średni' :
+                   competency.userLevel === 'advanced' ? 'Zaawansowany' : 'Ekspert'}
+                </span>
+              </div>
+
+              <h3 className="font-semibold text-white mb-1">{competency.name}</h3>
+              <p className="text-xs text-gray-400 mb-3 line-clamp-2">{competency.description}</p>
+
+              {/* Progress Bar */}
+              <div className="mb-3">
+                <div className="flex items-center justify-between text-xs mb-1">
+                  <span className="text-gray-500">Postęp</span>
+                  <span className={colors.text}>{competency.userProgress}%</span>
+                </div>
+                <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${competency.userProgress}%` }}
+                    transition={{ delay: 0.3, duration: 0.8 }}
+                    className={`h-full rounded-full bg-gradient-to-r ${
+                      competency.category === 'cognitive' ? 'from-violet-500 to-purple-500' :
+                      competency.category === 'technical' ? 'from-blue-500 to-cyan-500' :
+                      competency.category === 'interpersonal' ? 'from-emerald-500 to-teal-500' :
+                      'from-amber-500 to-orange-500'
+                    }`}
+                  />
+                </div>
+              </div>
+
+              {/* Related Careers Tags */}
+              <div className="flex flex-wrap gap-1 mb-3">
+                {competency.relatedCareers.slice(0, 3).map((career) => (
+                  <span key={career} className="text-[10px] px-2 py-0.5 bg-gray-900/50 text-gray-400 rounded-full">
+                    {career.charAt(0).toUpperCase() + career.slice(1).replace('-', ' ')}
+                  </span>
+                ))}
+                {competency.relatedCareers.length > 3 && (
+                  <span className="text-[10px] px-2 py-0.5 bg-violet-500/20 text-violet-400 rounded-full">
+                    +{competency.relatedCareers.length - 3}
+                  </span>
+                )}
+              </div>
+
+              {/* Transfer Score */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1">
+                  <TrendingUp className="w-3 h-3 text-emerald-400" />
+                  <span className="text-xs text-emerald-400">
+                    {competency.transferability}% transferowalność
+                  </span>
+                </div>
+                <ChevronRight className={`w-4 h-4 transition-transform ${isSelected ? 'rotate-90' : ''} text-gray-500`} />
+              </div>
+
+              {/* Expanded Details */}
+              <AnimatePresence>
+                {isSelected && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="mt-4 pt-4 border-t border-gray-700/50"
+                  >
+                    <h4 className="text-xs font-medium text-gray-400 mb-2">Składowe umiejętności:</h4>
+                    <div className="space-y-2">
+                      {competency.subSkills.map((skill) => (
+                        <div key={skill.id} className="flex items-center gap-2">
+                          {skill.mastered ? (
+                            <Check className="w-3 h-3 text-emerald-400" />
+                          ) : (
+                            <div className="w-3 h-3 border border-gray-600 rounded-sm" />
+                          )}
+                          <span className={`text-xs ${skill.mastered ? 'text-gray-300' : 'text-gray-500'}`}>
+                            {skill.name}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <button 
+                      onClick={(e) => handleShowTransfer(competency, e)}
+                      className="mt-3 w-full flex items-center justify-center gap-2 py-2 bg-violet-500/20 hover:bg-violet-500/30 text-violet-300 rounded-lg text-xs transition-colors"
+                    >
+                      <ArrowRight className="w-3 h-3" />
+                      Zobacz gdzie przenieść
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          );
+        })}
+      </div>
+
+      {/* Bottom Info */}
+      <div className="mt-6 p-4 bg-gradient-to-r from-violet-500/10 to-purple-500/10 rounded-xl border border-violet-500/20">
+        <div className="flex items-start gap-3">
+          <Info className="w-5 h-5 text-violet-400 flex-shrink-0 mt-0.5" />
+          <div>
+            <h4 className="text-sm font-medium text-white mb-1">Dlaczego to ważne?</h4>
+            <p className="text-xs text-gray-400">
+              W przyszłości ludzie będą zmieniać zawód średnio <span className="text-violet-400 font-medium">5-7 razy</span> w ciągu życia. 
+              Kluczem do sukcesu nie jest nauka jednego zawodu, ale budowanie <span className="text-violet-400 font-medium">uniwersalnej bazy umiejętności</span>, 
+              które można szybko adaptować do nowych domen.
+            </p>
+            <div className="flex items-center gap-4 mt-3 text-xs text-gray-500">
+              <span className="flex items-center gap-1">
+                <Zap className="w-3 h-3 text-amber-400" />
+                Uczysz się szybciej w nowych dziedzinach
+              </span>
+              <span className="flex items-center gap-1">
+                <TrendingUp className="w-3 h-3 text-emerald-400" />
+                Widzisz połączenia między branżami
+              </span>
+              <span className="flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-violet-400" />
+                Stajesz się bardziej konkurencyjny
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
