@@ -1,0 +1,315 @@
+'use client';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+
+// ============================================================
+// LEARNING CONTEXT - State Management
+// Zarządza: lekcjami, postępem, XP, streak
+// ============================================================
+
+const LearningContext = createContext();
+
+export const useLearning = () => {
+  const context = useContext(LearningContext);
+  if (!context) {
+    throw new Error('useLearning must be used within LearningProvider');
+  }
+  return context;
+};
+
+// ============================================================
+// MOCK DATA - Replace with API calls
+// ============================================================
+
+const MOCK_LESSONS = [
+  {
+    id: 'basic-electricity-1',
+    title: 'Podstawy prądu elektrycznego',
+    description: 'Poznaj podstawowe pojęcia: napięcie, natężenie, opór',
+    type: 'theory',
+    category: 'basics',
+    difficulty: 'easy',
+    estimatedTime: '15 min',
+    xpReward: 50,
+    content: {
+      sections: [
+        {
+          type: 'text',
+          title: 'Czym jest prąd elektryczny?',
+          content: 'Prąd elektryczny to uporządkowany ruch ładunków elektrycznych. W przewodnikach metalicznych są to elektrony poruszające się od bieguna ujemnego do dodatniego.'
+        },
+        {
+          type: 'image',
+          url: '/lessons/current-flow.svg',
+          caption: 'Kierunek przepływu prądu'
+        },
+        {
+          type: 'quiz',
+          question: 'W jakim kierunku płynie prąd elektryczny?',
+          options: [
+            'Od + do -',
+            'Od - do +',
+            'W obu kierunkach',
+            'Nie ma ustalonego kierunku'
+          ],
+          correctAnswer: 0,
+          explanation: 'Umownie przyjęto, że prąd płynie od bieguna dodatniego do ujemnego, choć elektrony poruszają się w przeciwnym kierunku.'
+        },
+        {
+          type: 'formula',
+          title: 'Prawo Ohma',
+          formula: 'U = I × R',
+          variables: [
+            { symbol: 'U', description: 'Napięcie [V]' },
+            { symbol: 'I', description: 'Natężenie [A]' },
+            { symbol: 'R', description: 'Opór [Ω]' }
+          ]
+        },
+        {
+          type: 'interactive',
+          component: 'OhmsLawCalculator'
+        }
+      ]
+    },
+    prerequisites: [],
+    nextLessons: ['basic-electricity-2', 'series-circuits']
+  },
+  {
+    id: 'series-circuits',
+    title: 'Obwody szeregowe',
+    description: 'Jak działają obwody połączone szeregowo?',
+    type: 'practical',
+    category: 'circuits',
+    difficulty: 'medium',
+    estimatedTime: '20 min',
+    xpReward: 75,
+    prerequisites: ['basic-electricity-1'],
+    nextLessons: ['parallel-circuits']
+  },
+  {
+    id: 'safety-basics',
+    title: 'Podstawy bezpieczeństwa',
+    description: 'Zasady BHP przy pracy z elektrycznością',
+    type: 'safety',
+    category: 'safety',
+    difficulty: 'easy',
+    estimatedTime: '10 min',
+    xpReward: 40,
+    prerequisites: [],
+    nextLessons: []
+  }
+];
+
+export const LearningProvider = ({ children }) => {
+  // ============================================================
+  // STATE
+  // ============================================================
+  
+  const [user, setUser] = useState({
+    id: 'user-123',
+    name: 'Jan',
+    totalXP: 3170,
+    level: 13,
+    streak: {
+      days: 7,
+      lastDate: new Date().toISOString().split('T')[0],
+      record: 15,
+      freezesAvailable: 2
+    },
+    dailyGoal: 100,
+    todayXP: 85,
+    completedToday: 3
+  });
+
+  const [lessons] = useState(MOCK_LESSONS);
+  
+  const [progress, setProgress] = useState({
+    'basic-electricity-1': { completed: true, score: 100, completedAt: '2024-01-10' },
+    'series-circuits': { completed: false, progress: 45, lastVisited: '2024-01-11' }
+  });
+
+  const [currentLesson, setCurrentLesson] = useState(null);
+  const [weeklyProgress, setWeeklyProgress] = useState([80, 120, 95, 150, 85, 0, 0]);
+
+  // ============================================================
+  // ACTIONS
+  // ============================================================
+
+  const startLesson = (lessonId) => {
+    const lesson = lessons.find(l => l.id === lessonId);
+    if (!lesson) {
+      console.error('Lesson not found:', lessonId);
+      return;
+    }
+
+    // Check prerequisites
+    const hasPrerequisites = lesson.prerequisites.every(
+      prereq => progress[prereq]?.completed
+    );
+
+    if (!hasPrerequisites && lesson.prerequisites.length > 0) {
+      alert('Najpierw ukończ wymagane lekcje!');
+      return;
+    }
+
+    setCurrentLesson(lesson);
+    
+    // Track last visited
+    setProgress(prev => ({
+      ...prev,
+      [lessonId]: {
+        ...prev[lessonId],
+        lastVisited: new Date().toISOString()
+      }
+    }));
+  };
+
+  const completeLesson = (lessonId, score = 100) => {
+    const lesson = lessons.find(l => l.id === lessonId);
+    if (!lesson) return;
+
+    // Award XP
+    const earnedXP = Math.round(lesson.xpReward * (score / 100));
+    
+    setUser(prev => ({
+      ...prev,
+      totalXP: prev.totalXP + earnedXP,
+      todayXP: prev.todayXP + earnedXP,
+      completedToday: prev.completedToday + 1
+    }));
+
+    // Mark as completed
+    setProgress(prev => ({
+      ...prev,
+      [lessonId]: {
+        completed: true,
+        score,
+        completedAt: new Date().toISOString(),
+        xpEarned: earnedXP
+      }
+    }));
+
+    // Update weekly progress (today)
+    const today = new Date().getDay();
+    const todayIndex = today === 0 ? 6 : today - 1;
+    setWeeklyProgress(prev => {
+      const newProgress = [...prev];
+      newProgress[todayIndex] = (newProgress[todayIndex] || 0) + earnedXP;
+      return newProgress;
+    });
+
+    // Clear current lesson
+    setCurrentLesson(null);
+
+    // Show celebration
+    return {
+      xpEarned: earnedXP,
+      newTotalXP: user.totalXP + earnedXP,
+      goalProgress: ((user.todayXP + earnedXP) / user.dailyGoal) * 100
+    };
+  };
+
+  const updateLessonProgress = (lessonId, progressPercent) => {
+    setProgress(prev => ({
+      ...prev,
+      [lessonId]: {
+        ...prev[lessonId],
+        progress: progressPercent,
+        lastVisited: new Date().toISOString()
+      }
+    }));
+  };
+
+  const exitLesson = () => {
+    setCurrentLesson(null);
+  };
+
+  const getNextLesson = () => {
+    // Find first incomplete lesson
+    return lessons.find(lesson => !progress[lesson.id]?.completed);
+  };
+
+  const getLessonStatus = (lessonId) => {
+    const lessonProgress = progress[lessonId];
+    const lesson = lessons.find(l => l.id === lessonId);
+    
+    if (!lesson) return 'locked';
+    
+    // Check prerequisites
+    const hasPrerequisites = lesson.prerequisites.every(
+      prereq => progress[prereq]?.completed
+    );
+    
+    if (!hasPrerequisites && lesson.prerequisites.length > 0) {
+      return 'locked';
+    }
+    
+    if (lessonProgress?.completed) return 'completed';
+    if (lessonProgress?.progress > 0) return 'in-progress';
+    return 'available';
+  };
+
+  const resetProgress = () => {
+    if (confirm('Czy na pewno chcesz zresetować cały postęp?')) {
+      setProgress({});
+      setUser(prev => ({
+        ...prev,
+        totalXP: 0,
+        todayXP: 0,
+        completedToday: 0
+      }));
+    }
+  };
+
+  // ============================================================
+  // PERSISTENCE (LocalStorage)
+  // ============================================================
+
+  useEffect(() => {
+    // Load from localStorage
+    const savedUser = localStorage.getItem('learning-user');
+    const savedProgress = localStorage.getItem('learning-progress');
+    const savedWeekly = localStorage.getItem('learning-weekly');
+    
+    if (savedUser) setUser(JSON.parse(savedUser));
+    if (savedProgress) setProgress(JSON.parse(savedProgress));
+    if (savedWeekly) setWeeklyProgress(JSON.parse(savedWeekly));
+  }, []);
+
+  useEffect(() => {
+    // Save to localStorage
+    localStorage.setItem('learning-user', JSON.stringify(user));
+    localStorage.setItem('learning-progress', JSON.stringify(progress));
+    localStorage.setItem('learning-weekly', JSON.stringify(weeklyProgress));
+  }, [user, progress, weeklyProgress]);
+
+  // ============================================================
+  // CONTEXT VALUE
+  // ============================================================
+
+  const value = {
+    // State
+    user,
+    lessons,
+    progress,
+    currentLesson,
+    weeklyProgress,
+    
+    // Actions
+    startLesson,
+    completeLesson,
+    updateLessonProgress,
+    exitLesson,
+    getNextLesson,
+    getLessonStatus,
+    resetProgress,
+    
+    // Computed
+    nextTask: getNextLesson(),
+  };
+
+  return (
+    <LearningContext.Provider value={value}>
+      {children}
+    </LearningContext.Provider>
+  );
+};
