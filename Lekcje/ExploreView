@@ -1,0 +1,72 @@
+function ExploreView() {
+  const careers = [
+    {
+      id: "electrician",
+      title: "Elektryk",
+      subtitle: "Instalacje, pomiary, diagnostyka",
+      starterLessonId: "elec-tools-intro"
+    },
+    { id: "plumber", title: "Hydraulik", subtitle: "Wod.-kan., serwis", starterLessonId: null },
+    { id: "carpenter", title: "Stolarz", subtitle: "Meble, montaż", starterLessonId: null }
+  ];
+
+  const openCareer = (c) => {
+    // MVP: jeśli masz starterLessonId → przerzuć do tasks
+    if (c.starterLessonId) {
+      window.dispatchEvent(
+        new CustomEvent("navigate", { detail: { section: "tasks", lessonId: c.starterLessonId } })
+      );
+      return;
+    }
+
+    window.dispatchEvent(
+      new CustomEvent("showNotification", {
+        detail: { type: "error", message: "Brak startowej lekcji dla tego zawodu (jeszcze).", duration: 2500 }
+      })
+    );
+  };
+
+  return (
+    <div style={{ display: "grid", gap: 16 }}>
+      <h1 style={{ fontSize: 32, fontWeight: 900, marginBottom: 4, color: "#1f2937" }}>Odkrywaj</h1>
+      <p style={{ color: "#6b7280", marginTop: 0 }}>
+        Eksploruj zawody jak mapę — bez presji. Wybierz zawód, żeby zobaczyć szczegóły i rozpocząć ścieżkę.
+      </p>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
+        {careers.map((c) => (
+          <div
+            key={c.id}
+            onClick={() => openCareer(c)}
+            style={{
+              background: "white",
+              borderRadius: 16,
+              padding: 20,
+              boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
+              cursor: "pointer"
+            }}
+          >
+            <div style={{ fontSize: 18, fontWeight: 900, color: "#111827" }}>{c.title}</div>
+            <div style={{ marginTop: 6, color: "#6b7280" }}>{c.subtitle}</div>
+
+            <button
+              style={{
+                marginTop: 14,
+                width: "100%",
+                padding: 12,
+                borderRadius: 12,
+                border: "none",
+                background: "#7c3aed",
+                color: "white",
+                fontWeight: 800,
+                cursor: "pointer"
+              }}
+            >
+              Zobacz / Zacznij
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
