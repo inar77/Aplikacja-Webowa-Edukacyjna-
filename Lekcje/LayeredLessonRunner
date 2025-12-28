@@ -1,0 +1,210 @@
+import React, { useMemo } from 'react';
+import { useLayeredProgress } from '../hooks/useLayeredProgress';
+import { LayeredLessonDefinition, LayerConfig, LayerKind } from '../types/layered-lessons';
+import { CheckCircle, Lock, ArrowRight, Play } from 'lucide-react';
+
+// --- STALER ---
+const LAYER_ORDER: LayerKind[] = ['surface', 'core', 'deep'];
+
+type LayerStatus = 'locked' | 'active' | 'completed';
+
+// --- SUB-KOMPONENT: KARTA WARSTWY ---
+interface LayerCardProps {
+  config: LayerConfig;
+  status: LayerStatus;
+  onClick?: () => void;
+}
+
+const LayerCard: React.FC<LayerCardProps> = ({ config, status, onClick }) => {
+  const isLocked = status === 'locked';
+  const isActive = status === 'active';
+  const isCompleted = status === 'completed';
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!isLocked && (e.key === 'Enter' || e.key === ' ')) {
+      onClick?.();
+    }
+  };
+
+  return (
+    <div
+      role="button"
+      tabIndex={isLocked ? -1 : 0}
+      onKeyDown={handleKeyDown}
+      onClick={!isLocked ? onClick : undefined}
+      className={`
+        relative p-4 rounded-xl mb-3 border transition-all duration-200
+        ${isLocked ? 'opacity-50 cursor-not-allowed border-gray-200 bg-gray-50' : 'cursor-pointer hover:shadow-md'}
+        ${isActive ? 'border-violet-500 bg-violet-50 ring-1 ring-violet-500' : 'border-gray-200 bg-white'}
+      `}
+    >
+      <div className="flex justify-between items-center mb-1">
+        <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+          {config.kind}
+        </span>
+        {isCompleted && <CheckCircle size={16} className="text-emerald-500" />}
+        {isLocked && <Lock size={16} className="text-gray-400" />}
+        {isActive && !isCompleted && <Play size={16} className="text-violet-600 animate-pulse" />}
+      </div>
+      
+      <h3 className="text-lg font-bold text-gray-900 mb-1">{config.title}</h3>
+      <p className="text-sm text-gray-600 leading-snug">{config.description}</p>
+      
+      <div className="mt-3 text-xs font-bold text-amber-600 flex items-center gap-1">
+        <span>+{config.xpReward} XP</span>
+      </div>
+    </div>
+  );
+};
+
+// --- SUB-KOMPONENT: EKRAN PRZEJŚCIA (INTERMISSION) ---
+interface IntermissionViewProps {
+  completedLayerConfig: LayerConfig;
+  nextLayerConfig: LayerConfig;
+  onProceed: () => void;
+  onExit: () => void;
+}
+
+const IntermissionView: React.FC<IntermissionViewProps> = ({ 
+  completedLayerConfig, 
+  nextLayerConfig, 
+  onProceed, 
+  onExit 
+}) => {
+  return (
+    <div className="flex flex-col items-center justify-center h-full max-w-lg mx-auto text-center animate-in fade-in zoom-in duration-300">
+      <div className="text-6xl mb-6">🎉</div>
+      <h2 className="text-2xl font-black text-gray-900 mb-2">
+        Warstwa {completedLayerConfig.title} zaliczona!
+      </h2>
+      <p className="text-gray-600 mb-8">
+        Zgarnąłeś właśnie <strong className="text-amber-600">{completedLayerConfig.xpReward} XP</strong>.
+      </p>
+
+      <div className="w-full bg-gradient-to-br from-violet-600 to-indigo-900 rounded-2xl p-8 text-white shadow-xl shadow-violet-500/20">
+        <h3 className="text-xl font-bold mb-2">Chcesz wejść głębiej?</h3>
+        <p className="text-white/90 mb-8 text-sm leading-relaxed">
+          Poziom <strong>{nextLayerConfig.title}</strong> to wiedza dla profesjonalistów. 
+          Czeka na Ciebie dodatkowe <span className="font-bold text-amber-400">{nextLayerConfig.xpReward} XP</span>.
+        </p>
+
+        <button
+          onClick={onProceed}
+          className="w-full py-4 bg-white text-violet-700 rounded-xl font-bold text-lg flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors"
+        >
+          Lecę dalej! <ArrowRight size={20} />
+        </button>
+
+        <button
+          onClick={onExit}
+          className="mt-4 text-sm text-white/60 hover:text-white transition-colors"
+        >
+          Nie, wystarczy mi na dzisiaj
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// --- GŁÓWNY KOMPONENT ---
+interface LayeredLessonRunnerProps {
+  lesson: LayeredLessonDefinition;
+  onExit?: () => void; // Callback do wyjścia z lekcji
+}
+
+export const LayeredLessonRunner: React.FC<LayeredLessonRunnerProps> = ({ lesson, onExit }) => {
+  const {
+    activeLayer,
+    currentStepId,
+    progressPercent,
+    isIntermission,
+    completedLayers,
+    completeStep,
+    proceedToNextLayer,
+    isLessonFullyComplete
+  } = useLayeredProgress(lesson);
+
+  // Helper do obliczania następnej warstwy
+  const nextLayerConfig = useMemo(() => {
+    const currentIndex = LAYER_ORDER.indexOf(activeLayer);
+    const nextLayerKey = LAYER_ORDER[currentIndex + 1];
+    return nextLayerKey ? lesson.layers[nextLayerKey] : null;
+  }, [activeLayer, lesson]);
+
+  // Renderowanie widoku Intermission
+  if (isIntermission && !isLessonFullyComplete && nextLayerConfig) {
+    return (
+      <IntermissionView 
+        completedLayerConfig={lesson.layers[activeLayer]}
+        nextLayerConfig={nextLayerConfig}
+        onProceed={proceedToNextLayer}
+        onExit={onExit || (() => {})}
+      />
+    );
+  }
+
+  // Renderowanie Głównego Widoku (Sidebar + Content)
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] h-screen bg-gray-50">
+      
+      {/* SIDEBAR */}
+      <aside className="border-r border-gray-200 bg-white p-6 overflow-y-auto">
+        <h3 className="mb-6 text-sm font-bold text-gray-400 uppercase tracking-widest">
+          Mapa Lekcji
+        </h3>
+        
+        {LAYER_ORDER.map((layerKey) => {
+           const config = lesson.layers[layerKey];
+           // Ustalanie statusu
+           let status: LayerStatus = 'locked';
+           if (completedLayers.includes(layerKey)) status = 'completed';
+           else if (activeLayer === layerKey) status = 'active';
+
+           return (
+             <LayerCard 
+               key={layerKey}
+               config={config} 
+               status={status}
+               // Opcjonalnie: pozwalamy wrócić do ukończonych
+               onClick={status === 'completed' ? () => console.log("Replay layer logic") : undefined} 
+             />
+           );
+        })}
+      </aside>
+
+      {/* MAIN CONTENT AREA */}
+      <main className="relative flex flex-col p-6 lg:p-12 overflow-y-auto">
+        {/* Progress Bar */}
+        <div className="max-w-3xl w-full mx-auto mb-8">
+          <div className="flex justify-between mb-2 text-xs font-bold text-gray-500 uppercase">
+            <span>{lesson.layers[activeLayer].title}</span>
+            <span>{progressPercent}%</span>
+          </div>
+          <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-violet-600 rounded-full transition-all duration-500 ease-out"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Step Container */}
+        <div className="flex-1 flex flex-col items-center justify-center max-w-3xl w-full mx-auto">
+          {/* Tutaj byłby właściwy StepRenderer */}
+          <div className="w-full bg-white border border-gray-200 rounded-2xl p-10 shadow-sm min-h-[400px] flex flex-col items-center justify-center text-center">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Krok ID: {currentStepId}</h2>
+            <p className="text-gray-600 mb-8">
+              Tu renderujemy treść: Video, Quiz, albo Symulację.
+            </p>
+            <button 
+              onClick={completeStep}
+              className="px-6 py-3 bg-gray-900 text-white rounded-lg font-bold hover:bg-black transition-colors"
+            >
+              Symuluj ukończenie kroku
+            </button>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+};
