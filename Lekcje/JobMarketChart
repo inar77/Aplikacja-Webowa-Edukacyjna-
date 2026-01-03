@@ -1,0 +1,372 @@
+'use client';
+
+import React from 'react';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+  Legend
+} from 'recharts';
+import { TrendingUp, Briefcase, Clock, DollarSign } from 'lucide-react';
+import type { MarketDataPoint } from './types';
+
+interface JobMarketChartProps {
+  data: MarketDataPoint[];
+  metric?: 'match' | 'salary' | 'offers' | 'growth';
+  title?: string;
+  subtitle?: string;
+  className?: string;
+}
+
+/**
+ * JobMarketChart - Interactive data visualization for job market
+ * 
+ * Features:
+ * - Recharts for performance
+ * - Accessible tooltips with full context
+ * - Color-coded by match score
+ * - WCAG AAA compliant colors
+ * - Responsive container
+ * - Keyboard navigable
+ */
+export const JobMarketChart = React.memo<JobMarketChartProps>(({
+  data,
+  metric = 'match',
+  title = 'Analiza rynku pracy',
+  subtitle = 'Porównanie zawodów praktycznych',
+  className = ''
+}) => {
+  const [activeIndex, setActiveIndex] = React.useState<number | null>(null);
+
+  // Metric configuration
+  const metricConfig = {
+    match: {
+      dataKey: 'match',
+      label: 'Dopasowanie',
+      unit: '%',
+      color: '#4F46E5', // accent-600
+      icon: TrendingUp
+    },
+    salary: {
+      dataKey: 'salary',
+      label: 'Zarobki',
+      unit: ' PLN',
+      color: '#059669', // success-600
+      icon: DollarSign
+    },
+    offers: {
+      dataKey: 'offers',
+      label: 'Oferty pracy',
+      unit: '',
+      color: '#4F46E5', // accent-600
+      icon: Briefcase
+    },
+    growth: {
+      dataKey: 'growth',
+      label: 'Wzrost r/r',
+      unit: '%',
+      color: '#059669', // success-600
+      icon: TrendingUp
+    }
+  };
+
+  const config = metricConfig[metric];
+  const Icon = config.icon;
+
+  // Get bar color based on match score
+  const getBarColor = (matchScore: number) => {
+    if (matchScore >= 90) return '#059669'; // success-600
+    if (matchScore >= 80) return '#4F46E5'; // accent-600
+    if (matchScore >= 70) return '#9333EA'; // secondary-600
+    return '#737373'; // neutral-500
+  };
+
+  // Custom Tooltip Component (WCAG AAA)
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (!active || !payload || payload.length === 0) return null;
+
+    const data = payload[0].payload as MarketDataPoint;
+
+    return (
+      <div 
+        className="bg-white border-2 border-neutral-200 rounded-xl shadow-xl p-4 min-w-[280px]"
+        role="tooltip"
+        aria-live="polite"
+      >
+        {/* Career Title */}
+        <h4 className="text-heading-xs text-neutral-900 mb-3 pb-3 border-b border-neutral-200">
+          {data.name}
+        </h4>
+
+        {/* All Metrics Grid */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-body-sm text-neutral-600">Dopasowanie:</span>
+            <span className="text-body-sm font-semibold text-neutral-900">{data.match}%</span>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <span className="text-body-sm text-neutral-600">Średnie zarobki:</span>
+            <span className="text-body-sm font-semibold text-neutral-900">
+              {data.salary.toLocaleString('pl-PL')} PLN
+            </span>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <span className="text-body-sm text-neutral-600">Liczba ofert:</span>
+            <span className="text-body-sm font-semibold text-neutral-900">
+              {data.offers.toLocaleString('pl-PL')}
+            </span>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <span className="text-body-sm text-neutral-600">Wzrost r/r:</span>
+            <span className="text-body-sm font-semibold text-success-700">
+              +{data.growth}%
+            </span>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <span className="text-body-sm text-neutral-600">Czas do pracy:</span>
+            <span className="text-body-sm font-semibold text-neutral-900">
+              {data.timeToJob} dni
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Custom Y-Axis Tick (Better contrast)
+  const CustomYAxisTick = (props: any) => {
+    const { x, y, payload } = props;
+    return (
+      <g transform={`translate(${x},${y})`}>
+        <text
+          x={0}
+          y={0}
+          dy={4}
+          textAnchor="end"
+          fill="#525252" // neutral-600 (7.48:1 contrast)
+          className="text-body-xs"
+        >
+          {payload.value}
+        </text>
+      </g>
+    );
+  };
+
+  // Custom X-Axis Tick (Better contrast)
+  const CustomXAxisTick = (props: any) => {
+    const { x, y, payload } = props;
+    return (
+      <g transform={`translate(${x},${y})`}>
+        <text
+          x={0}
+          y={0}
+          dy={16}
+          textAnchor="middle"
+          fill="#525252" // neutral-600 (7.48:1 contrast)
+          className="text-body-xs"
+        >
+          {payload.value}
+        </text>
+      </g>
+    );
+  };
+
+  return (
+    <div 
+      className={`bg-white border border-neutral-200 rounded-2xl p-6 ${className}`}
+      role="region"
+      aria-label={title}
+    >
+      {/* Header */}
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <h3 className="text-heading-md text-neutral-900 mb-1">
+            {title}
+          </h3>
+          {subtitle && (
+            <p className="text-body-sm text-neutral-600">
+              {subtitle}
+            </p>
+          )}
+        </div>
+
+        {/* Metric Badge */}
+        <div className="flex items-center gap-2 px-3 py-2 bg-accent-50 rounded-lg border border-accent-200">
+          <Icon className="w-4 h-4 text-accent-600" aria-hidden="true" />
+          <span className="text-label-lg text-accent-700">{config.label}</span>
+        </div>
+      </div>
+
+      {/* Chart */}
+      <div className="w-full" style={{ height: '400px' }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart
+            data={data}
+            margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+            onMouseMove={(state) => {
+              if (state.isTooltipActive) {
+                setActiveIndex(state.activeTooltipIndex ?? null);
+              } else {
+                setActiveIndex(null);
+              }
+            }}
+            onMouseLeave={() => setActiveIndex(null)}
+          >
+            {/* Grid - Subtle */}
+            <CartesianGrid 
+              strokeDasharray="3 3" 
+              stroke="#E5E5E5" 
+              vertical={false}
+            />
+
+            {/* X Axis */}
+            <XAxis
+              dataKey="name"
+              tick={<CustomXAxisTick />}
+              axisLine={{ stroke: '#D4D4D4' }}
+              tickLine={{ stroke: '#D4D4D4' }}
+            />
+
+            {/* Y Axis */}
+            <YAxis
+              tick={<CustomYAxisTick />}
+              axisLine={{ stroke: '#D4D4D4' }}
+              tickLine={{ stroke: '#D4D4D4' }}
+              label={{
+                value: config.unit ? `${config.label} (${config.unit})` : config.label,
+                angle: -90,
+                position: 'insideLeft',
+                style: { 
+                  fill: '#525252', 
+                  fontSize: '0.875rem',
+                  fontWeight: 500
+                }
+              }}
+            />
+
+            {/* Tooltip */}
+            <Tooltip 
+              content={<CustomTooltip />}
+              cursor={{ fill: 'rgba(79, 70, 229, 0.05)' }}
+            />
+
+            {/* Legend */}
+            <Legend 
+              wrapperStyle={{
+                paddingTop: '20px',
+                fontSize: '0.875rem',
+                color: '#525252'
+              }}
+            />
+
+            {/* Bars - Color coded by match score */}
+            <Bar
+              dataKey={config.dataKey}
+              name={config.label}
+              radius={[8, 8, 0, 0]}
+              maxBarSize={60}
+            >
+              {data.map((entry, index) => (
+                <Cell
+                  key={`cell-${index}`}
+                  fill={getBarColor(entry.match)}
+                  opacity={activeIndex === null || activeIndex === index ? 1 : 0.5}
+                  style={{
+                    transition: 'opacity 0.2s ease-in-out'
+                  }}
+                />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Legend - Color Meaning */}
+      <div className="mt-6 pt-6 border-t border-neutral-200">
+        <div className="flex flex-wrap gap-4 justify-center">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-sm bg-[#059669]" aria-hidden="true" />
+            <span className="text-body-sm text-neutral-600">Dopasowanie ≥90%</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-sm bg-[#4F46E5]" aria-hidden="true" />
+            <span className="text-body-sm text-neutral-600">Dopasowanie 80-89%</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-sm bg-[#9333EA]" aria-hidden="true" />
+            <span className="text-body-sm text-neutral-600">Dopasowanie 70-79%</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-sm bg-[#737373]" aria-hidden="true" />
+            <span className="text-body-sm text-neutral-600">Dopasowanie &lt;70%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+});
+
+JobMarketChart.displayName = 'JobMarketChart';
+
+/**
+ * MetricSelector - Switch between different metrics
+ */
+interface MetricSelectorProps {
+  selectedMetric: 'match' | 'salary' | 'offers' | 'growth';
+  onChange: (metric: 'match' | 'salary' | 'offers' | 'growth') => void;
+  className?: string;
+}
+
+export const MetricSelector = React.memo<MetricSelectorProps>(({
+  selectedMetric,
+  onChange,
+  className = ''
+}) => {
+  const metrics = [
+    { id: 'match' as const, label: 'Dopasowanie', icon: TrendingUp },
+    { id: 'salary' as const, label: 'Zarobki', icon: DollarSign },
+    { id: 'offers' as const, label: 'Oferty', icon: Briefcase },
+    { id: 'growth' as const, label: 'Wzrost', icon: TrendingUp }
+  ];
+
+  return (
+    <div 
+      className={`inline-flex bg-neutral-100 rounded-lg p-1 ${className}`}
+      role="tablist"
+      aria-label="Wybór metryki"
+    >
+      {metrics.map(({ id, label, icon: Icon }) => (
+        <button
+          key={id}
+          onClick={() => onChange(id)}
+          className={`
+            flex items-center gap-2 px-4 py-2 rounded-md text-body-sm font-medium
+            transition-all duration-base
+            ${selectedMetric === id
+              ? 'bg-white text-accent-700 shadow-sm'
+              : 'text-neutral-600 hover:text-neutral-900'
+            }
+          `}
+          role="tab"
+          aria-selected={selectedMetric === id}
+          aria-label={`Pokaż ${label.toLowerCase()}`}
+        >
+          <Icon className="w-4 h-4" aria-hidden="true" />
+          <span>{label}</span>
+        </button>
+      ))}
+    </div>
+  );
+});
+
+MetricSelector.displayName = 'MetricSelector';
+
