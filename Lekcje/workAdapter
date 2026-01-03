@@ -1,0 +1,119 @@
+// utils/workshopAdapter.ts
+
+import {
+  LessonDefinition,
+  InteractiveSimulationStep,
+  StoryScenarioStep,
+  PhotoChallengeStep,
+  VoiceResponseStep,
+} from '../types'; // Twój types.ts [file:50]
+import {
+  WorkshopTask,
+  SimulationTask,
+  StoryTask,
+  PhotoTask,
+  VoiceTask,
+  DailyJob,
+} from '../types/workshop';
+
+export function buildWorkshopTasksFromLesson(
+  lesson: LessonDefinition
+): WorkshopTask[] {
+  const tasks: WorkshopTask[] = [];
+
+  for (const step of lesson.steps) {
+    switch (step.kind) {
+      case 'interactive-simulation': {
+        const s = step as InteractiveSimulationStep;
+        const t: SimulationTask = {
+          id: `${lesson.id}-${s.id}`,
+          kind: 'simulation',
+          lessonId: lesson.id,
+          stepId: s.id,
+          title: s.title,
+          description: s.prompt,
+          estimatedMinutes: s.estimatedMinutes,
+          xpReward: 50, // możesz później policzyć z objectives.points
+          simulation: s,
+        };
+        tasks.push(t);
+        break;
+      }
+      case 'story-scenario': {
+        const st = step as StoryScenarioStep;
+        const t: StoryTask = {
+          id: `${lesson.id}-${st.id}`,
+          kind: 'story',
+          lessonId: lesson.id,
+          stepId: st.id,
+          title: st.title,
+          description: st.prompt,
+          estimatedMinutes: st.estimatedMinutes,
+          xpReward: 40,
+          story: st,
+        };
+        tasks.push(t);
+        break;
+      }
+      case 'photo-challenge': {
+        const p = step as PhotoChallengeStep;
+        const t: PhotoTask = {
+          id: `${lesson.id}-${p.id}`,
+          kind: 'photo',
+          lessonId: lesson.id,
+          stepId: p.id,
+          title: p.title,
+          description: p.instructions,
+          estimatedMinutes: p.estimatedMinutes,
+          xpReward: 60,
+          photo: p,
+        };
+        tasks.push(t);
+        break;
+      }
+      case 'voice-response': {
+        const v = step as VoiceResponseStep;
+        const t: VoiceTask = {
+          id: `${lesson.id}-${v.id}`,
+          kind: 'voice',
+          lessonId: lesson.id,
+          stepId: v.id,
+          title: v.title,
+          description: v.prompt,
+          estimatedMinutes: v.estimatedMinutes,
+          xpReward: 50,
+          voice: v,
+        };
+        tasks.push(t);
+        break;
+      }
+      default:
+        // inne kroki pomijamy w warsztacie, albo dodasz później
+        break;
+    }
+  }
+
+  return tasks;
+}
+
+// Prosty generator „Zlecenia dnia” z jednej lekcji [file:50]
+export function buildDailyJobFromLesson(
+  lesson: LessonDefinition,
+  maxTasks: number = 3
+): DailyJob | null {
+  const allTasks = buildWorkshopTasksFromLesson(lesson);
+  if (!allTasks.length) return null;
+
+  const selected = allTasks.slice(0, maxTasks);
+  const totalXP = selected.reduce((sum, t) => sum + t.xpReward, 0);
+  const estimatedMinutes = selected.reduce((sum, t) => sum + t.estimatedMinutes, 0);
+
+  return {
+    id: `job-${lesson.id}`,
+    title: `Zlecenie: ${lesson.title}`,
+    description: lesson.description,
+    tasks: selected,
+    totalXP,
+    estimatedMinutes,
+  };
+}
