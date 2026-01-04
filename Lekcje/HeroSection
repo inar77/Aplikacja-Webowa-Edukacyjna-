@@ -1,0 +1,318 @@
+'use client';
+
+import React from 'react';
+import { 
+  TrendingUp, 
+  Briefcase, 
+  Clock, 
+  DollarSign, 
+  ArrowRight,
+  Award,
+  Users
+} from 'lucide-react';
+import type { CareerWithKPI, CTAButton } from './types';
+
+interface HeroCareerCardProps {
+  career: CareerWithKPI;
+  primaryCTA: CTAButton;
+  secondaryCTA?: CTAButton;
+  isRecommended?: boolean;
+  onCardClick?: () => void;
+  className?: string;
+}
+
+/**
+ * HeroCareerCard - Premium career recommendation card
+ * 
+ * Design principles:
+ * - WCAG AAA: 7:1 contrast ratio on all text
+ * - 90% neutral + 10% accent colors
+ * - Clear visual hierarchy
+ * - Minimal animations (performance)
+ * - Mobile-first responsive
+ */
+export const HeroCareerCard = React.memo<HeroCareerCardProps>(({
+  career,
+  primaryCTA,
+  secondaryCTA,
+  isRecommended = false,
+  onCardClick,
+  className = ''
+}) => {
+  const [isHovered, setIsHovered] = React.useState(false);
+
+  // Format salary range
+  const salaryRange = `${(career.kpi.averageSalary.min / 1000).toFixed(0)}-${(career.kpi.averageSalary.max / 1000).toFixed(0)}k ${career.kpi.averageSalary.currency}`;
+
+  // Format time to job
+  const timeToJob = `${career.kpi.timeToFirstJob.value} ${career.kpi.timeToFirstJob.unit}`;
+
+  // Determine match score color (WCAG AAA compliant)
+  const getMatchScoreStyles = (score: number) => {
+    if (score >= 90) return 'text-success-700 bg-success-50';
+    if (score >= 75) return 'text-accent-700 bg-accent-50';
+    return 'text-neutral-700 bg-neutral-100';
+  };
+
+  // Demand badge styles
+  const getDemandStyles = (demand: string) => {
+    switch (demand) {
+      case 'very-high':
+        return 'text-success-700 bg-success-50 border-success-600';
+      case 'high':
+        return 'text-accent-700 bg-accent-50 border-accent-600';
+      case 'medium':
+        return 'text-warning-700 bg-warning-50 border-warning-600';
+      default:
+        return 'text-neutral-700 bg-neutral-50 border-neutral-600';
+    }
+  };
+
+  const demandLabels = {
+    'very-high': 'Bardzo wysokie zapotrzebowanie',
+    'high': 'Wysokie zapotrzebowanie',
+    'medium': 'Średnie zapotrzebowanie',
+    'low': 'Niskie zapotrzebowanie'
+  };
+
+  return (
+    <article
+      className={`
+        group relative
+        bg-white rounded-2xl border border-neutral-200
+        transition-all duration-base
+        ${isHovered ? 'shadow-xl border-accent-300' : 'shadow-lg hover:shadow-xl'}
+        ${onCardClick ? 'cursor-pointer' : ''}
+        ${className}
+      `}
+      onClick={onCardClick}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onKeyDown={(e) => {
+        if (onCardClick && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault();
+          onCardClick();
+        }
+      }}
+      tabIndex={onCardClick ? 0 : undefined}
+      role={onCardClick ? 'button' : 'article'}
+      aria-label={`${career.title} - ${career.matchScore}% dopasowania`}
+    >
+      {/* Recommended Badge */}
+      {isRecommended && (
+        <div 
+          className="absolute -top-3 left-6 px-4 py-1.5 bg-accent-600 text-white rounded-full text-label-md shadow-md"
+          aria-label="Najlepsze dopasowanie"
+        >
+          <div className="flex items-center gap-1.5">
+            <Award className="w-3.5 h-3.5" aria-hidden="true" />
+            <span>Najlepsze dopasowanie</span>
+          </div>
+        </div>
+      )}
+
+      {/* Card Content */}
+      <div className="p-8">
+        {/* Header Section */}
+        <div className="flex items-start justify-between gap-6 mb-6">
+          <div className="flex-1">
+            <h2 className="text-heading-lg text-neutral-900 mb-2">
+              {career.title}
+            </h2>
+            <p className="text-body-md text-neutral-600 leading-relaxed">
+              {career.description}
+            </p>
+          </div>
+
+          {/* Match Score - Large & Prominent */}
+          <div 
+            className={`
+              flex flex-col items-center justify-center
+              min-w-[88px] h-[88px]
+              rounded-xl border-2
+              ${getMatchScoreStyles(career.matchScore)}
+            `}
+            aria-label={`Dopasowanie: ${career.matchScore} procent`}
+          >
+            <div className="text-display-lg leading-none">
+              {career.matchScore}%
+            </div>
+            <div className="text-label-md mt-1">
+              Dopasowanie
+            </div>
+          </div>
+        </div>
+
+        {/* Demand Badge */}
+        <div className="mb-6">
+          <span 
+            className={`
+              inline-flex items-center gap-2
+              px-3 py-1.5 rounded-lg
+              text-label-lg border
+              ${getDemandStyles(career.demand)}
+            `}
+          >
+            <TrendingUp className="w-4 h-4" aria-hidden="true" />
+            {demandLabels[career.demand]}
+          </span>
+        </div>
+
+        {/* KPI Grid - 4 Columns */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          {/* Average Salary */}
+          <div className="flex items-start gap-3 p-4 bg-neutral-50 rounded-lg">
+            <div className="p-2 bg-white rounded-lg shadow-sm">
+              <DollarSign className="w-5 h-5 text-accent-600" aria-hidden="true" />
+            </div>
+            <div>
+              <div className="text-label-md text-neutral-500 mb-1">
+                Zarobki
+              </div>
+              <div className="text-heading-sm text-neutral-900">
+                {salaryRange}
+              </div>
+            </div>
+          </div>
+
+          {/* Job Offers */}
+          <div className="flex items-start gap-3 p-4 bg-neutral-50 rounded-lg">
+            <div className="p-2 bg-white rounded-lg shadow-sm">
+              <Briefcase className="w-5 h-5 text-accent-600" aria-hidden="true" />
+            </div>
+            <div>
+              <div className="text-label-md text-neutral-500 mb-1">
+                Oferty pracy
+              </div>
+              <div className="text-heading-sm text-neutral-900">
+                {career.kpi.jobOffers.toLocaleString('pl-PL')}
+              </div>
+            </div>
+          </div>
+
+          {/* Growth Rate */}
+          <div className="flex items-start gap-3 p-4 bg-neutral-50 rounded-lg">
+            <div className="p-2 bg-white rounded-lg shadow-sm">
+              <TrendingUp className="w-5 h-5 text-success-600" aria-hidden="true" />
+            </div>
+            <div>
+              <div className="text-label-md text-neutral-500 mb-1">
+                Wzrost r/r
+              </div>
+              <div className="text-heading-sm text-neutral-900">
+                +{career.kpi.growthRate}%
+              </div>
+            </div>
+          </div>
+
+          {/* Time to First Job */}
+          <div className="flex items-start gap-3 p-4 bg-neutral-50 rounded-lg">
+            <div className="p-2 bg-white rounded-lg shadow-sm">
+              <Clock className="w-5 h-5 text-accent-600" aria-hidden="true" />
+            </div>
+            <div>
+              <div className="text-label-md text-neutral-500 mb-1">
+                Czas do pracy
+              </div>
+              <div className="text-heading-sm text-neutral-900">
+                {timeToJob}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Required Skills */}
+        <div className="mb-8">
+          <h3 className="text-label-lg text-neutral-700 mb-3">
+            Wymagane umiejętności
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {career.kpi.skills.slice(0, 6).map((skill) => (
+              <span
+                key={skill}
+                className="px-3 py-1.5 bg-neutral-100 text-neutral-700 rounded-lg text-body-sm"
+              >
+                {skill}
+              </span>
+            ))}
+            {career.kpi.skills.length > 6 && (
+              <span className="px-3 py-1.5 text-neutral-500 text-body-sm">
+                +{career.kpi.skills.length - 6} więcej
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* CTA Buttons */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              primaryCTA.onClick();
+            }}
+            disabled={primaryCTA.disabled || primaryCTA.loading}
+            className={`
+              flex-1 flex items-center justify-center gap-2
+              px-6 py-3.5 rounded-lg
+              text-body-md font-medium
+              transition-all duration-base
+              focus:outline-none focus:ring-2 focus:ring-accent-500 focus:ring-offset-2
+              ${primaryCTA.variant === 'primary' 
+                ? 'bg-accent-600 text-white hover:bg-accent-700 active:bg-accent-800 shadow-md hover:shadow-lg' 
+                : primaryCTA.variant === 'secondary'
+                ? 'bg-secondary-600 text-white hover:bg-secondary-700 active:bg-secondary-800 shadow-md hover:shadow-lg'
+                : 'bg-white text-neutral-700 border-2 border-neutral-300 hover:border-accent-400 hover:bg-neutral-50'
+              }
+              disabled:opacity-50 disabled:cursor-not-allowed
+            `}
+            aria-label={primaryCTA.label}
+          >
+            {primaryCTA.loading ? (
+              <span className="animate-pulse-subtle">Ładowanie...</span>
+            ) : (
+              <>
+                <span>{primaryCTA.label}</span>
+                {primaryCTA.icon || <ArrowRight className="w-5 h-5" aria-hidden="true" />}
+              </>
+            )}
+          </button>
+
+          {secondaryCTA && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                secondaryCTA.onClick();
+              }}
+              disabled={secondaryCTA.disabled}
+              className={`
+                px-6 py-3.5 rounded-lg
+                text-body-md font-medium
+                bg-white text-neutral-700 border-2 border-neutral-300
+                hover:border-accent-400 hover:bg-neutral-50
+                transition-all duration-base
+                focus:outline-none focus:ring-2 focus:ring-accent-500 focus:ring-offset-2
+                disabled:opacity-50 disabled:cursor-not-allowed
+              `}
+              aria-label={secondaryCTA.label}
+            >
+              {secondaryCTA.label}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Hover Effect - Subtle accent on left border */}
+      <div 
+        className={`
+          absolute left-0 top-8 bottom-8 w-1 bg-accent-600 rounded-r-full
+          transition-opacity duration-base
+          ${isHovered ? 'opacity-100' : 'opacity-0'}
+        `}
+        aria-hidden="true"
+      />
+    </article>
+  );
+});
+
+HeroCareerCard.displayName = 'HeroCareerCard';
+
