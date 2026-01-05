@@ -1,0 +1,367 @@
+// components/ImmersiveWorkshop.tsx
+'use client';
+
+import { useState, useEffect, useRef } from 'react';
+import { 
+  ChevronLeft, ChevronRight, Mic, Camera, Zap, 
+  CheckCircle2, Clock, MapPin, Volume2, Settings,
+  Maximize2, Minimize2
+} from 'lucide-react';
+import { WorkshopRunner } from './WorkshopRunner';
+import { DailyJob, WorkshopTask } from '../types/workshop';
+import { useWorkshopProgress } from '../hooks/useWorkshopProgress';
+import { format } from 'date-fns';
+import { pl } from 'date-fns/locale';
+
+interface ImmersiveWorkshopProps {
+  job: DailyJob;
+  userId: string;
+  onComplete: (xpGained: number) => void;
+  onExit?: () => void;
+  enableRecording?: boolean;
+}
+
+export const ImmersiveWorkshop = ({
+  job,
+  userId,
+  onComplete,
+  onExit,
+  enableRecording = true
+}: ImmersiveWorkshopProps) => {
+  // Stan warsztatu
+  const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
+  const [isCameraOn, setIsCameraOn] = useState(false);
+  const [isMicOn, setIsMicOn] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [elapsedTime, setElapsedTime] = useState(0);
+  
+  const workshopRef = useRef<HTMLDivElement>(null);
+  const timerRef = useRef<NodeJS.Timeout>();
+  
+  // Hook do zarządzania progresem
+  const {
+    progress,
+    xpEarned,
+    totalXp,
+    completeTask,
+    isTaskComplete,
+    getTaskProgress
+  } = useWorkshopProgress(job.id, userId);
+  
+  const currentTask: WorkshopTask = job.tasks[currentTaskIndex];
+  const taskProgress = getTaskProgress(currentTask.id);
+  
+  // Aktualizuj czas co sekundę
+  useEffect(() => {
+    timerRef.current = setInterval(() => {
+      setCurrentTime(new Date());
+      setElapsedTime(prev => prev + 1);
+    }, 1000);
+    
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []);
+  
+  // Fullscreen handling
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      workshopRef.current?.requestFullscreen();
+      setIsFullscreen(true);
+    } else {
+      document.exitFullscreen();
+      setIsFullscreen(false);
+    }
+  };
+  
+  // Task navigation
+  const goToNextTask = () => {
+    if (currentTaskIndex < job.tasks.length - 1) {
+      setCurrentTaskIndex(prev => prev + 1);
+    } else {
+      // Ostatnie zadanie ukończone
+      handleWorkshopComplete();
+    }
+  };
+  
+  const goToPreviousTask = () => {
+    if (currentTaskIndex > 0) {
+      setCurrentTaskIndex(prev => prev - 1);
+    }
+  };
+  
+  const handleTaskComplete = (taskId: string) => {
+    completeTask(taskId);
+    
+    // Auto-advance after 2 seconds
+    setTimeout(() => {
+      goToNextTask();
+    }, 2000);
+  };
+  
+  const handleWorkshopComplete = () => {
+    const totalXpEarned = job.totalXP * (progress / 100);
+    onComplete(totalXpEarned);
+    
+    // Zapisz do historii
+    saveWorkshopHistory({
+      jobId: job.id,
+      completedAt: new Date(),
+      xpEarned: totalXpEarned,
+      timeSpent: elapsedTime
+    });
+  };
+  
+  // Formatowanie czasu
+  const formatElapsedTime = (seconds: number) => {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    
+    if (hrs > 0) {
+      return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+  
+  // Save workshop history (mock)
+  const saveWorkshopHistory = (data: any) => {
+    localStorage.setItem(`workshop_${job.id}_${userId}`, JSON.stringify(data));
+  };
+  
+  return (
+    <div 
+      ref={workshopRef}
+      className="h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 overflow-hidden relative"
+      role="application"
+      aria-label={`Warsztat: ${job.title}`}
+    >
+      {/* Background overlay */}
+      <div 
+        className="absolute inset-0 bg-cover bg-center opacity-10 transition-opacity duration-500"
+        style={{ 
+          backgroundImage: `url('/workshop-bg-${job.category || 'default'}.jpg')`,
+          backgroundSize: 'cover'
+        }}
+        aria-hidden="true"
+      />
+      
+      {/* Top Bar - Job Info & Controls */}
+      <header className="relative z-20 pt-6 pb-4 px-6 border-b-4 border-amber-500/30 bg-gradient-to-r from-slate-900/95 to-slate-950/95 backdrop-blur-xl">
+        <div className="flex flex-col md:flex-row md:items-center justify-between text-white gap-4">
+          {/* Job Info */}
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-3 mb-2">
+              <Zap className="text-amber-400 flex-shrink-0" />
+              <span className="truncate">{job.title}</span>
+              {progress === 100 && (
+                <CheckCircle2 className="text-emerald-400 flex-shrink-0" size={24} />
+              )}
+            </h1>
+            
+            <div className="flex flex-wrap items-center gap-4 text-sm text-slate-300">
+              <div className="flex items-center gap-2">
+                <Clock size={16} />
+                <span>
+                  Zadanie {currentTaskIndex + 1}/{job.tasks.length} • 
+                  {formatElapsedTime(elapsedTime)} / {job.estimatedMinutes}min
+                </span>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <MapPin size={16} />
+                <span>
+                  {format(currentTime, "dd MMMM yyyy, HH:mm", { locale: pl })} • 
+                  {job.location || 'Leszno'}
+                </span>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <Zap size={16} className="text-amber-400" />
+                <span className="font-semibold">{xpEarned}/{totalXp} XP</span>
+              </div>
+            </div>
+          </div>
+          
+          {/* Controls */}
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <button
+              onClick={toggleFullscreen}
+              className="p-2 rounded-lg bg-slate-800/50 hover:bg-slate-700 border border-slate-600 text-slate-300 transition-colors"
+              aria-label={isFullscreen ? "Wyłącz pełny ekran" : "Włącz pełny ekran"}
+            >
+              {isFullscreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
+            </button>
+            
+            <button
+              onClick={onExit}
+              className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 text-sm font-medium transition-colors"
+              aria-label="Wyjdź z warsztatu"
+            >
+              Wyjdź
+            </button>
+          </div>
+        </div>
+        
+        {/* Progress Bar */}
+        <div className="mt-4">
+          <div className="flex justify-between text-xs text-slate-400 mb-1">
+            <span>Postęp warsztatu</span>
+            <span>{progress}%</span>
+          </div>
+          <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-gradient-to-r from-amber-500 via-amber-400 to-emerald-400 rounded-full transition-all duration-500"
+              style={{ width: `${progress}%` }}
+              role="progressbar"
+              aria-valuenow={progress}
+              aria-valuemin={0}
+              aria-valuemax={100}
+            />
+          </div>
+        </div>
+      </header>
+      
+      {/* Main Content Area */}
+      <main className="relative z-10 flex-1 px-4 md:px-8 py-6 md:py-10 overflow-y-auto">
+        <div className="max-w-6xl mx-auto">
+          <WorkshopRunner 
+            job={job}
+            currentTask={currentTask}
+            taskProgress={taskProgress}
+            onTaskComplete={handleTaskComplete}
+            userId={userId}
+          />
+        </div>
+      </main>
+      
+      {/* Bottom Toolbar - Workshop Tools */}
+      <footer className="relative z-20 p-4 bg-gradient-to-t from-slate-950/95 to-transparent border-t-2 border-slate-800/50">
+        <div className="flex flex-col md:flex-row items-center justify-between max-w-6xl mx-auto gap-6">
+          
+          {/* Left: Navigation & Tools */}
+          <div className="flex flex-wrap items-center gap-3 justify-center md:justify-start">
+            {/* Task Navigation */}
+            <div className="flex gap-2">
+              <button
+                onClick={goToPreviousTask}
+                disabled={currentTaskIndex === 0}
+                className="p-3 rounded-xl border border-slate-600 disabled:opacity-40 disabled:cursor-not-allowed bg-slate-800/50 hover:bg-slate-700 transition-colors"
+                aria-label="Poprzednie zadanie"
+              >
+                <ChevronLeft size={20} className="text-slate-300" />
+              </button>
+              
+              <button
+                onClick={goToNextTask}
+                disabled={currentTaskIndex === job.tasks.length - 1 || !isTaskComplete(currentTask.id)}
+                className="p-3 rounded-xl border border-slate-600 disabled:opacity-40 disabled:cursor-not-allowed bg-slate-800/50 hover:bg-slate-700 transition-colors"
+                aria-label="Następne zadanie"
+              >
+                <ChevronRight size={20} className="text-slate-300" />
+              </button>
+            </div>
+            
+            {/* Workshop Tools */}
+            {enableRecording && (
+              <div className="flex gap-2 p-2 bg-slate-900/80 rounded-2xl border border-slate-700">
+                <button
+                  onClick={() => setIsCameraOn(!isCameraOn)}
+                  className={`p-3 rounded-xl border transition-all ${
+                    isCameraOn 
+                      ? 'bg-amber-500/20 border-amber-500/50 text-amber-400' 
+                      : 'border-slate-600 hover:bg-slate-800 text-slate-400'
+                  }`}
+                  aria-label={isCameraOn ? "Wyłącz kamerę" : "Włącz kamerę"}
+                  aria-pressed={isCameraOn}
+                >
+                  <Camera size={20} />
+                </button>
+                
+                <button
+                  onClick={() => setIsMicOn(!isMicOn)}
+                  className={`p-3 rounded-xl border transition-all ${
+                    isMicOn 
+                      ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400' 
+                      : 'border-slate-600 hover:bg-slate-800 text-slate-400'
+                  }`}
+                  aria-label={isMicOn ? "Wyłącz mikrofon" : "Włącz mikrofon"}
+                  aria-pressed={isMicOn}
+                >
+                  <Mic size={20} />
+                </button>
+                
+                <button className="p-3 rounded-xl border border-slate-600 hover:bg-slate-800 text-slate-400">
+                  <Volume2 size={20} />
+                </button>
+                
+                <button className="p-3 rounded-xl border border-slate-600 hover:bg-slate-800 text-slate-400">
+                  <Settings size={20} />
+                </button>
+              </div>
+            )}
+            
+            {/* Complete Task Button */}
+            {!isTaskComplete(currentTask.id) && (
+              <button
+                onClick={() => handleTaskComplete(currentTask.id)}
+                className="px-6 py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold rounded-xl border border-amber-400/30 shadow-lg shadow-amber-500/20 transition-all hover:scale-105"
+                aria-label="Zakończ aktualne zadanie"
+              >
+                Zakończ zadanie (+{currentTask.xpReward} XP)
+              </button>
+            )}
+          </div>
+          
+          {/* Right: XP & Status */}
+          <div className="flex flex-col md:flex-row items-center gap-4 text-white">
+            <div className="text-center md:text-right">
+              <div className="text-sm text-slate-400">Aktualne zadanie</div>
+              <div className="text-xl font-bold text-amber-400">
+                {currentTask.title}
+              </div>
+              <div className="text-xs text-slate-400">
+                {currentTask.xpReward} XP • {currentTask.estimatedMinutes} min
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-4">
+              <div className="hidden md:block w-24 h-2 bg-slate-700 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-amber-400 to-emerald-400 rounded-full transition-all duration-300"
+                  style={{ width: `${taskProgress}%` }}
+                />
+              </div>
+              
+              <div className="bg-slate-800/50 px-4 py-2 rounded-xl border border-slate-700">
+                <div className="text-2xl font-bold text-amber-400">
+                  {xpEarned}<span className="text-slate-400 text-lg">/{totalXp}</span>
+                </div>
+                <div className="text-xs text-slate-400">XP zdobyte</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </footer>
+      
+      {/* Recording Indicators */}
+      {(isCameraOn || isMicOn) && (
+        <div className="fixed top-4 right-4 flex gap-2 z-30">
+          {isCameraOn && (
+            <div className="px-3 py-1.5 bg-red-600 text-white text-xs font-bold rounded-full flex items-center gap-2 animate-pulse">
+              <div className="w-2 h-2 bg-white rounded-full"></div>
+              NAGRYWANIE VIDEO
+            </div>
+          )}
+          {isMicOn && (
+            <div className="px-3 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-full flex items-center gap-2">
+              <div className="w-2 h-2 bg-white rounded-full"></div>
+              NAGRYWANIE AUDIO
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
