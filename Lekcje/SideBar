@@ -1,0 +1,266 @@
+'use client';
+
+import React from 'react';
+import { 
+  User,
+  Briefcase,
+  GraduationCap,
+  Star,
+  TrendingUp,
+  Settings,
+  LogOut,
+  Flame
+} from 'lucide-react';
+import type { UserProfile, UserProgress } from './types';
+
+interface UserProfileSidebarProps {
+  user: UserProfile;
+  progress: UserProgress;
+  onSettings?: () => void;
+  onLogout?: () => void;
+  className?: string;
+}
+
+/**
+ * UserProfileSidebar - Sticky user profile panel
+ * 
+ * Features:
+ * - User info + avatar
+ * - Progress overview
+ * - Quick actions
+ * - Gamification elements (XP, streak)
+ * - Sticky positioning for desktop
+ */
+export const UserProfileSidebar = React.memo<UserProfileSidebarProps>(({
+  user,
+  progress,
+  onSettings,
+  onLogout,
+  className = ''
+}) => {
+  const completionPercentage = Math.round((progress.completedCourses / progress.totalCourses) * 100);
+  
+  // Calculate days since last active
+  const daysSinceActive = Math.floor(
+    (Date.now() - new Date(progress.lastActive).getTime()) / (1000 * 60 * 60 * 24)
+  );
+  const isActive = daysSinceActive === 0;
+
+  return (
+    <aside
+      className={`
+        bg-white border border-neutral-200 rounded-2xl
+        ${className}
+      `}
+      role="complementary"
+      aria-label="Profil użytkownika"
+    >
+      {/* User Header */}
+      <div className="p-6 border-b border-neutral-200">
+        <div className="flex items-start gap-4">
+          {/* Avatar */}
+          <div className="relative">
+            <div className="w-16 h-16 rounded-xl bg-accent-100 flex items-center justify-center overflow-hidden">
+              {user.avatar ? (
+                <img 
+                  src={user.avatar} 
+                  alt={user.name}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <User className="w-8 h-8 text-accent-600" aria-hidden="true" />
+              )}
+            </div>
+            
+            {/* Active Status Indicator */}
+            {isActive && (
+              <div 
+                className="absolute -bottom-1 -right-1 w-5 h-5 bg-success-600 border-2 border-white rounded-full"
+                aria-label="Aktywny dzisiaj"
+                title="Aktywny dzisiaj"
+              />
+            )}
+          </div>
+
+          {/* User Info */}
+          <div className="flex-1 min-w-0">
+            <h2 className="text-heading-sm text-neutral-900 truncate mb-1">
+              {user.name}
+            </h2>
+            <p className="text-body-sm text-neutral-600 truncate">
+              {user.age} lat • {user.experience} lat doświadczenia
+            </p>
+          </div>
+        </div>
+
+        {/* Current Career */}
+        {user.currentCareer && (
+          <div className="mt-4 p-3 bg-neutral-50 rounded-lg">
+            <div className="flex items-center gap-2 text-body-sm text-neutral-600 mb-1">
+              <Briefcase className="w-4 h-4" aria-hidden="true" />
+              <span>Obecna kariera</span>
+            </div>
+            <div className="text-body-md font-medium text-neutral-900">
+              {user.currentCareer}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Progress Section */}
+      <div className="p-6 border-b border-neutral-200">
+        <h3 className="text-label-lg text-neutral-700 mb-4">
+          Twój postęp
+        </h3>
+
+        {/* Course Progress */}
+        <div className="mb-4">
+          <div className="flex items-center justify-between text-body-sm mb-2">
+            <span className="text-neutral-600">Ukończone kursy</span>
+            <span className="font-semibold text-neutral-900">
+              {progress.completedCourses}/{progress.totalCourses}
+            </span>
+          </div>
+          
+          {/* Progress Bar */}
+          <div className="relative h-2 bg-neutral-200 rounded-full overflow-hidden">
+            <div
+              className="absolute inset-y-0 left-0 bg-accent-600 rounded-full transition-all duration-slow"
+              style={{ width: `${completionPercentage}%` }}
+              role="progressbar"
+              aria-valuenow={completionPercentage}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label={`Postęp kursów: ${completionPercentage}%`}
+            />
+          </div>
+        </div>
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-2 gap-3">
+          {/* XP */}
+          <div className="p-3 bg-accent-50 rounded-lg">
+            <div className="flex items-center gap-2 mb-1">
+              <Star className="w-4 h-4 text-accent-600" aria-hidden="true" />
+              <span className="text-label-md text-accent-700">XP</span>
+            </div>
+            <div className="text-heading-sm text-neutral-900">
+              {progress.xpEarned.toLocaleString('pl-PL')}
+            </div>
+          </div>
+
+          {/* Streak */}
+          <div className="p-3 bg-warning-50 rounded-lg">
+            <div className="flex items-center gap-2 mb-1">
+              <Flame className="w-4 h-4 text-warning-600" aria-hidden="true" />
+              <span className="text-label-md text-warning-700">Seria</span>
+            </div>
+            <div className="text-heading-sm text-neutral-900">
+              {progress.streak} dni
+            </div>
+          </div>
+        </div>
+
+        {/* Streak Motivation */}
+        {progress.streak > 0 && (
+          <div className="mt-3 p-3 bg-success-50 border border-success-200 rounded-lg">
+            <p className="text-body-xs text-success-700">
+              {progress.streak >= 7 
+                ? '🔥 Niesamowita seria! Tak trzymaj!' 
+                : '✨ Dobra robota! Kontynuuj naukę codziennie.'}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Education & Skills */}
+      <div className="p-6 border-b border-neutral-200">
+        <h3 className="text-label-lg text-neutral-700 mb-4">
+          Wykształcenie i umiejętności
+        </h3>
+
+        {/* Education */}
+        <div className="flex items-start gap-3 mb-4">
+          <div className="p-2 bg-neutral-100 rounded-lg">
+            <GraduationCap className="w-4 h-4 text-neutral-600" aria-hidden="true" />
+          </div>
+          <div className="flex-1">
+            <div className="text-label-md text-neutral-500 mb-1">
+              Wykształcenie
+            </div>
+            <div className="text-body-sm text-neutral-900">
+              {user.education}
+            </div>
+          </div>
+        </div>
+
+        {/* Skills */}
+        <div className="flex items-start gap-3">
+          <div className="p-2 bg-neutral-100 rounded-lg">
+            <TrendingUp className="w-4 h-4 text-neutral-600" aria-hidden="true" />
+          </div>
+          <div className="flex-1">
+            <div className="text-label-md text-neutral-500 mb-2">
+              Umiejętności ({user.skills.length})
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {user.skills.slice(0, 5).map((skill) => (
+                <span
+                  key={skill}
+                  className="px-2 py-1 bg-neutral-100 text-neutral-700 rounded text-body-xs"
+                >
+                  {skill}
+                </span>
+              ))}
+              {user.skills.length > 5 && (
+                <span className="px-2 py-1 text-neutral-500 text-body-xs">
+                  +{user.skills.length - 5}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="p-6">
+        <nav aria-label="Szybkie akcje">
+          {onSettings && (
+            <button
+              onClick={onSettings}
+              className={`
+                w-full flex items-center gap-3 px-4 py-3 rounded-lg
+                text-body-sm text-neutral-700
+                hover:bg-neutral-50 transition-colors duration-base
+                focus:outline-none focus:ring-2 focus:ring-accent-500 focus:ring-offset-2
+              `}
+              aria-label="Ustawienia"
+            >
+              <Settings className="w-5 h-5" aria-hidden="true" />
+              <span>Ustawienia</span>
+            </button>
+          )}
+
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              className={`
+                w-full flex items-center gap-3 px-4 py-3 rounded-lg
+                text-body-sm text-neutral-700
+                hover:bg-error-50 hover:text-error-700 transition-colors duration-base
+                focus:outline-none focus:ring-2 focus:ring-error-500 focus:ring-offset-2
+              `}
+              aria-label="Wyloguj się"
+            >
+              <LogOut className="w-5 h-5" aria-hidden="true" />
+              <span>Wyloguj się</span>
+            </button>
+          )}
+        </nav>
+      </div>
+    </aside>
+  );
+});
+
+UserProfileSidebar.displayName = 'UserProfileSidebar';
+
