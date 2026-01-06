@@ -1,0 +1,492 @@
+// ============================================================
+// CORE LESSON TYPES
+// ============================================================
+
+export type ContentType = 
+  | 'text' 
+  | 'video' 
+  | 'interactive' 
+  | 'quiz' 
+  | 'simulation'
+  | 'photo-challenge'
+  | 'voice-challenge'
+  | 'story-scenario';
+
+export type LayerType = 'surface' | 'core' | 'deep';
+
+export type DifficultyLevel = 'beginner' | 'intermediate' | 'advanced' | 'expert';
+
+export type ProfessionType = 
+  | 'electrician' 
+  | 'plumber' 
+  | 'welder' 
+  | 'carpenter' 
+  | 'hvac-technician'
+  | 'cnc-operator'
+  | 'solar-installer'
+  | 'ev-charger-installer';
+
+export type DemandLevel = 'low' | 'medium' | 'high' | 'very-high';
+
+// ============================================================
+// CONTENT BLOCKS
+// ============================================================
+
+export interface TextContent {
+  type: 'text';
+  title: string;
+  body: string;
+  imageUrl?: string;
+  imageAlt?: string;
+  highlights?: string[];
+  estimatedReadTime: number; // seconds
+}
+
+export interface VideoContent {
+  type: 'video';
+  title: string;
+  videoUrl: string;
+  thumbnailUrl: string;
+  duration: number; // seconds
+  chapters?: VideoChapter[];
+  transcript?: string;
+}
+
+export interface VideoChapter {
+  title: string;
+  startTime: number;
+  endTime: number;
+}
+
+export interface QuizContent {
+  type: 'quiz';
+  question: string;
+  options: QuizOption[];
+  correctOptionId: string;
+  explanation: string;
+  hint?: string;
+  difficulty: number; // 0-1 IRT difficulty parameter
+  discrimination: number; // IRT discrimination parameter
+}
+
+export interface QuizOption {
+  id: string;
+  text: string;
+  isCorrect: boolean;
+  feedback?: string;
+}
+
+export interface InteractiveContent {
+  type: 'interactive';
+  title: string;
+  description: string;
+  simulationType: 'drag-drop' | '3d-model' | 'circuit-builder' | 'tool-selector';
+  config: Record<string, any>;
+  successCriteria: SuccessCriteria[];
+}
+
+export interface SuccessCriteria {
+  id: string;
+  description: string;
+  validator: string; // function name or expression
+  weight: number;
+}
+
+export interface SimulationContent {
+  type: 'simulation';
+  title: string;
+  description: string;
+  sceneId: string;
+  tools: SimulationTool[];
+  objectives: SimulationObjective[];
+  hints: string[];
+}
+
+export interface SimulationTool {
+  id: string;
+  name: string;
+  icon: string;
+  instructions: string;
+}
+
+export interface SimulationObjective {
+  id: string;
+  description: string;
+  completed: boolean;
+  xpReward: number;
+}
+
+export interface PhotoChallengeContent {
+  type: 'photo-challenge';
+  title: string;
+  instructions: string;
+  exampleImageUrl?: string;
+  expectedKeywords: string[];
+  validationRules: PhotoValidationRule[];
+  minScore: number; // 0-100
+  xpReward: number;
+}
+
+export interface PhotoValidationRule {
+  id: string;
+  description: string;
+  type: 'object-detection' | 'color-detection' | 'ocr' | 'pose-estimation';
+  params: Record<string, any>;
+  weight: number;
+}
+
+export interface VoiceChallengeContent {
+  type: 'voice-challenge';
+  title: string;
+  prompt: string;
+  expectedKeywords: string[];
+  niceToHaveKeywords?: string[];
+  minDuration: number; // seconds
+  maxDuration: number;
+  xpReward: number;
+}
+
+export interface StoryScenarioContent {
+  type: 'story-scenario';
+  title: string;
+  scenario: string;
+  context: {
+    location: string;
+    client?: string;
+    problem: string;
+    urgency: 'low' | 'medium' | 'high';
+  };
+  decisions: ScenarioDecision[];
+  correctDecisionId: string;
+  explanation: string;
+}
+
+export interface ScenarioDecision {
+  id: string;
+  text: string;
+  consequence: string;
+  isCorrect: boolean;
+  partialScore?: number; // 0-1 for partially correct answers
+}
+
+export type LessonContent = 
+  | TextContent 
+  | VideoContent 
+  | QuizContent 
+  | InteractiveContent 
+  | SimulationContent
+  | PhotoChallengeContent
+  | VoiceChallengeContent
+  | StoryScenarioContent;
+
+// ============================================================
+// LESSON STRUCTURE
+// ============================================================
+
+export interface LessonStep {
+  id: string;
+  order: number;
+  content: LessonContent;
+  xpReward: number;
+  isOptional: boolean;
+  unlockCondition?: UnlockCondition;
+}
+
+export interface UnlockCondition {
+  type: 'xp-threshold' | 'lesson-complete' | 'streak' | 'time-based';
+  value: number | string;
+}
+
+export interface LessonLayer {
+  type: LayerType;
+  title: string;
+  description: string;
+  steps: LessonStep[];
+  xpReward: number;
+  unlockThreshold: number; // XP needed to unlock this layer
+  estimatedTime: number; // minutes
+  masteryRequirement: number; // 0-1, minimum mastery to complete
+}
+
+export interface LessonIntermission {
+  id: string;
+  afterLayer: LayerType;
+  title: string;
+  message: string;
+  ctaText: string;
+  motivationalQuote?: string;
+  showProgress: boolean;
+}
+
+export interface Lesson {
+  id: string;
+  slug: string;
+  title: string;
+  description: string;
+  profession: ProfessionType;
+  category: string;
+  subcategory?: string;
+  difficulty: DifficultyLevel;
+  estimatedTime: number; // total minutes
+  totalXp: number;
+  layers: LessonLayer[];
+  intermissions: LessonIntermission[];
+  prerequisites: string[]; // lesson IDs
+  tags: string[];
+  thumbnailUrl: string;
+  createdAt: string;
+  updatedAt: string;
+  version: number;
+  isPublished: boolean;
+}
+
+// ============================================================
+// USER PROGRESS
+// ============================================================
+
+export interface StepProgress {
+  stepId: string;
+  completed: boolean;
+  score: number; // 0-100
+  attempts: number;
+  timeSpent: number; // seconds
+  completedAt?: string;
+  responses?: Record<string, any>;
+}
+
+export interface LayerProgress {
+  layerType: LayerType;
+  started: boolean;
+  completed: boolean;
+  stepsProgress: StepProgress[];
+  masteryScore: number; // 0-1
+  xpEarned: number;
+  startedAt?: string;
+  completedAt?: string;
+}
+
+export interface LessonProgress {
+  lessonId: string;
+  userId: string;
+  currentLayer: LayerType;
+  currentStepIndex: number;
+  layersProgress: LayerProgress[];
+  totalXpEarned: number;
+  totalTimeSpent: number; // seconds
+  masteryScore: number; // 0-1
+  started: boolean;
+  completed: boolean;
+  startedAt: string;
+  completedAt?: string;
+  lastActivityAt: string;
+}
+
+export interface UserProgress {
+  userId: string;
+  totalXp: number;
+  level: number;
+  currentStreak: number;
+  longestStreak: number;
+  lessonsCompleted: string[];
+  lessonsInProgress: string[];
+  achievements: string[];
+  learningStyle: LearningStyle;
+  cognitiveProfile: CognitiveProfile;
+  lastActiveAt: string;
+  createdAt: string;
+}
+
+export interface LearningStyle {
+  visual: number; // 0-1
+  auditory: number; // 0-1
+  kinesthetic: number; // 0-1
+  reading: number; // 0-1
+}
+
+export interface CognitiveProfile {
+  averageSessionLength: number; // minutes
+  preferredTimeOfDay: 'morning' | 'afternoon' | 'evening' | 'night';
+  averageAccuracy: number; // 0-1
+  learningSpeed: 'slow' | 'medium' | 'fast';
+  retentionRate: number; // 0-1
+}
+
+// ============================================================
+// ADAPTIVE LEARNING
+// ============================================================
+
+export interface KnowledgeNode {
+  conceptId: string;
+  name: string;
+  mastery: number; // 0-1
+  lastPracticed?: string;
+  practiceCount: number;
+  nextReviewDate?: string;
+}
+
+export interface KnowledgeEdge {
+  from: string; // concept ID
+  to: string; // concept ID
+  strength: number; // 0-1, how strongly connected
+  type: 'prerequisite' | 'related' | 'builds-upon';
+}
+
+export interface StudentModel {
+  userId: string;
+  knowledgeNodes: Map<string, KnowledgeNode>;
+  knowledgeEdges: KnowledgeEdge[];
+  abilityLevel: number; // theta in IRT
+  cognitiveLoad: number; // 0-100
+  engagement: EngagementMetrics;
+  lastUpdated: string;
+}
+
+export interface EngagementMetrics {
+  focusScore: number; // 0-100
+  timeOnTask: number; // seconds
+  errorRate: number; // 0-1
+  streakCorrect: number;
+  streakIncorrect: number;
+  hesitationTime: number; // average ms before response
+}
+
+// ============================================================
+// GAMIFICATION
+// ============================================================
+
+export interface Achievement {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  category: 'milestone' | 'secret' | 'skill' | 'social';
+  tier: 'bronze' | 'silver' | 'gold' | 'platinum';
+  xpReward: number;
+  unlockCriteria: UnlockCriteria;
+  isHidden: boolean;
+  unlockedAt?: string;
+}
+
+export interface UnlockCriteria {
+  type: 'xp' | 'lessons' | 'streak' | 'accuracy' | 'time' | 'custom';
+  threshold: number;
+  customValidator?: string;
+}
+
+export interface LeaderboardEntry {
+  userId: string;
+  username: string;
+  avatarUrl?: string;
+  xp: number;
+  rank: number;
+  trend: 'up' | 'down' | 'stable';
+  profession: ProfessionType;
+}
+
+export interface DailyChallenge {
+  id: string;
+  date: string;
+  title: string;
+  description: string;
+  lessonId?: string;
+  xpBonus: number;
+  timeLimit?: number; // minutes
+  completed: boolean;
+}
+
+// ============================================================
+// WORKSHOP & IMMERSION
+// ============================================================
+
+export interface WorkshopEnvironment {
+  id: string;
+  profession: ProfessionType;
+  name: string;
+  description: string;
+  sceneUrl: string; // GLTF/GLB file
+  ambientSounds: AmbientSound[];
+  tools: WorkshopTool[];
+  lighting: LightingConfig;
+  particles?: ParticleConfig;
+}
+
+export interface AmbientSound {
+  id: string;
+  name: string;
+  url: string;
+  volume: number; // 0-1
+  loop: boolean;
+  spatialPosition?: [number, number, number];
+}
+
+export interface WorkshopTool {
+  id: string;
+  name: string;
+  modelUrl: string;
+  position: [number, number, number];
+  rotation: [number, number, number];
+  scale: number;
+  interactive: boolean;
+  tooltip: string;
+  soundOnUse?: string;
+}
+
+export interface LightingConfig {
+  ambient: { color: string; intensity: number };
+  directional: { color: string; intensity: number; position: [number, number, number] };
+  spotlights?: SpotlightConfig[];
+}
+
+export interface SpotlightConfig {
+  color: string;
+  intensity: number;
+  position: [number, number, number];
+  target: [number, number, number];
+  angle: number;
+}
+
+export interface ParticleConfig {
+  type: 'dust' | 'sparks' | 'smoke';
+  count: number;
+  size: number;
+  color: string;
+  opacity: number;
+  speed: number;
+}
+
+// ============================================================
+// API RESPONSES
+// ============================================================
+
+export interface ValidationResult {
+  success: boolean;
+  score: number; // 0-100
+  feedback: string;
+  detailedFeedback?: string[];
+  suggestions?: string[];
+  xpAwarded: number;
+}
+
+export interface LessonCompleteResponse {
+  lessonId: string;
+  totalXp: number;
+  newLevel?: number;
+  achievementsUnlocked: Achievement[];
+  nextLessonSuggestion?: string;
+  masteryScore: number;
+  timeSpent: number;
+}
+
+export interface ProgressSyncResponse {
+  success: boolean;
+  syncedAt: string;
+  conflicts?: ProgressConflict[];
+}
+
+export interface ProgressConflict {
+  field: string;
+  localValue: any;
+  serverValue: any;
+  resolution: 'local' | 'server' | 'merge';
+}
+```
