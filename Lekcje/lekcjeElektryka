@@ -1,0 +1,328 @@
+import { Lesson, ProfessionType } from '@/types/lesson';
+
+export const electricianLessons: Lesson[] = [
+  // ============================================================
+  // LEKCJA 1: Podstawy multimetru
+  // ============================================================
+  {
+    id: 'elec-001',
+    slug: 'podstawy-multimetru',
+    title: 'Pierwsze starcie z multimetrem',
+    description: 'Naucz się obsługiwać multimetr - podstawowe narzędzie każdego elektryka. Poznasz pomiary napięcia, prądu i rezystancji.',
+    profession: 'electrician',
+    category: 'narzędzia',
+    subcategory: 'pomiary',
+    difficulty: 'beginner',
+    estimatedTime: 15,
+    totalXp: 250,
+    thumbnailUrl: '/images/lessons/multimeter-basics.jpg',
+    prerequisites: [],
+    tags: ['multimetr', 'pomiary', 'napięcie', 'podstawy'],
+    createdAt: '2024-01-15',
+    updatedAt: '2024-01-20',
+    version: 1,
+    isPublished: true,
+    
+    layers: [
+      // SURFACE LAYER - Szybki wstęp
+      {
+        type: 'surface',
+        title: 'Poznaj multimetr',
+        description: 'Podstawowa orientacja - co to jest i do czego służy',
+        estimatedTime: 5,
+        xpReward: 80,
+        unlockThreshold: 0,
+        masteryRequirement: 0.6,
+        steps: [
+          {
+            id: 'elec-001-s1',
+            order: 1,
+            xpReward: 20,
+            isOptional: false,
+            content: {
+              type: 'quiz',
+              question: 'Co mierzy multimetr ustawiony na symbol "V~"?',
+              options: [
+                { id: 'a', text: 'Napięcie stałe (DC)', isCorrect: false, feedback: 'Nie, symbol ~ oznacza prąd zmienny' },
+                { id: 'b', text: 'Napięcie zmienne (AC)', isCorrect: true, feedback: 'Dokładnie! ~ to symbol prądu zmiennego, V to volt' },
+                { id: 'c', text: 'Rezystancję', isCorrect: false, feedback: 'Rezystancję oznacza symbol Ω (omega)' },
+                { id: 'd', text: 'Natężenie prądu', isCorrect: false, feedback: 'Natężenie oznacza symbol A (amper)' }
+              ],
+              correctOptionId: 'b',
+              explanation: 'V~ oznacza pomiar napięcia zmiennego (AC). To ustawienie używasz np. przy pomiarze gniazdka 230V.',
+              hint: 'Pomyśl o symbolu fali (~) i literze V jak Volt',
+              difficulty: 0.3,
+              discrimination: 1.2
+            }
+          },
+          {
+            id: 'elec-001-s2',
+            order: 2,
+            xpReward: 30,
+            isOptional: false,
+            content: {
+              type: 'text',
+              title: 'Budowa multimetru cyfrowego',
+              body: `Multimetr to Twój najważniejszy przyjaciel w pracy elektryka. Składa się z:
+
+**1. Wyświetlacz LCD** - pokazuje wynik pomiaru z dokładnością do 3-4 cyfr
+
+**2. Pokrętło wyboru funkcji** - obracasz, by wybrać co chcesz mierzyć:
+   - V⎓ (napięcie stałe DC) - baterie, akumulatory
+   - V~ (napięcie zmienne AC) - gniazdka, instalacja domowa
+   - A (natężenie prądu) - ile prądu płynie
+   - Ω (rezystancja) - opór elementów
+   - 🔊 (ciągłość) - czy przewód jest przerwany
+
+**3. Gniazda sond**:
+   - COM (czarne) - zawsze tutaj czarna sonda
+   - VΩmA (czerwone) - do większości pomiarów
+   - 10A lub 20A - tylko do pomiaru dużych prądów!
+
+**4. Sondy pomiarowe** - czerwona (+) i czarna (-/COM)
+
+⚠️ ZASADA ZŁOTA: Przed pomiarem ZAWSZE sprawdź czy pokrętło jest na właściwej pozycji!`,
+              imageUrl: '/images/lessons/multimeter-anatomy.png',
+              imageAlt: 'Budowa multimetru cyfrowego z opisanymi elementami',
+              highlights: ['V⎓', 'V~', 'COM', 'VΩmA'],
+              estimatedReadTime: 90
+            }
+          },
+          {
+            id: 'elec-001-s3',
+            order: 3,
+            xpReward: 30,
+            isOptional: false,
+            content: {
+              type: 'story-scenario',
+              title: 'Pierwszy dzień w warsztacie',
+              scenario: 'Jest Twój pierwszy dzień jako praktykant u elektryka Marka. Klient dzwoni, że nie działa mu lampka nocna. Marek daje Ci multimetr i mówi: "Sprawdź najpierw czy żarówka dostaje prąd". Co robisz?',
+              context: {
+                location: 'Mieszkanie klienta, Leszno',
+                client: 'Pan Kowalski',
+                problem: 'Nie świeci lampka nocna przy łóżku',
+                urgency: 'low'
+              },
+              decisions: [
+                {
+                  id: 'd1',
+                  text: 'Ustawiam multimetr na V~ i mierzę napięcie na gnieździe, do którego podłączona jest lampka',
+                  consequence: 'Sprawdzasz czy jest zasilanie. To logiczny pierwszy krok!',
+                  isCorrect: true
+                },
+                {
+                  id: 'd2',
+                  text: 'Ustawiam multimetr na Ω i mierzę rezystancję żarówki',
+                  consequence: 'Dobry pomysł, ale najpierw sprawdź czy w ogóle jest prąd w gniazdku',
+                  isCorrect: false,
+                  partialScore: 0.5
+                },
+                {
+                  id: 'd3',
+                  text: 'Ustawiam multimetr na A i mierzę prąd',
+                  consequence: 'Pomiar prądu wymaga rozłączenia obwodu - to bardziej zaawansowane. Zacznij od napięcia!',
+                  isCorrect: false,
+                  partialScore: 0.2
+                }
+              ],
+              correctDecisionId: 'd1',
+              explanation: 'Zawsze zaczynaj od najprostszego: sprawdź czy jest napięcie w gniazdku (V~ dla 230V AC). Jeśli jest - problem w lampce. Jeśli nie ma - problem w instalacji.'
+            }
+          }
+        ]
+      },
+      
+      // CORE LAYER - Praktyka
+      {
+        type: 'core',
+        title: 'Pomiary w praktyce',
+        description: 'Wykonaj realne pomiary i zrozum wyniki',
+        estimatedTime: 7,
+        xpReward: 100,
+        unlockThreshold: 50,
+        masteryRequirement: 0.7,
+        steps: [
+          {
+            id: 'elec-001-c1',
+            order: 1,
+            xpReward: 40,
+            isOptional: false,
+            content: {
+              type: 'photo-challenge',
+              title: 'Zmierz napięcie baterii',
+              instructions: `Weź baterię AA lub AAA i zmierz jej napięcie:
+
+1. Ustaw multimetr na **V⎓** (napięcie stałe) w zakresie 20V
+2. Czerwoną sondę przyłóż do **+** baterii
+3. Czarną sondę przyłóż do **-** baterii
+4. Zrób zdjęcie pokazujące wynik na wyświetlaczu
+
+💡 Nowa bateria powinna pokazać ~1.5V, zużyta poniżej 1.2V`,
+              exampleImageUrl: '/images/lessons/battery-measurement-example.jpg',
+              expectedKeywords: ['1.5', '1.4', '1.3', '1.2', 'V', 'volt'],
+              validationRules: [
+                {
+                  id: 'display-visible',
+                  description: 'Wyświetlacz multimetru widoczny',
+                  type: 'object-detection',
+                  params: { object: 'lcd-display', confidence: 0.7 },
+                  weight: 0.3
+                },
+                {
+                  id: 'voltage-reading',
+                  description: 'Odczyt w zakresie 1.0-1.6V',
+                  type: 'ocr',
+                  params: { pattern: '/[0-1]\\.[0-9]/', range: [1.0, 1.6] },
+                  weight: 0.5
+                },
+                {
+                  id: 'probes-connected',
+                  description: 'Sondy dotykają baterii',
+                  type: 'object-detection',
+                  params: { objects: ['probe', 'battery'], proximity: 50 },
+                  weight: 0.2
+                }
+              ],
+              minScore: 70,
+              xpReward: 40
+            }
+          },
+          {
+            id: 'elec-001-c2',
+            order: 2,
+            xpReward: 30,
+            isOptional: false,
+            content: {
+              type: 'quiz',
+              question: 'Zmierzyłeś baterię AA i multimetr pokazał 1.18V. Co to oznacza?',
+              options: [
+                { id: 'a', text: 'Bateria jest pełna i gotowa do użycia', isCorrect: false },
+                { id: 'b', text: 'Bateria jest częściowo rozładowana, ale jeszcze działa', isCorrect: true },
+                { id: 'c', text: 'Bateria jest całkowicie wyczerpana', isCorrect: false },
+                { id: 'd', text: 'Multimetr jest uszkodzony', isCorrect: false }
+              ],
+              correctOptionId: 'b',
+              explanation: 'Bateria AA ma nominalne napięcie 1.5V. Przy 1.18V jest rozładowana w około 60-70%, ale nadal może działać w urządzeniach o niskim poborze mocy. Poniżej 1.0V uznajemy baterię za wyczerpaną.',
+              difficulty: 0.4,
+              discrimination: 1.3
+            }
+          },
+          {
+            id: 'elec-001-c3',
+            order: 3,
+            xpReward: 30,
+            isOptional: false,
+            content: {
+              type: 'voice-challenge',
+              title: 'Wyjaśnij klientowi',
+              prompt: 'Pan Kowalski pyta: "Skąd wiesz, że ta bateria jest słaba? Na oko wygląda normalnie." Nagraj krótką odpowiedź (30-60 sekund), wyjaśniając mu co zmierzyłeś i co to oznacza. Mów prostym językiem!',
+              expectedKeywords: ['napięcie', 'wolt', 'volt', '1.5', 'multimetr', 'zmierzyłem', 'bateria', 'rozładowana', 'słaba'],
+              niceToHaveKeywords: ['nowa bateria', 'pełna', 'nominalne', 'wyświetlacz'],
+              minDuration: 20,
+              maxDuration: 90,
+              xpReward: 30
+            }
+          }
+        ]
+      },
+      
+      // DEEP LAYER - Zaawansowane
+      {
+        type: 'deep',
+        title: 'Diagnostyka zaawansowana',
+        description: 'Rozwiązywanie problemów i nietypowe pomiary',
+        estimatedTime: 5,
+        xpReward: 70,
+        unlockThreshold: 150,
+        masteryRequirement: 0.8,
+        steps: [
+          {
+            id: 'elec-001-d1',
+            order: 1,
+            xpReward: 35,
+            isOptional: false,
+            content: {
+              type: 'simulation',
+              title: 'Diagnoza usterki lampki',
+              description: 'Użyj wirtualnego multimetru aby znaleźć usterkę w obwodzie lampki nocnej',
+              sceneId: 'lamp-circuit-diagnosis',
+              tools: [
+                {
+                  id: 'multimeter',
+                  name: 'Multimetr cyfrowy',
+                  icon: '📊',
+                  instructions: 'Kliknij na punkty pomiarowe aby zmierzyć napięcie',
+                  soundOnUse: '/sounds/multimeter-beep.mp3'
+                }
+              ],
+              objectives: [
+                { id: 'obj1', description: 'Zmierz napięcie na wejściu (gniazdko)', completed: false, xpReward: 10 },
+                { id: 'obj2', description: 'Zmierz napięcie na wyłączniku', completed: false, xpReward: 10 },
+                { id: 'obj3', description: 'Zidentyfikuj miejsce usterki', completed: false, xpReward: 15 }
+              ],
+              hints: [
+                'Zacznij od źródła zasilania i idź w stronę odbiornika',
+                'Jeśli napięcie "znika" między dwoma punktami - tam jest problem',
+                'Sprawdź zarówno przewód fazowy jak i neutralny'
+              ]
+            }
+          },
+          {
+            id: 'elec-001-d2',
+            order: 2,
+            xpReward: 35,
+            isOptional: false,
+            content: {
+              type: 'quiz',
+              question: 'Podczas pomiaru ciągłości przewodu multimetr pokazuje "OL" (overload). Co to oznacza?',
+              options: [
+                { id: 'a', text: 'Przewód jest sprawny - ma niską rezystancję', isCorrect: false },
+                { id: 'b', text: 'Przewód jest przerwany - brak ciągłości', isCorrect: true },
+                { id: 'c', text: 'Bateria w multimetrze jest słaba', isCorrect: false },
+                { id: 'd', text: 'Przewód ma zwarcie', isCorrect: false }
+              ],
+              correctOptionId: 'b',
+              explanation: '"OL" (Overload/Over Limit) przy pomiarze ciągłości oznacza nieskończoną rezystancję - czyli przerwę w przewodzie. Sprawny przewód powinien pokazać wartość bliską 0Ω i wydać sygnał dźwiękowy.',
+              difficulty: 0.6,
+              discrimination: 1.5
+            }
+          }
+        ]
+      }
+    ],
+    
+    intermissions: [
+      {
+        id: 'int-1',
+        afterLayer: 'surface',
+        title: 'Świetny start! 🎉',
+        message: 'Opanowałeś podstawy multimetru. Gotowy na prawdziwe pomiary?',
+        ctaText: 'Przejdź do praktyki',
+        motivationalQuote: '"Teoria bez praktyki jest jak mapa bez terenu" - stare powiedzenie elektryków',
+        showProgress: true
+      },
+      {
+        id: 'int-2',
+        afterLayer: 'core',
+        title: 'Brawo! Masz już praktyczne umiejętności 💪',
+        message: 'Wykonałeś prawdziwe pomiary. Chcesz nauczyć się diagnozować usterki jak zawodowiec?',
+        ctaText: 'Zostań ekspertem',
+        showProgress: true
+      }
+    ]
+  },
+
+  // ============================================================
+  // LEKCJA 2: Bezpieczeństwo elektryczne
+  // ============================================================
+  {
+    id: 'elec-002',
+    slug: 'bezpieczenstwo-elektryczne',
+    title: 'Bezpieczeństwo przy pracy z prądem',
+    description: 'Poznaj zasady BHP, które mogą uratować Ci życie. Dowiedz się jak bezpiecznie pracować z instalacją elektryczną.',
+    profession: 'electrician',
+    category: 'bhp',
+    subcategory: 'podstawy',
+    difficulty: 'beginner',
+    estimatedTime: 20,
+    totalX
