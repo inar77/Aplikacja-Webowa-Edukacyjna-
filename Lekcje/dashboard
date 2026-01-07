@@ -1,0 +1,1402 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  Play, Clock, Zap, Trophy, Target, TrendingUp, 
+  BookOpen, Award, Users, Calendar, ChevronRight,
+  Flame, Star, CheckCircle, Lock, Sparkles,
+  Brain, Heart, Coffee, Moon, Sun, Sunset
+} from 'lucide-react';
+import { 
+  UserProgress, LearningPath, DailyChallenge, 
+  Achievement, Notification, RecommendedLesson,
+  CompetencyData, WeeklyGoal
+} from '../types/dashboard.types';
+
+// ============================================================
+// SEKCJA 1: PERSONALIZED WELCOME HERO
+// ============================================================
+
+interface WelcomeHeroProps {
+  userName: string;
+  currentStreak: number;
+  totalXP: number;
+  level: number;
+  lastActivity?: Date;
+  mood?: 'energetic' | 'tired' | 'focused' | 'neutral';
+}
+
+export const WelcomeHero: React.FC<WelcomeHeroProps> = ({
+  userName,
+  currentStreak,
+  totalXP,
+  level,
+  lastActivity,
+  mood = 'neutral'
+}) => {
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [greeting, setGreeting] = useState('');
+  const [timeIcon, setTimeIcon] = useState<React.ReactNode>(null);
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const hour = currentTime.getHours();
+    if (hour >= 5 && hour < 12) {
+      setGreeting('Dzień dobry');
+      setTimeIcon(<Sun className="w-6 h-6 text-amber-400" />);
+    } else if (hour >= 12 && hour < 18) {
+      setGreeting('Cześć');
+      setTimeIcon(<Sunset className="w-6 h-6 text-orange-400" />);
+    } else if (hour >= 18 && hour < 22) {
+      setGreeting('Dobry wieczór');
+      setTimeIcon(<Moon className="w-6 h-6 text-indigo-400" />);
+    } else {
+      setGreeting('Pracujesz nocą?');
+      setTimeIcon(<Coffee className="w-6 h-6 text-amber-600" />);
+    }
+  }, [currentTime]);
+
+  const getMoodMessage = () => {
+    switch (mood) {
+      case 'energetic':
+        return 'Świetna energia! Czas na ambitną lekcję 💪';
+      case 'tired':
+        return 'Może krótka, lekka sesja? 15 minut wystarczy';
+      case 'focused':
+        return 'Widzimy skupienie - wykorzystaj to!';
+      default:
+        return 'Gotowy na naukę?';
+    }
+  };
+
+  const xpToNextLevel = (level + 1) * 500;
+  const xpProgress = (totalXP % 500) / 500 * 100;
+
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6 }}
+      className="relative overflow-hidden rounded-3xl mb-8"
+      style={{
+        background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4c1d95 100%)',
+        padding: '32px',
+      }}
+    >
+      {/* Animated background particles */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {[...Array(20)].map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute w-2 h-2 bg-white/10 rounded-full"
+            initial={{ 
+              x: Math.random() * 100 + '%', 
+              y: Math.random() * 100 + '%',
+              scale: Math.random() * 0.5 + 0.5
+            }}
+            animate={{ 
+              y: [null, '-20%', null],
+              opacity: [0.1, 0.3, 0.1]
+            }}
+            transition={{ 
+              duration: Math.random() * 5 + 5, 
+              repeat: Infinity,
+              ease: 'easeInOut'
+            }}
+          />
+        ))}
+      </div>
+
+      {/* Main content */}
+      <div className="relative z-10">
+        {/* Top row: Greeting + Time */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            {timeIcon}
+            <div>
+              <motion.h1 
+                className="text-3xl md:text-4xl font-bold text-white"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.2 }}
+              >
+                {greeting}, <span className="text-amber-400">{userName}</span>!
+              </motion.h1>
+              <motion.p 
+                className="text-white/70 mt-1"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.4 }}
+              >
+                {getMoodMessage()}
+              </motion.p>
+            </div>
+          </div>
+
+          {/* Streak badge */}
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.3, type: 'spring' }}
+            className="flex items-center gap-2 px-4 py-2 rounded-full"
+            style={{ background: 'rgba(251, 146, 60, 0.2)', border: '1px solid rgba(251, 146, 60, 0.3)' }}
+          >
+            <Flame className="w-5 h-5 text-orange-400" />
+            <span className="text-orange-300 font-bold">{currentStreak} dni</span>
+          </motion.div>
+        </div>
+
+        {/* Stats row */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          {/* Level */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="bg-white/5 backdrop-blur rounded-2xl p-4 border border-white/10"
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <Star className="w-4 h-4 text-amber-400" />
+              <span className="text-white/60 text-sm">Poziom</span>
+            </div>
+            <div className="text-2xl font-bold text-white">{level}</div>
+            <div className="mt-2">
+              <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${xpProgress}%` }}
+                  transition={{ delay: 0.5, duration: 1 }}
+                  className="h-full bg-gradient-to-r from-amber-400 to-orange-500 rounded-full"
+                />
+              </div>
+              <p className="text-xs text-white/40 mt-1">{totalXP % 500}/{500} XP</p>
+            </div>
+          </motion.div>
+
+          {/* Total XP */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="bg-white/5 backdrop-blur rounded-2xl p-4 border border-white/10"
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <Zap className="w-4 h-4 text-yellow-400" />
+              <span className="text-white/60 text-sm">Łączne XP</span>
+            </div>
+            <div className="text-2xl font-bold text-white">
+              {totalXP.toLocaleString()}
+            </div>
+            <p className="text-xs text-green-400 mt-1">+150 dzisiaj</p>
+          </motion.div>
+
+          {/* Completed lessons */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+            className="bg-white/5 backdrop-blur rounded-2xl p-4 border border-white/10"
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <BookOpen className="w-4 h-4 text-blue-400" />
+              <span className="text-white/60 text-sm">Ukończone</span>
+            </div>
+            <div className="text-2xl font-bold text-white">24</div>
+            <p className="text-xs text-white/40 mt-1">lekcje</p>
+          </motion.div>
+
+          {/* Achievements */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6 }}
+            className="bg-white/5 backdrop-blur rounded-2xl p-4 border border-white/10"
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <Trophy className="w-4 h-4 text-purple-400" />
+              <span className="text-white/60 text-sm">Odznaki</span>
+            </div>
+            <div className="text-2xl font-bold text-white">8</div>
+            <p className="text-xs text-purple-400 mt-1">2 nowe!</p>
+          </motion.div>
+        </div>
+
+        {/* Quick action CTA */}
+        <motion.button
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.7 }}
+          whileHover={{ scale: 1.02, y: -2 }}
+          whileTap={{ scale: 0.98 }}
+          className="w-full md:w-auto px-8 py-4 rounded-2xl font-semibold text-lg flex items-center justify-center gap-3 transition-all"
+          style={{
+            background: 'linear-gradient(135deg, #f59e0b 0%, #ea580c 100%)',
+            boxShadow: '0 10px 40px rgba(245, 158, 11, 0.3)'
+          }}
+        >
+          <Play className="w-5 h-5" fill="currentColor" />
+          Kontynuuj naukę
+          <ChevronRight className="w-5 h-5" />
+        </motion.button>
+      </div>
+    </motion.section>
+  );
+};
+
+// ============================================================
+// SEKCJA 2: LEARNING PATH VISUALIZATION
+// ============================================================
+
+interface LearningPathModule {
+  id: string;
+  title: string;
+  icon: string;
+  totalLessons: number;
+  completedLessons: number;
+  totalXP: number;
+  earnedXP: number;
+  estimatedHours: number;
+  status: 'locked' | 'available' | 'in-progress' | 'completed';
+  unlockRequirement?: string;
+}
+
+interface LearningPathSectionProps {
+  modules: LearningPathModule[];
+  currentModuleId: string;
+  totalProgress: number;
+  estimatedCompletion: string;
+  profession: string;
+}
+
+export const LearningPathSection: React.FC<LearningPathSectionProps> = ({
+  modules,
+  currentModuleId,
+  totalProgress,
+  estimatedCompletion,
+  profession
+}) => {
+  const [expandedModule, setExpandedModule] = useState<string | null>(currentModuleId);
+
+  const getStatusColor = (status: LearningPathModule['status']) => {
+    switch (status) {
+      case 'completed': return { bg: 'bg-green-500/20', border: 'border-green-500/50', text: 'text-green-400' };
+      case 'in-progress': return { bg: 'bg-amber-500/20', border: 'border-amber-500/50', text: 'text-amber-400' };
+      case 'available': return { bg: 'bg-blue-500/20', border: 'border-blue-500/50', text: 'text-blue-400' };
+      case 'locked': return { bg: 'bg-gray-500/20', border: 'border-gray-500/30', text: 'text-gray-500' };
+    }
+  };
+
+  const getStatusIcon = (status: LearningPathModule['status']) => {
+    switch (status) {
+      case 'completed': return <CheckCircle className="w-5 h-5 text-green-400" />;
+      case 'in-progress': return <Play className="w-5 h-5 text-amber-400" fill="currentColor" />;
+      case 'available': return <Target className="w-5 h-5 text-blue-400" />;
+      case 'locked': return <Lock className="w-5 h-5 text-gray-500" />;
+    }
+  };
+
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.2 }}
+      className="mb-8"
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+              <Target className="w-5 h-5 text-white" />
+            </div>
+            Twoja Ścieżka: {profession}
+          </h2>
+          <p className="text-white/60 mt-1">
+            Ukończysz za około {estimatedCompletion}
+          </p>
+        </div>
+
+        {/* Overall progress */}
+        <div className="text-right">
+          <div className="text-3xl font-bold text-white">{totalProgress}%</div>
+          <p className="text-white/60 text-sm">ukończono</p>
+        </div>
+      </div>
+
+      {/* Overall progress bar */}
+      <div className="h-3 bg-white/10 rounded-full overflow-hidden mb-8">
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: `${totalProgress}%` }}
+          transition={{ duration: 1.5, ease: 'easeOut' }}
+          className="h-full rounded-full relative"
+          style={{
+            background: 'linear-gradient(90deg, #22c55e 0%, #84cc16 50%, #eab308 100%)'
+          }}
+        >
+          <motion.div
+            className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full shadow-lg"
+            animate={{ scale: [1, 1.2, 1] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          />
+        </motion.div>
+      </div>
+
+      {/* Modules timeline */}
+      <div className="relative">
+        {/* Connecting line */}
+        <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gradient-to-b from-green-500 via-amber-500 to-gray-600" />
+
+        {/* Module cards */}
+        <div className="space-y-4">
+          {modules.map((module, index) => {
+            const colors = getStatusColor(module.status);
+            const isExpanded = expandedModule === module.id;
+            const progressPercent = module.totalLessons > 0 
+              ? Math.round((module.completedLessons / module.totalLessons) * 100) 
+              : 0;
+
+            return (
+              <motion.div
+                key={module.id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: index * 0.1 }}
+                className="relative pl-16"
+              >
+                {/* Timeline node */}
+                <motion.div
+                  className={`absolute left-3 w-6 h-6 rounded-full ${colors.bg} ${colors.border} border-2 flex items-center justify-center z-10`}
+                  whileHover={{ scale: 1.2 }}
+                >
+                  {module.status === 'completed' && (
+                    <CheckCircle className="w-4 h-4 text-green-400" />
+                  )}
+                  {module.status === 'in-progress' && (
+                    <motion.div
+                      className="w-2 h-2 bg-amber-400 rounded-full"
+                      animate={{ scale: [1, 1.5, 1] }}
+                      transition={{ duration: 1.5, repeat: Infinity }}
+                    />
+                  )}
+                </motion.div>
+
+                {/* Module card */}
+                <motion.div
+                  className={`rounded-2xl border ${colors.border} ${colors.bg} backdrop-blur overflow-hidden cursor-pointer transition-all`}
+                  onClick={() => setExpandedModule(isExpanded ? null : module.id)}
+                  whileHover={{ scale: 1.01 }}
+                >
+                  {/* Card header */}
+                  <div className="p-4 flex items-center gap-4">
+                    {/* Icon */}
+                    <div className={`w-12 h-12 rounded-xl ${colors.bg} flex items-center justify-center text-2xl`}>
+                      {module.icon}
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className={`font-semibold ${module.status === 'locked' ? 'text-gray-400' : 'text-white'}`}>
+                          {module.title}
+                        </h3>
+                        {getStatusIcon(module.status)}
+                      </div>
+                      <div className="flex items-center gap-4 mt-1 text-sm">
+                        <span className="text-white/60">
+                          {module.completedLessons}/{module.totalLessons} lekcji
+                        </span>
+                        <span className="text-white/60">
+                          ~{module.estimatedHours}h
+                        </span>
+                        <span className={colors.text}>
+                          {module.earnedXP}/{module.totalXP} XP
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Progress circle */}
+                    <div className="relative w-14 h-14">
+                      <svg className="w-14 h-14 -rotate-90">
+                        <circle
+                          cx="28"
+                          cy="28"
+                          r="24"
+                          fill="none"
+                          stroke="rgba(255,255,255,0.1)"
+                          strokeWidth="4"
+                        />
+                        <motion.circle
+                          cx="28"
+                          cy="28"
+                          r="24"
+                          fill="none"
+                          stroke={module.status === 'completed' ? '#22c55e' : module.status === 'in-progress' ? '#f59e0b' : '#6b7280'}
+                          strokeWidth="4"
+                          strokeLinecap="round"
+                          strokeDasharray={`${progressPercent * 1.51} 151`}
+                          initial={{ strokeDasharray: '0 151' }}
+                          animate={{ strokeDasharray: `${progressPercent * 1.51} 151` }}
+                          transition={{ duration: 1, delay: index * 0.1 }}
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className={`text-sm font-bold ${colors.text}`}>{progressPercent}%</span>
+                      </div>
+                    </div>
+
+                    {/* Expand indicator */}
+                    <motion.div
+                      animate={{ rotate: isExpanded ? 90 : 0 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <ChevronRight className="w-5 h-5 text-white/40" />
+                    </motion.div>
+                  </div>
+
+                  {/* Expanded content */}
+                  <AnimatePresence>
+                    {isExpanded && module.status !== 'locked' && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="border-t border-white/10"
+                      >
+                        <div className="p-4 space-y-3">
+                          {/* Sample lessons preview */}
+                          {[1, 2, 3].map((lessonNum) => (
+                            <div
+                              key={lessonNum}
+                              className="flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
+                            >
+                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-medium ${
+                                lessonNum <= module.completedLessons 
+                                  ? 'bg-green-500/20 text-green-400' 
+                                  : 'bg-white/10 text-white/60'
+                              }`}>
+                                {lessonNum <= module.completedLessons ? '✓' : lessonNum}
+                              </div>
+                              <span className={lessonNum <= module.completedLessons ? 'text-white/60' : 'text-white'}>
+                                Lekcja {lessonNum}: {module.title} - Podstawy {lessonNum}
+                              </span>
+                              {lessonNum === module.completedLessons + 1 && (
+                                <span className="ml-auto px-2 py-1 rounded-full bg-amber-500/20 text-amber-400 text-xs">
+                                  Następna
+                                </span>
+                              )}
+                            </div>
+                          ))}
+
+                          {/* Start/Continue button */}
+                          <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            className="w-full py-3 rounded-xl font-semibold flex items-center justify-center gap-2"
+                            style={{
+                              background: module.status === 'completed' 
+                                ? 'rgba(34, 197, 94, 0.2)' 
+                                : 'linear-gradient(135deg, #7c3aed 0%, #6366f1 100%)'
+                            }}
+                          >
+                            {module.status === 'completed' ? (
+                              <>
+                                <CheckCircle className="w-5 h-5 text-green-400" />
+                                <span className="text-green-400">Ukończono - Powtórz</span>
+                              </>
+                            ) : (
+                              <>
+                                <Play className="w-5 h-5" fill="currentColor" />
+                                <span className="text-white">
+                                  {module.completedLessons > 0 ? 'Kontynuuj' : 'Rozpocznij'}
+                                </span>
+                              </>
+                            )}
+                          </motion.button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Locked message */}
+                  {module.status === 'locked' && (
+                    <div className="px-4 pb-4">
+                      <div className="flex items-center gap-2 text-gray-500 text-sm">
+                        <Lock className="w-4 h-4" />
+                        <span>{module.unlockRequirement || 'Ukończ poprzedni moduł'}</span>
+                      </div>
+                    </div>
+                  )}
+                </motion.div>
+              </motion.div>
+            );
+          })}
+        </div>
+      </div>
+    </motion.section>
+  );
+};
+
+// ============================================================
+// SEKCJA 3: DAILY CHALLENGE & QUICK ACTIONS
+// ============================================================
+
+interface QuickActionsSectionProps {
+  dailyChallenge: DailyChallenge;
+  lastLesson: {
+    id: string;
+    title: string;
+    module: string;
+    progress: number;
+    thumbnail?: string;
+  };
+  quickQuizAvailable: boolean;
+  recommendedVideo?: {
+    id: string;
+    title: string;
+    duration: string;
+    thumbnail?: string;
+  };
+  onStartChallenge: () => void;
+  onContinueLesson: () => void;
+  onStartQuiz: () => void;
+  onWatchVideo: () => void;
+}
+
+export const QuickActionsSection: React.FC<QuickActionsSectionProps> = ({
+  dailyChallenge,
+  lastLesson,
+  quickQuizAvailable,
+  recommendedVideo,
+  onStartChallenge,
+  onContinueLesson,
+  onStartQuiz,
+  onWatchVideo
+}) => {
+  const challengeTimeLeft = () => {
+    const now = new Date();
+    const endOfDay = new Date(now);
+    endOfDay.setHours(23, 59, 59, 999);
+    const diff = endOfDay.getTime() - now.getTime();
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    return `${hours}h ${minutes}m`;
+  };
+
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.4 }}
+      className="mb-8"
+    >
+      <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+        <Sparkles className="w-5 h-5 text-amber-400" />
+        Szybkie akcje
+      </h2>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Continue last lesson */}
+        <motion.div
+          whileHover={{ scale: 1.02, y: -4 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={onContinueLesson}
+          className="relative overflow-hidden rounded-2xl cursor-pointer group"
+          style={{
+            background: 'linear-gradient(135deg, #1e40af 0%, #3b82f6 100%)',
+            padding: '24px'
+          }}
+        >
+          {/* Background decoration */}
+          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+          
+          <div className="relative z-10">
+            <div className="flex items-start justify-between mb-4">
+              <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+                <Play className="w-6 h-6 text-white" fill="currentColor" />
+              </div>
+              <span className="px-3 py-1 rounded-full bg-white/20 text-white text-sm">
+                {lastLesson.progress}% ukończone
+              </span>
+            </div>
+
+            <h3 className="text-lg font-bold text-white mb-1">Kontynuuj naukę</h3>
+            <p className="text-white/70 text-sm mb-3">{lastLesson.title}</p>
+            
+            {/* Progress bar */}
+            <div className="h-2 bg-white/20 rounded-full overflow-hidden">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${lastLesson.progress}%` }}
+                transition={{ duration: 1 }}
+                className="h-full bg-white rounded-full"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 mt-3 text-white/60 text-sm">
+              <BookOpen className="w-4 h-4" />
+              <span>{lastLesson.module}</span>
+            </div>
+          </div>
+
+          {/* Hover arrow */}
+          <motion.div
+            className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity"
+            animate={{ x: [0, 5, 0] }}
+            transition={{ duration: 1.5, repeat: Infinity }}
+          >
+            <ChevronRight className="w-6 h-6 text-white" />
+          </motion.div>
+        </motion.div>
+
+        {/* Daily challenge */}
+        <motion.div
+          whileHover={{ scale: 1.02, y: -4 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={onStartChallenge}
+          className="relative overflow-hidden rounded-2xl cursor-pointer group"
+          style={{
+            background: dailyChallenge.completed 
+              ? 'linear-gradient(135deg, #15803d 0%, #22c55e 100%)'
+              : 'linear-gradient(135deg, #b45309 0%, #f59e0b 100%)',
+            padding: '24px'
+          }}
+        >
+          {/* Animated sparkles for uncompleted challenge */}
+          {!dailyChallenge.completed && (
+            <motion.div
+              className="absolute top-4 right-4"
+              animate={{ rotate: [0, 15, -15, 0], scale: [1, 1.1, 1] }}
+              transition={{ duration: 2, repeat: Infinity }}
+            >
+              <Sparkles className="w-6 h-6 text-white/60" />
+            </motion.div>
+          )}
+
+          <div className="relative z-10">
+            <div className="flex items-start justify-between mb-4">
+              <div className="w-12 h-12 rounde
+
+
+
+'use client';
+
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Bell, Settings, Search, Menu, X, ChevronDown,
+  TrendingUp, Calendar, Target, Zap, BookOpen,
+  Award, Users, BarChart3, Briefcase, MapPin,
+  Clock, ArrowRight, RefreshCw, Filter,
+  Moon, Sun, Volume2, VolumeX, Maximize2,
+  HelpCircle, LogOut, User, CreditCard
+} from 'lucide-react';
+
+// Import wszystkich sekcji
+import { WelcomeHero } from './sections/WelcomeHero';
+import { LearningPathSection } from './sections/LearningPathSection';
+import { QuickActionsSection } from './sections/QuickActionsSection';
+import { CompetencyRadarSection } from './sections/CompetencyRadarSection';
+import { AchievementsSection } from './sections/AchievementsSection';
+import { WeeklyGoalsSection } from './sections/WeeklyGoalsSection';
+import { JobMarketInsights } from './sections/JobMarketInsights';
+import { ActivityHeatmap } from './sections/ActivityHeatmap';
+import { NotificationsPanel } from './sections/NotificationsPanel';
+import { RecommendationsEngine } from './sections/RecommendationsEngine';
+
+// Import typów
+import {
+  UserProfile,
+  UserProgress,
+  LearningPath,
+  DailyChallenge,
+  Achievement,
+  Notification,
+  WeeklyGoal,
+  CompetencyData,
+  JobMarketData,
+  ActivityData,
+  DashboardSettings
+} from '../../types/dashboard.types';
+
+// Import hooków
+import {
+  useDashboardData,
+  useUserProgress,
+  useNotifications,
+  useAchievements,
+  useJobMarket,
+  useActivityTracking
+} from '../../hooks/useDashboard';
+
+// ============================================================
+// TYPY GŁÓWNE
+// ============================================================
+
+interface SmartDashboardProps {
+  userId: string;
+  initialData?: Partial<DashboardData>;
+  onNavigate?: (route: string, params?: Record<string, any>) => void;
+  onStartLesson?: (lessonId: string) => void;
+  onOpenWorkshop?: (workshopId: string) => void;
+}
+
+interface DashboardData {
+  user: UserProfile;
+  progress: UserProgress;
+  learningPath: LearningPath;
+  dailyChallenge: DailyChallenge;
+  achievements: Achievement[];
+  notifications: Notification[];
+  weeklyGoals: WeeklyGoal[];
+  competencies: CompetencyData[];
+  jobMarket: JobMarketData;
+  activity: ActivityData[];
+}
+
+type DashboardView = 'overview' | 'learning' | 'achievements' | 'market' | 'settings';
+type ThemeMode = 'dark' | 'light' | 'auto';
+
+// ============================================================
+// MOCK DATA DLA DEMONSTRACJI
+// ============================================================
+
+const MOCK_USER: UserProfile = {
+  id: 'user-001',
+  name: 'Marek',
+  email: 'marek@example.com',
+  avatar: '/avatars/marek.jpg',
+  profession: 'Elektryk',
+  location: 'Leszno',
+  level: 7,
+  totalXP: 3420,
+  currentStreak: 12,
+  longestStreak: 21,
+  joinedAt: new Date('2024-01-15'),
+  preferences: {
+    theme: 'dark',
+    notifications: true,
+    soundEnabled: true,
+    language: 'pl'
+  }
+};
+
+const MOCK_LEARNING_PATH: LearningPath = {
+  id: 'path-electrician',
+  profession: 'Elektryk',
+  totalModules: 6,
+  completedModules: 2,
+  totalProgress: 42,
+  estimatedCompletion: '3 tygodnie',
+  modules: [
+    {
+      id: 'mod-1',
+      title: 'BHP i Podstawy',
+      icon: '🛡️',
+      totalLessons: 8,
+      completedLessons: 8,
+      totalXP: 400,
+      earnedXP: 400,
+      estimatedHours: 4,
+      status: 'completed'
+    },
+    {
+      id: 'mod-2',
+      title: 'Teoria Elektryczności',
+      icon: '⚡',
+      totalLessons: 12,
+      completedLessons: 12,
+      totalXP: 600,
+      earnedXP: 600,
+      estimatedHours: 6,
+      status: 'completed'
+    },
+    {
+      id: 'mod-3',
+      title: 'Narzędzia i Pomiary',
+      icon: '🔧',
+      totalLessons: 10,
+      completedLessons: 6,
+      totalXP: 500,
+      earnedXP: 300,
+      estimatedHours: 5,
+      status: 'in-progress'
+    },
+    {
+      id: 'mod-4',
+      title: 'Instalacje Domowe',
+      icon: '🏠',
+      totalLessons: 15,
+      completedLessons: 0,
+      totalXP: 750,
+      earnedXP: 0,
+      estimatedHours: 8,
+      status: 'available'
+    },
+    {
+      id: 'mod-5',
+      title: 'Diagnostyka Usterek',
+      icon: '🔍',
+      totalLessons: 12,
+      completedLessons: 0,
+      totalXP: 600,
+      earnedXP: 0,
+      estimatedHours: 6,
+      status: 'locked',
+      unlockRequirement: 'Ukończ moduł Instalacje Domowe'
+    },
+    {
+      id: 'mod-6',
+      title: 'Zaawansowane Systemy',
+      icon: '🚀',
+      totalLessons: 10,
+      completedLessons: 0,
+      totalXP: 800,
+      earnedXP: 0,
+      estimatedHours: 7,
+      status: 'locked',
+      unlockRequirement: 'Ukończ moduł Diagnostyka'
+    }
+  ]
+};
+
+const MOCK_DAILY_CHALLENGE: DailyChallenge = {
+  id: 'challenge-today',
+  title: '15 minut z multimetrem',
+  description: 'Wykonaj 3 pomiary napięcia i udokumentuj wyniki',
+  type: 'practice',
+  xpReward: 150,
+  bonusXP: 50,
+  timeLimit: 15,
+  completed: false,
+  expiresAt: new Date(new Date().setHours(23, 59, 59, 999))
+};
+
+const MOCK_ACHIEVEMENTS: Achievement[] = [
+  {
+    id: 'ach-1',
+    title: 'Pierwszy Krok',
+    description: 'Ukończ swoją pierwszą lekcję',
+    icon: '🎯',
+    category: 'milestone',
+    tier: 'bronze',
+    unlockedAt: new Date('2024-01-16'),
+    xpReward: 50
+  },
+  {
+    id: 'ach-2',
+    title: 'Tydzień Mocy',
+    description: 'Ucz się przez 7 dni z rzędu',
+    icon: '🔥',
+    category: 'streak',
+    tier: 'silver',
+    unlockedAt: new Date('2024-01-23'),
+    xpReward: 200
+  },
+  {
+    id: 'ach-3',
+    title: 'Mistrz BHP',
+    description: 'Ukończ cały moduł BHP',
+    icon: '🛡️',
+    category: 'skill',
+    tier: 'gold',
+    unlockedAt: new Date('2024-02-01'),
+    xpReward: 300
+  },
+  {
+    id: 'ach-4',
+    title: 'Teoretyk',
+    description: 'Zdaj wszystkie quizy z teorii na 100%',
+    icon: '📚',
+    category: 'skill',
+    tier: 'gold',
+    unlockedAt: new Date('2024-02-10'),
+    xpReward: 350
+  },
+  {
+    id: 'ach-5',
+    title: 'Nocny Marek',
+    description: 'Ucz się po 22:00 przez 5 dni',
+    icon: '🌙',
+    category: 'secret',
+    tier: 'bronze',
+    unlockedAt: new Date('2024-02-05'),
+    xpReward: 100
+  }
+];
+
+const MOCK_NOTIFICATIONS: Notification[] = [
+  {
+    id: 'notif-1',
+    type: 'achievement',
+    title: 'Nowa odznaka!',
+    message: 'Zdobyłeś odznakę "Tydzień Mocy"',
+    timestamp: new Date(Date.now() - 1000 * 60 * 30),
+    read: false,
+    actionUrl: '/achievements'
+  },
+  {
+    id: 'notif-2',
+    type: 'reminder',
+    title: 'Czas na naukę!',
+    message: 'Twoja dzienna seria wynosi 12 dni. Nie przerwij jej!',
+    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2),
+    read: false
+  },
+  {
+    id: 'notif-3',
+    type: 'market',
+    title: 'Nowa oferta w Twojej okolicy',
+    message: 'Firma ElektroPro szuka elektryka w Lesznie - 8500 PLN',
+    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 5),
+    read: true,
+    actionUrl: '/market/job-123'
+  }
+];
+
+const MOCK_WEEKLY_GOALS: WeeklyGoal[] = [
+  {
+    id: 'goal-1',
+    title: 'Ukończ 5 lekcji',
+    current: 3,
+    target: 5,
+    xpReward: 200,
+    icon: '📖'
+  },
+  {
+    id: 'goal-2',
+    title: 'Zdobądź 500 XP',
+    current: 420,
+    target: 500,
+    xpReward: 100,
+    icon: '⚡'
+  },
+  {
+    id: 'goal-3',
+    title: 'Wykonaj wyzwanie praktyczne',
+    current: 0,
+    target: 1,
+    xpReward: 150,
+    icon: '🎯'
+  }
+];
+
+const MOCK_COMPETENCIES: CompetencyData[] = [
+  { id: 'comp-1', name: 'Bezpieczeństwo', level: 92, maxLevel: 100, color: '#22c55e' },
+  { id: 'comp-2', name: 'Pomiary', level: 78, maxLevel: 100, color: '#3b82f6' },
+  { id: 'comp-3', name: 'Instalacje', level: 45, maxLevel: 100, color: '#f59e0b' },
+  { id: 'comp-4', name: 'Diagnostyka', level: 32, maxLevel: 100, color: '#8b5cf6' },
+  { id: 'comp-5', name: 'Teoria', level: 85, maxLevel: 100, color: '#ec4899' },
+  { id: 'comp-6', name: 'Narzędzia', level: 67, maxLevel: 100, color: '#06b6d4' }
+];
+
+const MOCK_ACTIVITY: ActivityData[] = Array.from({ length: 90 }, (_, i) => {
+  const date = new Date();
+  date.setDate(date.getDate() - (89 - i));
+  return {
+    date: date.toISOString().split('T')[0],
+    minutes: Math.random() > 0.3 ? Math.floor(Math.random() * 60) + 5 : 0,
+    lessonsCompleted: Math.random() > 0.5 ? Math.floor(Math.random() * 3) + 1 : 0,
+    xpEarned: Math.random() > 0.3 ? Math.floor(Math.random() * 200) + 20 : 0
+  };
+});
+
+// ============================================================
+// HEADER COMPONENT
+// ============================================================
+
+interface DashboardHeaderProps {
+  user: UserProfile;
+  notifications: Notification[];
+  currentView: DashboardView;
+  onViewChange: (view: DashboardView) => void;
+  onOpenNotifications: () => void;
+  onOpenSettings: () => void;
+  onOpenProfile: () => void;
+  onSearch: (query: string) => void;
+}
+
+const DashboardHeader: React.FC<DashboardHeaderProps> = ({
+  user,
+  notifications,
+  currentView,
+  onViewChange,
+  onOpenNotifications,
+  onOpenSettings,
+  onOpenProfile,
+  onSearch
+}) => {
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  const navItems: { id: DashboardView; label: string; icon: React.ReactNode }[] = [
+    { id: 'overview', label: 'Przegląd', icon: <BarChart3 className="w-4 h-4" /> },
+    { id: 'learning', label: 'Nauka', icon: <BookOpen className="w-4 h-4" /> },
+    { id: 'achievements', label: 'Osiągnięcia', icon: <Award className="w-4 h-4" /> },
+    { id: 'market', label: 'Rynek pracy', icon: <Briefcase className="w-4 h-4" /> }
+  ];
+
+  return (
+    <header className="sticky top-0 z-50 backdrop-blur-xl bg-slate-900/80 border-b border-white/10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16">
+          {/* Logo & Brand */}
+          <div className="flex items-center gap-3">
+            <motion.div
+              whileHover={{ rotate: 10 }}
+              className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center"
+            >
+              <Zap className="w-6 h-6 text-white" />
+            </motion.div>
+            <div className="hidden sm:block">
+              <h1 className="text-lg font-bold text-white">MasterCraft</h1>
+              <p className="text-xs text-white/60">Academy</p>
+            </div>
+          </div>
+
+          {/* Desktop Navigation */}
+          <nav className="hidden md:flex items-center gap-1">
+            {navItems.map((item) => (
+              <motion.button
+                key={item.id}
+                whileHover={{ y: -2 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => onViewChange(item.id)}
+                className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all ${
+                  currentView === item.id
+                    ? 'bg-white/10 text-white'
+                    : 'text-white/60 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                {item.icon}
+                <span className="text-sm font-medium">{item.label}</span>
+              </motion.button>
+            ))}
+          </nav>
+
+          {/* Right side actions */}
+          <div className="flex items-center gap-2">
+            {/* Search */}
+            <AnimatePresence>
+              {searchOpen ? (
+                <motion.div
+                  initial={{ width: 0, opacity: 0 }}
+                  animate={{ width: 200, opacity: 1 }}
+                  exit={{ width: 0, opacity: 0 }}
+                  className="relative"
+                >
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && onSearch(searchQuery)}
+                    placeholder="Szukaj lekcji..."
+                    className="w-full px-4 py-2 rounded-xl bg-white/10 border border-white/20 text-white placeholder-white/40 text-sm focus:outline-none focus:border-amber-400"
+                    autoFocus
+                  />
+                  <button
+                    onClick={() => setSearchOpen(false)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2"
+                  >
+                    <X className="w-4 h-4 text-white/40" />
+                  </button>
+                </motion.div>
+              ) : (
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => setSearchOpen(true)}
+                  className="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors"
+                >
+                  <Search className="w-5 h-5 text-white/60" />
+                </motion.button>
+              )}
+            </AnimatePresence>
+
+            {/* Notifications */}
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={onOpenNotifications}
+              className="relative w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors"
+            >
+              <Bell className="w-5 h-5 text-white/60" />
+              {unreadCount > 0 && (
+                <motion.span
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center font-bold"
+                >
+                  {unreadCount}
+                </motion.span>
+              )}
+            </motion.button>
+
+            {/* Profile */}
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={onOpenProfile}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
+            >
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
+                {user.name[0]}
+              </div>
+              <div className="hidden sm:block text-left">
+                <p className="text-sm font-medium text-white">{user.name}</p>
+                <p className="text-xs text-white/60">Poziom {user.level}</p>
+              </div>
+              <ChevronDown className="w-4 h-4 text-white/40 hidden sm:block" />
+            </motion.button>
+
+            {/* Mobile menu button */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="md:hidden w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center"
+            >
+              {mobileMenuOpen ? (
+                <X className="w-5 h-5 text-white" />
+              ) : (
+                <Menu className="w-5 h-5 text-white" />
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile Navigation */}
+        <AnimatePresence>
+          {mobileMenuOpen && (
+            <motion.nav
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="md:hidden py-4 border-t border-white/10"
+            >
+              <div className="flex flex-col gap-2">
+                {navItems.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      onViewChange(item.id);
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`px-4 py-3 rounded-xl flex items-center gap-3 transition-all ${
+                      currentView === item.id
+                        ? 'bg-white/10 text-white'
+                        : 'text-white/60'
+                    }`}
+                  >
+                    {item.icon}
+                    <span>{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            </motion.nav>
+          )}
+        </AnimatePresence>
+      </div>
+    </header>
+  );
+};
+
+// ============================================================
+// SIDEBAR WIDGETS
+// ============================================================
+
+interface SidebarWidgetsProps {
+  user: UserProfile;
+  weeklyGoals: WeeklyGoal[];
+  upcomingEvents: any[];
+  recentActivity: ActivityData[];
+}
+
+const SidebarWidgets: React.FC<SidebarWidgetsProps> = ({
+  user,
+  weeklyGoals,
+  upcomingEvents,
+  recentActivity
+}) => {
+  // Calculate weekly stats
+  const thisWeekActivity = recentActivity.slice(-7);
+  const totalMinutes = thisWeekActivity.reduce((sum, d) => sum + d.minutes, 0);
+  const totalXP = thisWeekActivity.reduce((sum, d) => sum + d.xpEarned, 0);
+  const activeDays = thisWeekActivity.filter(d => d.minutes > 0).length;
+
+  return (
+    <aside className="space-y-6">
+      {/* Weekly summary card */}
+      <motion.div
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        className="rounded-2xl p-5 border border-white/10"
+        style={{ background: 'rgba(255,255,255,0.03)' }}
+      >
+        <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+          <Calendar className="w-5 h-5 text-amber-400" />
+          Ten tydzień
+        </h3>
+
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-white/60">Czas nauki</span>
+            <span className="text-white font-semibold">
+              {Math.floor(totalMinutes / 60)}h {totalMinutes % 60}m
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-white/60">Zdobyte XP</span>
+            <span className="text-amber-400 font-semibold">+{totalXP}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-white/60">Aktywne dni</span>
+            <span className="text-white font-semibold">{activeDays}/7</span>
+          </div>
+
+          {/* Mini activity bars */}
+          <div className="flex items-end gap-1 h-12 pt-2">
+            {thisWeekActivity.map((day, i) => (
+              <div
+                key={i}
+                className="flex-1 rounded-t transition-all"
+                style={{
+                  height: `${Math.max((day.minutes / 60) * 100, day.minutes > 0 ? 20 : 5)}%`,
+                  background: day.minutes > 0
+                    ? 'linear-gradient(to top, #f59e0b, #fbbf24)'
+                    : 'rgba(255,255,255,0.1)'
+                }}
+              />
+            ))}
+          </div>
+          <div className="flex justify-between text-xs text-white/40">
+            <span>Pon</span>
+            <span>Wt</span>
+            <span>Śr</span>
+            <span>Czw</span>
+            <span>Pt</span>
+            <span>Sob</span>
+            <span>Nd</span>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Weekly goals */}
+      <motion.div
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 0.1 }}
+        className="rounded-2xl p-5 border border-white/10"
+        style={{ background: 'rgba(255,255,255,0.03)' }}
+      >
+        <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+          <Target className="w-5 h-5 text-violet-400" />
+          Cele tygodnia
+        </h3>
+
+        <div className="space-y-4">
+          {weeklyGoals.map((goal) => {
+            const progress = (goal.current / goal.target) * 100;
+            const isComplete = goal.current >= goal.target;
+
+            return (
+              <div key={goal.id} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">{goal.icon}</span>
+                    <span className={`text-sm ${isComplete ? 'text-green-400' : 'text-white'}`}>
+                      {goal.title}
+                    </span>
+                  </div>
+                  <span className={`text-sm font-medium ${isComplete ? 'text-green-400' : 'text-white/60'}`}>
+                    {goal.current}/{goal.target}
+                  </span>
+                </div>
+                <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${Math.min(progress, 100)}%` }}
+                    transition={{ duration: 1 }}
+                    className={`h-full rounded-full ${
+                      isComplete
+                        ? 'bg-gradient-to-r from-green-500 to-emerald-400'
+                        : 'bg-gradient-to-r from-violet-500 to-purple-400'
+                    }`}
+                  />
+                </div>
+                {isComplete && (
+                  <p className="text-xs text-green-400">
+                    +{goal.xpReward} XP zdobyte! ✓
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </motion.div>
+
+      {/* Quick stats */}
+      <motion.div
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 0.2 }}
+        className="rounded-2xl p-5 border border-white/10"
+        style={{ background: 'rgba(255,255,255,0.03)' }}
+      >
+        <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+          <TrendingUp className="w-5 h-5 text-green-400" />
+          Twój progres
+        </h3>
+
+        <div className="space-y-3">
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
+              <Zap className="w-5 h-5 text-amber-400" />
+            </div>
+            <div>
+              <p className="text-white font-semibold">{user.totalXP.toLocaleString()}</p>
+              <p className="text-xs text-white/60">Łączne XP</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5">
+            <div className="w-10 h-10 rounded-xl bg-orange-500/20 flex items-center justify-center">
+              <span className="text-lg">🔥</span>
+            </div>
+            <div>
+              <p className="text-white font-semibold">{user.currentStreak} dni</p>
+              <p className="text-xs text-white/60">Aktualna seria</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5">
+            <div className="w-10 h-10 rounded-xl bg-violet-500/20 flex items-center justify-center">
+              <Award className="w-5 h-5 text-violet-400" />
+            </div>
+            <div>
+              <p className="text-white font-semibold">Poziom {user.level}</p>
+              <p className="text-xs text-white/60">Ranking: Top 15%</p>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Job market teaser */}
+      <motion.div
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 0.3 }}
+        className="rounded-2xl p-5 border border-emerald-500/30 overflow-hidden relative"
+        style={{ background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%)' }}
+      >
+        <div className="absolute top-0 right-0 w-20 h-20 bg-emerald-500/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+        
+        <h3 className="text-lg font-semibold text-white mb-2 flex items-center gap-2">
+          <Briefcase className="w-5 h-
