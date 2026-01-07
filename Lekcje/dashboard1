@@ -1,0 +1,1358 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  Play, Clock, Zap, Trophy, Target, TrendingUp, 
+  BookOpen, Award, Users, Calendar, ChevronRight,
+  Flame, Star, CheckCircle, Lock, Sparkles,
+  Brain, Heart, Coffee, Moon, Sun, Sunset,
+  Video, HelpCircle, Bell, Gift, ArrowRight,
+  BarChart3, Lightbulb, MessageCircle, Share2,
+  Timer, Volume2, Eye, ThumbsUp, Bookmark
+} from 'lucide-react';
+import { 
+  UserProgress, LearningPath, DailyChallenge, 
+  Achievement, Notification, RecommendedLesson,
+  CompetencyData, WeeklyGoal
+} from '../types/dashboard.types';
+
+// ============================================================
+// SEKCJA 1: PERSONALIZED WELCOME HERO
+// ============================================================
+
+interface WelcomeHeroProps {
+  userName: string;
+  currentStreak: number;
+  totalXP: number;
+  level: number;
+  lastActivity?: Date;
+  mood?: 'energetic' | 'tired' | 'focused' | 'neutral';
+}
+
+export const WelcomeHero: React.FC<WelcomeHeroProps> = ({
+  userName,
+  currentStreak,
+  totalXP,
+  level,
+  lastActivity,
+  mood = 'neutral'
+}) => {
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [greeting, setGreeting] = useState('');
+  const [timeIcon, setTimeIcon] = useState<React.ReactNode>(null);
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const hour = currentTime.getHours();
+    if (hour >= 5 && hour < 12) {
+      setGreeting('Dzień dobry');
+      setTimeIcon(<Sun className="w-6 h-6 text-amber-400" />);
+    } else if (hour >= 12 && hour < 18) {
+      setGreeting('Cześć');
+      setTimeIcon(<Sunset className="w-6 h-6 text-orange-400" />);
+    } else if (hour >= 18 && hour < 22) {
+      setGreeting('Dobry wieczór');
+      setTimeIcon(<Moon className="w-6 h-6 text-indigo-400" />);
+    } else {
+      setGreeting('Pracujesz nocą?');
+      setTimeIcon(<Coffee className="w-6 h-6 text-amber-600" />);
+    }
+  }, [currentTime]);
+
+  const getMoodMessage = () => {
+    switch (mood) {
+      case 'energetic':
+        return 'Świetna energia! Czas na ambitną lekcję 💪';
+      case 'tired':
+        return 'Może krótka, lekka sesja? 15 minut wystarczy';
+      case 'focused':
+        return 'Widzimy skupienie - wykorzystaj to!';
+      default:
+        return 'Gotowy na naukę?';
+    }
+  };
+
+  const xpToNextLevel = (level + 1) * 500;
+  const xpProgress = (totalXP % 500) / 500 * 100;
+
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6 }}
+      className="relative overflow-hidden rounded-3xl mb-8"
+      style={{
+        background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4c1d95 100%)',
+        padding: '32px',
+      }}
+    >
+      {/* Animated background particles */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {[...Array(20)].map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute w-2 h-2 bg-white/10 rounded-full"
+            initial={{ 
+              x: Math.random() * 100 + '%', 
+              y: Math.random() * 100 + '%',
+              scale: Math.random() * 0.5 + 0.5
+            }}
+            animate={{ 
+              y: [null, '-20%', null],
+              opacity: [0.1, 0.3, 0.1]
+            }}
+            transition={{ 
+              duration: Math.random() * 5 + 5, 
+              repeat: Infinity,
+              ease: 'easeInOut'
+            }}
+          />
+        ))}
+      </div>
+
+      {/* Main content */}
+      <div className="relative z-10">
+        {/* Top row: Greeting + Time */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            {timeIcon}
+            <div>
+              <motion.h1 
+                className="text-3xl md:text-4xl font-bold text-white"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.2 }}
+              >
+                {greeting}, <span className="text-amber-400">{userName}</span>!
+              </motion.h1>
+              <motion.p 
+                className="text-white/70 mt-1"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.4 }}
+              >
+                {getMoodMessage()}
+              </motion.p>
+            </div>
+          </div>
+
+          {/* Streak badge */}
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.3, type: 'spring' }}
+            className="flex items-center gap-2 px-4 py-2 rounded-full"
+            style={{ background: 'rgba(251, 146, 60, 0.2)', border: '1px solid rgba(251, 146, 60, 0.3)' }}
+          >
+            <Flame className="w-5 h-5 text-orange-400" />
+            <span className="text-orange-300 font-bold">{currentStreak} dni</span>
+          </motion.div>
+        </div>
+
+        {/* Stats row */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          {/* Level */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="bg-white/5 backdrop-blur rounded-2xl p-4 border border-white/10"
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <Star className="w-4 h-4 text-amber-400" />
+              <span className="text-white/60 text-sm">Poziom</span>
+            </div>
+            <div className="text-2xl font-bold text-white">{level}</div>
+            <div className="mt-2">
+              <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${xpProgress}%` }}
+                  transition={{ delay: 0.5, duration: 1 }}
+                  className="h-full bg-gradient-to-r from-amber-400 to-orange-500 rounded-full"
+                />
+              </div>
+              <p className="text-xs text-white/40 mt-1">{totalXP % 500}/{500} XP</p>
+            </div>
+          </motion.div>
+
+          {/* Total XP */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="bg-white/5 backdrop-blur rounded-2xl p-4 border border-white/10"
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <Zap className="w-4 h-4 text-yellow-400" />
+              <span className="text-white/60 text-sm">Łączne XP</span>
+            </div>
+            <div className="text-2xl font-bold text-white">
+              {totalXP.toLocaleString()}
+            </div>
+            <p className="text-xs text-green-400 mt-1">+150 dzisiaj</p>
+          </motion.div>
+
+          {/* Completed lessons */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+            className="bg-white/5 backdrop-blur rounded-2xl p-4 border border-white/10"
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <BookOpen className="w-4 h-4 text-blue-400" />
+              <span className="text-white/60 text-sm">Ukończone</span>
+            </div>
+            <div className="text-2xl font-bold text-white">24</div>
+            <p className="text-xs text-white/40 mt-1">lekcje</p>
+          </motion.div>
+
+          {/* Achievements */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6 }}
+            className="bg-white/5 backdrop-blur rounded-2xl p-4 border border-white/10"
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <Trophy className="w-4 h-4 text-purple-400" />
+              <span className="text-white/60 text-sm">Odznaki</span>
+            </div>
+            <div className="text-2xl font-bold text-white">8</div>
+            <p className="text-xs text-purple-400 mt-1">2 nowe!</p>
+          </motion.div>
+        </div>
+
+        {/* Quick action CTA */}
+        <motion.button
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.7 }}
+          whileHover={{ scale: 1.02, y: -2 }}
+          whileTap={{ scale: 0.98 }}
+          className="w-full md:w-auto px-8 py-4 rounded-2xl font-semibold text-lg flex items-center justify-center gap-3 transition-all"
+          style={{
+            background: 'linear-gradient(135deg, #f59e0b 0%, #ea580c 100%)',
+            boxShadow: '0 10px 40px rgba(245, 158, 11, 0.3)'
+          }}
+        >
+          <Play className="w-5 h-5" fill="currentColor" />
+          Kontynuuj naukę
+          <ChevronRight className="w-5 h-5" />
+        </motion.button>
+      </div>
+    </motion.section>
+  );
+};
+
+// ============================================================
+// SEKCJA 2: LEARNING PATH VISUALIZATION
+// ============================================================
+
+interface LearningPathModule {
+  id: string;
+  title: string;
+  icon: string;
+  totalLessons: number;
+  completedLessons: number;
+  totalXP: number;
+  earnedXP: number;
+  estimatedHours: number;
+  status: 'locked' | 'available' | 'in-progress' | 'completed';
+  unlockRequirement?: string;
+}
+
+interface LearningPathSectionProps {
+  modules: LearningPathModule[];
+  currentModuleId: string;
+  totalProgress: number;
+  estimatedCompletion: string;
+  profession: string;
+}
+
+export const LearningPathSection: React.FC<LearningPathSectionProps> = ({
+  modules,
+  currentModuleId,
+  totalProgress,
+  estimatedCompletion,
+  profession
+}) => {
+  const [expandedModule, setExpandedModule] = useState<string | null>(currentModuleId);
+
+  const getStatusColor = (status: LearningPathModule['status']) => {
+    switch (status) {
+      case 'completed': return { bg: 'bg-green-500/20', border: 'border-green-500/50', text: 'text-green-400' };
+      case 'in-progress': return { bg: 'bg-amber-500/20', border: 'border-amber-500/50', text: 'text-amber-400' };
+      case 'available': return { bg: 'bg-blue-500/20', border: 'border-blue-500/50', text: 'text-blue-400' };
+      case 'locked': return { bg: 'bg-gray-500/20', border: 'border-gray-500/30', text: 'text-gray-500' };
+    }
+  };
+
+  const getStatusIcon = (status: LearningPathModule['status']) => {
+    switch (status) {
+      case 'completed': return <CheckCircle className="w-5 h-5 text-green-400" />;
+      case 'in-progress': return <Play className="w-5 h-5 text-amber-400" fill="currentColor" />;
+      case 'available': return <Target className="w-5 h-5 text-blue-400" />;
+      case 'locked': return <Lock className="w-5 h-5 text-gray-500" />;
+    }
+  };
+
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.2 }}
+      className="mb-8"
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+              <Target className="w-5 h-5 text-white" />
+            </div>
+            Twoja Ścieżka: {profession}
+          </h2>
+          <p className="text-white/60 mt-1">
+            Ukończysz za około {estimatedCompletion}
+          </p>
+        </div>
+
+        {/* Overall progress */}
+        <div className="text-right">
+          <div className="text-3xl font-bold text-white">{totalProgress}%</div>
+          <p className="text-white/60 text-sm">ukończono</p>
+        </div>
+      </div>
+
+      {/* Overall progress bar */}
+      <div className="h-3 bg-white/10 rounded-full overflow-hidden mb-8">
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: `${totalProgress}%` }}
+          transition={{ duration: 1.5, ease: 'easeOut' }}
+          className="h-full rounded-full relative"
+          style={{
+            background: 'linear-gradient(90deg, #22c55e 0%, #84cc16 50%, #eab308 100%)'
+          }}
+        >
+          <motion.div
+            className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full shadow-lg"
+            animate={{ scale: [1, 1.2, 1] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          />
+        </motion.div>
+      </div>
+
+      {/* Modules timeline */}
+      <div className="relative">
+        {/* Connecting line */}
+        <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gradient-to-b from-green-500 via-amber-500 to-gray-600" />
+
+        {/* Module cards */}
+        <div className="space-y-4">
+          {modules.map((module, index) => {
+            const colors = getStatusColor(module.status);
+            const isExpanded = expandedModule === module.id;
+            const progressPercent = module.totalLessons > 0 
+              ? Math.round((module.completedLessons / module.totalLessons) * 100) 
+              : 0;
+
+            return (
+              <motion.div
+                key={module.id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: index * 0.1 }}
+                className="relative pl-16"
+              >
+                {/* Timeline node */}
+                <motion.div
+                  className={`absolute left-3 w-6 h-6 rounded-full ${colors.bg} ${colors.border} border-2 flex items-center justify-center z-10`}
+                  whileHover={{ scale: 1.2 }}
+                >
+                  {module.status === 'completed' && (
+                    <CheckCircle className="w-4 h-4 text-green-400" />
+                  )}
+                  {module.status === 'in-progress' && (
+                    <motion.div
+                      className="w-2 h-2 bg-amber-400 rounded-full"
+                      animate={{ scale: [1, 1.5, 1] }}
+                      transition={{ duration: 1.5, repeat: Infinity }}
+                    />
+                  )}
+                </motion.div>
+
+                {/* Module card */}
+                <motion.div
+                  className={`rounded-2xl border ${colors.border} ${colors.bg} backdrop-blur overflow-hidden cursor-pointer transition-all`}
+                  onClick={() => setExpandedModule(isExpanded ? null : module.id)}
+                  whileHover={{ scale: 1.01 }}
+                >
+                  {/* Card header */}
+                  <div className="p-4 flex items-center gap-4">
+                    {/* Icon */}
+                    <div className={`w-12 h-12 rounded-xl ${colors.bg} flex items-center justify-center text-2xl`}>
+                      {module.icon}
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className={`font-semibold ${module.status === 'locked' ? 'text-gray-400' : 'text-white'}`}>
+                          {module.title}
+                        </h3>
+                        {getStatusIcon(module.status)}
+                      </div>
+                      <div className="flex items-center gap-4 mt-1 text-sm">
+                        <span className="text-white/60">
+                          {module.completedLessons}/{module.totalLessons} lekcji
+                        </span>
+                        <span className="text-white/60">
+                          ~{module.estimatedHours}h
+                        </span>
+                        <span className={colors.text}>
+                          {module.earnedXP}/{module.totalXP} XP
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Progress circle */}
+                    <div className="relative w-14 h-14">
+                      <svg className="w-14 h-14 -rotate-90">
+                        <circle
+                          cx="28"
+                          cy="28"
+                          r="24"
+                          fill="none"
+                          stroke="rgba(255,255,255,0.1)"
+                          strokeWidth="4"
+                        />
+                        <motion.circle
+                          cx="28"
+                          cy="28"
+                          r="24"
+                          fill="none"
+                          stroke={module.status === 'completed' ? '#22c55e' : module.status === 'in-progress' ? '#f59e0b' : '#6b7280'}
+                          strokeWidth="4"
+                          strokeLinecap="round"
+                          strokeDasharray={`${progressPercent * 1.51} 151`}
+                          initial={{ strokeDasharray: '0 151' }}
+                          animate={{ strokeDasharray: `${progressPercent * 1.51} 151` }}
+                          transition={{ duration: 1, delay: index * 0.1 }}
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className={`text-sm font-bold ${colors.text}`}>{progressPercent}%</span>
+                      </div>
+                    </div>
+
+                    {/* Expand indicator */}
+                    <motion.div
+                      animate={{ rotate: isExpanded ? 90 : 0 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <ChevronRight className="w-5 h-5 text-white/40" />
+                    </motion.div>
+                  </div>
+
+                  {/* Expanded content */}
+                  <AnimatePresence>
+                    {isExpanded && module.status !== 'locked' && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="border-t border-white/10"
+                      >
+                        <div className="p-4 space-y-3">
+                          {/* Sample lessons preview */}
+                          {[1, 2, 3].map((lessonNum) => (
+                            <div
+                              key={lessonNum}
+                              className="flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
+                            >
+                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-medium ${
+                                lessonNum <= module.completedLessons 
+                                  ? 'bg-green-500/20 text-green-400' 
+                                  : 'bg-white/10 text-white/60'
+                              }`}>
+                                {lessonNum <= module.completedLessons ? '✓' : lessonNum}
+                              </div>
+                              <span className={lessonNum <= module.completedLessons ? 'text-white/60' : 'text-white'}>
+                                Lekcja {lessonNum}: {module.title} - Podstawy {lessonNum}
+                              </span>
+                              {lessonNum === module.completedLessons + 1 && (
+                                <span className="ml-auto px-2 py-1 rounded-full bg-amber-500/20 text-amber-400 text-xs">
+                                  Następna
+                                </span>
+                              )}
+                            </div>
+                          ))}
+
+                          {/* Start/Continue button */}
+                          <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            className="w-full py-3 rounded-xl font-semibold flex items-center justify-center gap-2"
+                            style={{
+                              background: module.status === 'completed' 
+                                ? 'rgba(34, 197, 94, 0.2)' 
+                                : 'linear-gradient(135deg, #7c3aed 0%, #6366f1 100%)'
+                            }}
+                          >
+                            {module.status === 'completed' ? (
+                              <>
+                                <CheckCircle className="w-5 h-5 text-green-400" />
+                                <span className="text-green-400">Ukończono - Powtórz</span>
+                              </>
+                            ) : (
+                              <>
+                                <Play className="w-5 h-5" fill="currentColor" />
+                                <span className="text-white">
+                                  {module.completedLessons > 0 ? 'Kontynuuj' : 'Rozpocznij'}
+                                </span>
+                              </>
+                            )}
+                          </motion.button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Locked message */}
+                  {module.status === 'locked' && (
+                    <div className="px-4 pb-4">
+                      <div className="flex items-center gap-2 text-gray-500 text-sm">
+                        <Lock className="w-4 h-4" />
+                        <span>{module.unlockRequirement || 'Ukończ poprzedni moduł'}</span>
+                      </div>
+                    </div>
+                  )}
+                </motion.div>
+              </motion.div>
+            );
+          })}
+        </div>
+      </div>
+    </motion.section>
+  );
+};
+
+// ============================================================
+// SEKCJA 3: DAILY CHALLENGE & QUICK ACTIONS
+// ============================================================
+
+interface QuickActionsSectionProps {
+  dailyChallenge: DailyChallenge;
+  lastLesson: {
+    id: string;
+    title: string;
+    module: string;
+    progress: number;
+    thumbnail?: string;
+  };
+  quickQuizAvailable: boolean;
+  recommendedVideo?: {
+    id: string;
+    title: string;
+    duration: string;
+    thumbnail?: string;
+  };
+  onStartChallenge: () => void;
+  onContinueLesson: () => void;
+  onStartQuiz: () => void;
+  onWatchVideo: () => void;
+}
+
+export const QuickActionsSection: React.FC<QuickActionsSectionProps> = ({
+  dailyChallenge,
+  lastLesson,
+  quickQuizAvailable,
+  recommendedVideo,
+  onStartChallenge,
+  onContinueLesson,
+  onStartQuiz,
+  onWatchVideo
+}) => {
+  const [timeLeft, setTimeLeft] = useState('');
+
+  useEffect(() => {
+    const calculateTimeLeft = () => {
+      const now = new Date();
+      const endOfDay = new Date(now);
+      endOfDay.setHours(23, 59, 59, 999);
+      const diff = endOfDay.getTime() - now.getTime();
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      return `${hours}h ${minutes}m`;
+    };
+
+    setTimeLeft(calculateTimeLeft());
+    const interval = setInterval(() => {
+      setTimeLeft(calculateTimeLeft());
+    }, 60000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.4 }}
+      className="mb-8"
+    >
+      <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+        <Sparkles className="w-5 h-5 text-amber-400" />
+        Szybkie akcje
+      </h2>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Continue last lesson */}
+        <motion.div
+          whileHover={{ scale: 1.02, y: -4 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={onContinueLesson}
+          className="relative overflow-hidden rounded-2xl cursor-pointer group"
+          style={{
+            background: 'linear-gradient(135deg, #1e40af 0%, #3b82f6 100%)',
+            padding: '24px'
+          }}
+        >
+          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+          
+          <div className="relative z-10">
+            <div className="flex items-start justify-between mb-4">
+              <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+                <Play className="w-6 h-6 text-white" fill="currentColor" />
+              </div>
+              <span className="px-3 py-1 rounded-full bg-white/20 text-white text-sm">
+                {lastLesson.progress}% ukończone
+              </span>
+            </div>
+
+            <h3 className="text-lg font-bold text-white mb-1">Kontynuuj naukę</h3>
+            <p className="text-white/70 text-sm mb-3">{lastLesson.title}</p>
+            
+            <div className="h-2 bg-white/20 rounded-full overflow-hidden">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${lastLesson.progress}%` }}
+                transition={{ duration: 1 }}
+                className="h-full bg-white rounded-full"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 mt-3 text-white/60 text-sm">
+              <BookOpen className="w-4 h-4" />
+              <span>{lastLesson.module}</span>
+            </div>
+          </div>
+
+          <motion.div
+            className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity"
+            animate={{ x: [0, 5, 0] }}
+            transition={{ duration: 1.5, repeat: Infinity }}
+          >
+            <ChevronRight className="w-6 h-6 text-white" />
+          </motion.div>
+        </motion.div>
+
+        {/* Daily challenge */}
+        <motion.div
+          whileHover={{ scale: 1.02, y: -4 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={onStartChallenge}
+          className="relative overflow-hidden rounded-2xl cursor-pointer group"
+          style={{
+            background: dailyChallenge.completed 
+              ? 'linear-gradient(135deg, #15803d 0%, #22c55e 100%)'
+              : 'linear-gradient(135deg, #b45309 0%, #f59e0b 100%)',
+            padding: '24px'
+          }}
+        >
+          {!dailyChallenge.completed && (
+            <motion.div
+              className="absolute top-4 right-4"
+              animate={{ rotate: [0, 15, -15, 0], scale: [1, 1.1, 1] }}
+              transition={{ duration: 2, repeat: Infinity }}
+            >
+              <Sparkles className="w-6 h-6 text-white/60" />
+            </motion.div>
+          )}
+
+          <div className="relative z-10">
+            <div className="flex items-start justify-between mb-4">
+              <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+                {dailyChallenge.completed ? (
+                  <CheckCircle className="w-6 h-6 text-white" />
+                ) : (
+                  <Target className="w-6 h-6 text-white" />
+                )}
+              </div>
+              {!dailyChallenge.completed && (
+                <span className="px-3 py-1 rounded-full bg-white/20 text-white text-sm flex items-center gap-1">
+                  <Timer className="w-3 h-3" />
+                  {timeLeft}
+                </span>
+              )}
+            </div>
+
+            <h3 className="text-lg font-bold text-white mb-1">
+              {dailyChallenge.completed ? 'Wyzwanie ukończone!' : 'Dzisiejsze wyzwanie'}
+            </h3>
+            <p className="text-white/70 text-sm mb-3">{dailyChallenge.title}</p>
+            
+            <div className="flex items-center gap-3">
+              <span className="px-3 py-1 rounded-full bg-white/20 text-white text-sm flex items-center gap-1">
+                <Zap className="w-4 h-4" />
+                +{dailyChallenge.xpReward} XP
+              </span>
+              <span className="text-white/60 text-sm">
+                {dailyChallenge.timeLimit} min
+              </span>
+            </div>
+          </div>
+
+          {dailyChallenge.completed && (
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              className="absolute top-4 right-4"
+            >
+              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+                <CheckCircle className="w-6 h-6 text-white" />
+              </div>
+            </motion.div>
+          )}
+        </motion.div>
+
+        {/* Quick quiz */}
+        <motion.div
+          whileHover={{ scale: 1.02, y: -4 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={onStartQuiz}
+          className="relative overflow-hidden rounded-2xl cursor-pointer group"
+          style={{
+            background: 'linear-gradient(135deg, #7c3aed 0%, #a855f7 100%)',
+            padding: '24px'
+          }}
+        >
+          <div className="absolute bottom-0 right-0 w-24 h-24 bg-white/10 rounded-full translate-y-1/2 translate-x-1/2" />
+
+          <div className="relative z-10">
+            <div className="flex items-start justify-between mb-4">
+              <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+                <HelpCircle className="w-6 h-6 text-white" />
+              </div>
+              <span className="px-3 py-1 rounded-full bg-white/20 text-white text-sm">
+                5 pytań
+              </span>
+            </div>
+
+            <h3 className="text-lg font-bold text-white mb-1">Sprawdź się</h3>
+            <p className="text-white/70 text-sm mb-3">Szybki quiz z ostatnich lekcji</p>
+            
+            <div className="flex items-center gap-3">
+              <span className="px-3 py-1 rounded-full bg-white/20 text-white text-sm flex items-center gap-1">
+                <Clock className="w-4 h-4" />
+                ~5 min
+              </span>
+              <span className="px-3 py-1 rounded-full bg-white/20 text-white text-sm flex items-center gap-1">
+                <Zap className="w-4 h-4" />
+                +50 XP
+              </span>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Recommended video */}
+        {recommendedVideo && (
+          <motion.div
+            whileHover={{ scale: 1.02, y: -4 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={onWatchVideo}
+            className="relative overflow-hidden rounded-2xl cursor-pointer group"
+            style={{
+              background: 'linear-gradient(135deg, #0f766e 0%, #14b8a6 100%)',
+              padding: '24px'
+            }}
+          >
+            <div className="absolute top-0 left-0 w-20 h-20 bg-white/10 rounded-full -translate-y-1/2 -translate-x-1/2" />
+
+            <div className="relative z-10">
+              <div className="flex items-start justify-between mb-4">
+                <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+                  <Video className="w-6 h-6 text-white" />
+                </div>
+                <span className="px-3 py-1 rounded-full bg-white/20 text-white text-sm flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  {recommendedVideo.duration}
+                </span>
+              </div>
+
+              <h3 className="text-lg font-bold text-white mb-1">Obejrzyj</h3>
+              <p className="text-white/70 text-sm mb-3">{recommendedVideo.title}</p>
+              
+              <div className="flex items-center gap-2 text-white/60 text-sm">
+                <Eye className="w-4 h-4" />
+                <span>Polecane dla Ciebie</span>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </div>
+    </motion.section>
+  );
+};
+
+// ============================================================
+// SEKCJA 4: AI RECOMMENDATIONS
+// ============================================================
+
+interface AIRecommendation {
+  id: string;
+  type: 'lesson' | 'practice' | 'review' | 'break';
+  title: string;
+  reason: string;
+  confidence: number;
+  estimatedTime: number;
+  xpReward?: number;
+  priority: 'high' | 'medium' | 'low';
+}
+
+interface AIRecommendationsSectionProps {
+  recommendations: AIRecommendation[];
+  learningStyle: {
+    visual: number;
+    auditory: number;
+    kinesthetic: number;
+  };
+  onSelectRecommendation: (id: string) => void;
+}
+
+export const AIRecommendationsSection: React.FC<AIRecommendationsSectionProps> = ({
+  recommendations,
+  learningStyle,
+  onSelectRecommendation
+}) => {
+  const [showAllRecommendations, setShowAllRecommendations] = useState(false);
+  
+  const displayedRecommendations = showAllRecommendations 
+    ? recommendations 
+    : recommendations.slice(0, 3);
+
+  const getTypeIcon = (type: AIRecommendation['type']) => {
+    switch (type) {
+      case 'lesson': return <BookOpen className="w-5 h-5" />;
+      case 'practice': return <Target className="w-5 h-5" />;
+      case 'review': return <Brain className="w-5 h-5" />;
+      case 'break': return <Coffee className="w-5 h-5" />;
+    }
+  };
+
+  const getTypeColor = (type: AIRecommendation['type']) => {
+    switch (type) {
+      case 'lesson': return 'from-blue-500 to-blue-600';
+      case 'practice': return 'from-amber-500 to-orange-500';
+      case 'review': return 'from-purple-500 to-violet-600';
+      case 'break': return 'from-green-500 to-emerald-600';
+    }
+  };
+
+  const getPriorityBadge = (priority: AIRecommendation['priority']) => {
+    switch (priority) {
+      case 'high':
+        return (
+          <span className="px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 text-xs font-medium">
+            Priorytet
+          </span>
+        );
+      case 'medium':
+        return (
+          <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-xs font-medium">
+            Zalecane
+          </span>
+        );
+      default:
+        return null;
+    }
+  };
+
+  // Determine dominant learning style
+  const dominantStyle = Object.entries(learningStyle).reduce((a, b) => 
+    learningStyle[a[0] as keyof typeof learningStyle] > learningStyle[b[0] as keyof typeof learningStyle] ? a : b
+  )[0];
+
+  const styleLabels = {
+    visual: { label: 'Wzrokowiec', icon: '👁️', tip: 'Preferujesz diagramy i wideo' },
+    auditory: { label: 'Słuchowiec', icon: '👂', tip: 'Lubisz wyjaśnienia głosowe' },
+    kinesthetic: { label: 'Kinestetyk', icon: '✋', tip: 'Uczysz się przez praktykę' }
+  };
+
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.5 }}
+      className="mb-8"
+    >
+      {/* Header with AI badge */}
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-bold text-white flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+            <Brain className="w-4 h-4 text-white" />
+          </div>
+          Rekomendacje AI
+          <span className="px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-400 text-xs">
+            Personalizowane
+          </span>
+        </h2>
+
+        {/* Learning style indicator */}
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10">
+          <span className="text-lg">{styleLabels[dominantStyle as keyof typeof styleLabels].icon}</span>
+          <span className="text-white/70 text-sm">
+            {styleLabels[dominantStyle as keyof typeof styleLabels].label}
+          </span>
+        </div>
+      </div>
+
+      {/* Learning style breakdown */}
+      <div className="grid grid-cols-3 gap-3 mb-6">
+        {Object.entries(learningStyle).map(([style, value]) => (
+          <div
+            key={style}
+            className="p-3 rounded-xl bg-white/5 border border-white/10"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-white/60 text-sm capitalize">
+                {styleLabels[style as keyof typeof styleLabels].label}
+              </span>
+              <span className="text-white font-medium">{value}%</span>
+            </div>
+            <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${value}%` }}
+                transition={{ duration: 1, delay: 0.2 }}
+                className={`h-full rounded-full ${
+                  style === 'visual' ? 'bg-blue-500' :
+                  style === 'auditory' ? 'bg-amber-500' : 'bg-green-500'
+                }`}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Recommendations list */}
+      <div className="space-y-3">
+        <AnimatePresence>
+          {displayedRecommendations.map((rec, index) => (
+            <motion.div
+              key={rec.id}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ delay: index * 0.1 }}
+              whileHover={{ scale: 1.01, x: 4 }}
+              onClick={() => onSelectRecommendation(rec.id)}
+              className="relative overflow-hidden rounded-xl bg-white/5 border border-white/10 p-4 cursor-pointer group hover:border-white/20 transition-all"
+            >
+              <div className="flex items-start gap-4">
+                {/* Type icon */}
+                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${getTypeColor(rec.type)} flex items-center justify-center text-white flex-shrink-0`}>
+                  {getTypeIcon(rec.type)}
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="font-semibold text-white truncate">{rec.title}</h3>
+                    {getPriorityBadge(rec.priority)}
+                  </div>
+                  
+                  <p className="text-white/60 text-sm mb-2 flex items-start gap-1">
+                    <Lightbulb className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-400" />
+                    {rec.reason}
+                  </p>
+
+                  <div className="flex items-center gap-4 text-sm">
+                    <span className="text-white/50 flex items-center gap-1">
+                      <Clock className="w-4 h-4" />
+                      {rec.estimatedTime} min
+                    </span>
+                    {rec.xpReward && (
+                      <span className="text-amber-400 flex items-center gap-1">
+                        <Zap className="w-4 h-4" />
+                        +{rec.xpReward} XP
+                      </span>
+                    )}
+                    <span className="text-white/40 flex items-center gap-1">
+                      <BarChart3 className="w-4 h-4" />
+                      {rec.confidence}% dopasowania
+                    </span>
+                  </div>
+                </div>
+
+                {/* Action arrow */}
+                <motion.div
+                  className="opacity-0 group-hover:opacity-100 transition-opacity"
+                  animate={{ x: [0, 4, 0] }}
+                  transition={{ duration: 1.5, repeat: Infinity }}
+                >
+                  <ChevronRight className="w-5 h-5 text-white/40" />
+                </motion.div>
+              </div>
+
+              {/* Confidence bar */}
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/5">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${rec.confidence}%` }}
+                  transition={{ duration: 1, delay: index * 0.1 }}
+                  className={`h-full bg-gradient-to-r ${getTypeColor(rec.type)}`}
+                />
+              </div>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+
+      {/* Show more button */}
+      {recommendations.length > 3 && (
+        <motion.button
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          onClick={() => setShowAllRecommendations(!showAllRecommendations)}
+          className="w-full mt-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white/70 hover:text-white hover:bg-white/10 transition-all flex items-center justify-center gap-2"
+        >
+          {showAllRecommendations ? 'Pokaż mniej' : `Pokaż więcej (${recommendations.length - 3})`}
+          <motion.div
+            animate={{ rotate: showAllRecommendations ? 180 : 0 }}
+          >
+            <ChevronRight className="w-4 h-4 rotate-90" />
+          </motion.div>
+        </motion.button>
+      )}
+    </motion.section>
+  );
+};
+
+// ============================================================
+// SEKCJA 5: ACHIEVEMENTS & GAMIFICATION
+// ============================================================
+
+interface Achievement {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  category: 'milestone' | 'skill' | 'streak' | 'social' | 'secret';
+  progress: number;
+  maxProgress: number;
+  unlocked: boolean;
+  unlockedAt?: Date;
+  xpReward: number;
+  rarity: 'common' | 'rare' | 'epic' | 'legendary';
+}
+
+interface AchievementsSectionProps {
+  achievements: Achievement[];
+  recentUnlocks: Achievement[];
+  totalUnlocked: number;
+  totalAchievements: number;
+}
+
+export const AchievementsSection: React.FC<AchievementsSectionProps> = ({
+  achievements,
+  recentUnlocks,
+  totalUnlocked,
+  totalAchievements
+}) => {
+  const [selectedCategory, setSelectedCategory] = useState<Achievement['category'] | 'all'>('all');
+  const [showUnlockedOnly, setShowUnlockedOnly] = useState(false);
+
+  const categories = [
+    { id: 'all', label: 'Wszystkie', icon: '🏆' },
+    { id: 'milestone', label: 'Kamienie milowe', icon: '🎯' },
+    { id: 'skill', label: 'Umiejętności', icon: '⚡' },
+    { id: 'streak', label: 'Serie', icon: '🔥' },
+    { id: 'social', label: 'Społeczność', icon: '👥' },
+    { id: 'secret', label: 'Sekretne', icon: '🔮' }
+  ];
+
+  const rarityColors = {
+    common: { bg: 'from-gray-500 to-gray-600', border: 'border-gray-500/30', glow: '' },
+    rare: { bg: 'from-blue-500 to-blue-600', border: 'border-blue-500/30', glow: 'shadow-blue-500/20' },
+    epic: { bg: 'from-purple-500 to-violet-600', border: 'border-purple-500/30', glow: 'shadow-purple-500/20' },
+    legendary: { bg: 'from-amber-500 to-orange-500', border: 'border-amber-500/30', glow: 'shadow-amber-500/30' }
+  };
+
+  const filteredAchievements = achievements.filter(a => {
+    if (selectedCategory !== 'all' && a.category !== selectedCategory) return false;
+    if (showUnlockedOnly && !a.unlocked) return false;
+    return true;
+  });
+
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.6 }}
+      className="mb-8"
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-bold text-white flex items-center gap-2">
+          <Trophy className="w-5 h-5 text-amber-400" />
+          Osiągnięcia
+          <span className="text-white/50 font-normal text-base">
+            {totalUnlocked}/{totalAchievements}
+          </span>
+        </h2>
+
+        {/* Toggle */}
+        <button
+          onClick={() => setShowUnlockedOnly(!showUnlockedOnly)}
+          className={`px-3 py-1.5 rounded-full text-sm transition-all ${
+            showUnlockedOnly 
+              ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' 
+              : 'bg-white/5 text-white/60 border border-white/10'
+          }`}
+        >
+          {showUnlockedOnly ? 'Tylko odblokowane' : 'Pokaż wszystkie'}
+        </button>
+      </div>
+
+      {/* Recent unlocks highlight */}
+      {recentUnlocks.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20"
+        >
+          <div className="flex items-center gap-2 mb-3">
+            <Sparkles className="w-4 h-4 text-amber-400" />
+            <span className="text-amber-400 font-medium">Ostatnio odblokowane!</span>
+          </div>
+          <div className="flex gap-3 overflow-x-auto pb-2">
+            {recentUnlocks.map((achievement) => (
+              <motion.div
+                key={achievement.id}
+                whileHover={{ scale: 1.05, y: -2 }}
+                className={`flex-shrink-0 w-20 text-center p-3 rounded-xl bg-gradient-to-br ${rarityColors[achievement.rarity].bg} shadow-lg ${rarityColors[achievement.rarity].glow}`}
+              >
+                <div className="text-3xl mb-1">{achievement.icon}</div>
+                <div className="text-white text-xs font-medium truncate">{achievement.title}</div>
+              </motion.div>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Category tabs */}
+      <div className="flex gap-2 overflow-x-auto pb-2 mb-4 scrollbar-hide">
+        {categories.map((cat) => (
+          <button
+            key={cat.id}
+            onClick={() => setSelectedCategory(cat.id as any)}
+            className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm font-medium transition-all flex items-center gap-2 ${
+              selectedCategory === cat.id
+                ? 'bg-white/10 text-white border border-white/20'
+                : 'bg-white/5 text-white/60 border border-transparent hover:border-white/10'
+            }`}
+          >
+            <span>{cat.icon}</span>
+            {cat.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Achievements grid */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+        {filteredAchievements.map((achievement, index) => {
+          const colors = rarityColors[achievement.rarity];
+          const progressPercent = (achievement.progress / achievement.maxProgress) * 100;
+
+          return (
+            <motion.div
+              key={achievement.id}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: index * 0.05 }}
+              whileHover={{ scale: 1.03, y: -2 }}
+              className={`relative overflow-hidden rounded-xl p-4 border transition-all cursor-pointer ${
+                achievement.unlocked
+                  ? `bg-gradient-to-br ${colors.bg} ${colors.border} shadow-lg ${colors.glow}`
+                  : 'bg-white/5 border-white/10'
+              }`}
+            >
+              <div className="text-4xl mb-2 text-center">{achievement.icon}</div>
+              <div className="text-center mb-2">
+                <div className="font-semibold text-white text-sm">{achievement.title}</div>
+                <div className="text-white/50 text-xs">{achievement.description}</div>
+              </div>
+              
+              {!achievement.unlocked ? (
+                <div className="mt-3">
+                  <div className="flex justify-between text-xs text-white/60 mb-1">
+                    <span>Postęp</span>
+                    <span>{achievement.progress}/{achievement.maxProgress}</span>
+                  </div>
+                  <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${progressPercent}%` }}
+                      transition={{ duration: 1, delay: index * 0.05 }}
+                      className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-3 flex items-center justify-between">
+                  <span className="px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 text-xs">
+                    Odblokowano
+                  </span>
+                  <span className="text-amber-400 text-sm font-medium">
+                    +{achievement.xpReward} XP
+                  </span>
+                </div>
+              )}
+            </motion.div>
+          );
+        })}
+      </div>
+    </motion.section>
+  );
+};
+
+// ============================================================
+// GŁÓWNY KOMPONENT DASHBOARD
+// ============================================================
+
+interface DashboardProps {
+  user: {
+    name: string;
+    streak: number;
+    totalXP: number;
+    level: number;
+    lastActivity?: Date;
+    mood?: 'energetic' | 'tired' | 'focused' | 'neutral';
+  };
+  learningPath: {
+    modules: LearningPathModule[];
+    currentModuleId: string;
+    totalProgress: number;
+    estimatedCompletion: string;
+    profession: string;
+  };
+  dailyChallenge: DailyChallenge;
+  lastLesson: {
+    id: string;
+    title: string;
+    module: string;
+    progress: number;
+    thumbnail?: string;
+  };
+  quickQuizAvailable: boolean;
+  recommendedVideo?: {
+    id: string;
+    title: string;
+    duration: string;
+    thumbnail?: string;
+  };
+  aiRecommendations: AIRecommendation[];
+  learningStyle: {
+    visual: number;
+    auditory: number;
+    kinesthetic: number;
+  };
+  achievements: Achievement[];
+  recentUnlocks: Achievement[];
+  onAction: (action: string, data?: any) => void;
+}
+
+export const Dashboard: React.FC<DashboardProps> = ({
+  user,
+  learningPath,
+  dailyChallenge,
+  lastLesson,
+  quickQuizAvailable,
+  recommendedVideo,
+  aiRecommendations,
+  learningStyle,
+  achievements,
+  recentUnlocks,
+  onAction
+}) => {
+  const handleStartChallenge = () => onAction('start_challenge', dailyChallenge);
+  const handleContinueLesson = () => onAction('continue_lesson', lastLesson);
+  const handleStartQuiz = () => onAction('start_quiz');
+  const handleWatchVideo = () => onAction('watch_video', recommendedVideo);
+  const handleSelectRecommendation = (id: string) => onAction('select_recommendation', id);
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-950 to-black p-4 md:p-8">
+      <div className="max-w-7xl mx-auto">
+        <WelcomeHero
+          userName={user.name}
+          currentStreak={user.streak}
+          totalXP={user.totalXP}
+          level={user.level}
+          lastActivity={user.lastActivity}
+          mood={user.mood}
+        />
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2">
+            <LearningPathSection
+              modules={learningPath.modules}
+              currentModuleId={learningPath.currentModuleId}
+              totalProgress={learningPath.totalProgress}
+              estimatedCompletion={learningPath.estimatedCompletion}
+              profession={learningPath.profession}
+            />
+          </div>
+
+          <div className="lg:col-span-1">
+            <QuickActionsSection
+              dailyChallenge={dailyChallenge}
+              lastLesson={lastLesson}
+              quickQuizAvailable={quickQuizAvailable}
+              recommendedVideo={recommendedVideo}
+              onStartChallenge={handleStartChallenge}
+              onContinueLesson={handleContinueLesson}
+              onStartQuiz={handleStartQuiz}
+              onWatchVideo={handleWatchVideo}
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <AIRecommendationsSection
+            recommendations={aiRecommendations}
+            learningStyle={learningStyle}
+            onSelectRecommendation={handleSelectRecommendation}
+          />
+
+          <AchievementsSection
+            achievements={achievements}
+            recentUnlocks={recentUnlocks}
+            totalUnlocked={recentUnlocks.length}
+            totalAchievements={achievements.length}
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
