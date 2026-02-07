@@ -1,0 +1,149 @@
+// SkillTreeLogic.ts
+import { useState, useCallback, useEffect } from 'react';
+import { Node, Edge, MarkerType } from 'reactflow';
+import { SkillData, SkillStatus } from './SkillTreeSystem'; // Import typów z poprzedniego pliku
+
+// --- 1. MOCK BACKEND SERVICE (Symulacja bazy danych) ---
+// W prawdziwej apce tutaj byłby axios.get('/api/skills')
+const MOCK_DB = {
+  saveProgress: async (skillId: string): Promise<{ success: boolean; newXp: number }> => {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        resolve({ success: true, newXp: 150 });
+      }, 800); // Symulacja network lag
+    });
+  },
+  
+  fetchUserSkills: async (): Promise<string[]> => {
+    // Zwraca ID ukończonych skilli
+    return new Promise((resolve) => {
+      setTimeout(() => resolve(['s1']), 500);
+    });
+  }
+};
+
+// --- 2. CUSTOM HOOK (Business Logic) ---
+// To jest "mózg" Twojego komponentu
+export const useSkillEngine = (initialNodes: Node<SkillData>[], initialEdges: Edge[]) => {
+  const [nodes, setNodes] = useState(initialNodes);
+  const [edges, setEdges] = useState(initialEdges);
+  const [userXp, setUserXp] = useState(0);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [completedSkillIds, setCompletedSkillIds] = useState<Set<string>>(new Set());
+
+  // A. Inicjalizacja - pobierz dane z "backendu"
+  useEffect(() => {
+    const loadUserData = async () => {
+      setIsSyncing(true);
+      try {
+        const completed = await MOCK_DB.fetchUserSkills();
+        setCompletedSkillIds(new Set(completed));
+        // Tutaj normalnie byłby też fetch całego drzewka strukturą z CMS
+      } catch (err) {
+        console.error("Failed to load user progress", err);
+      } finally {
+        setIsSyncing(false);
+      }
+    };
+    loadUserData();
+  }, []);
+
+  // B. Przeliczanie stanu drzewa (Recalculate Graph)
+  // Uruchamia się automatycznie, gdy zmieni się lista ukończonych skilli
+  useEffect(() => {
+    setNodes((currentNodes) => {
+      return currentNodes.map((node) => {
+        // 1. Jeśli ukończony -> oznacz jako completed
+        if (completedSkillIds.has(node.id)) {
+          return { ...node, data: { ...node.data, status: 'completed' } };
+        }
+
+        // 2. Sprawdź prerequisites
+        const prerequisites = node.data.prerequisites;
+        const canUnlock = prerequisites.length === 0 || 
+                          prerequisites.every(reqId => completedSkillIds.has(reqId));
+
+        // 3. Update statusu
+        const newStatus: SkillStatus = canUnlock ? 'available' : 'locked';
+        
+        // Optymalizacja: nie zmieniaj referencji obiektu jeśli status się nie zmienił
+        if (node.data.status === newStatus) return node;
+
+        return { ...node, data: { ...node.data, status: newStatus } };
+      });
+    });
+
+    // Aktualizacja krawędzi (Edges) - kolorowanie ścieżek
+    setEdges((currentEdges) => {
+      return currentEdges.map(edge => {
+        const sourceCompleted = completedSkillIds.has(edge.source);
+        // Target jest dostępny jeśli jego prerekwizyty są spełnione (czyli sourceCompleted w prostym przypadku)
+        
+        if (sourceCompleted) {
+            return {
+                ...edge,
+                animated: true,
+                style: { ...edge.style, stroke: '#eab308', strokeWidth: 2 }
+            };
+        }
+        return {
+            ...edge,
+            animated: false,
+            style: { ...edge.style, stroke: '#64748b', strokeWidth: 1 }
+        };
+      });
+    });
+
+  }, [completedSkillIds, setNodes, setEdges]);
+
+  // C. Interakcje Użytkownika (Action Handlers)
+
+  const unlockSkill = useCallback(async (skillId: string) => {
+    // 1. Optimistic Update (natychmiastowa reakcja UI)
+    setCompletedSkillIds(prev => new Set(prev).add(skillId));
+    
+    // 2. API Call
+    setIsSyncing(true);
+    try {
+      const { newXp } = await MOCK_DB.saveProgress(skillId);
+      setUserXp(prev => prev + newXp);
+      console.log(`Synced: Skill ${skillId} saved. XP gained.`);
+    } catch (error) {
+      // Rollback w przypadku błędu
+      console.error("Sync failed!");
+      setCompletedSkillIds(prev => {
+        const next = new Set(prev);
+        next.delete(skillId);
+        return next;
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  }, []);
+
+  const startLesson = useCallback((skillId: string) => {
+    // Tutaj logika nawigacji:
+    // router.push(`/learn/${skillId}`);
+    console.log("Navigating to lesson engine for:", skillId);
+    
+    // DEMO ONLY: Symulacja ukończenia lekcji po 3 sekundach
+    setTimeout(() => {
+        if(window.confirm("Symulacja: Czy ukończyłeś lekcję?")) {
+            unlockSkill(skillId);
+        }
+    }, 1000);
+  }, [unlockSkill]);
+
+  return {
+    nodes,
+    edges,
+    onNodesChange: (changes: any) => {}, // W ReactFlow trzeba to spiąć z useNodesState jeśli chcemy drag&drop
+    onEdgesChange: (changes: any) => {},
+    userXp,
+    isSyncing,
+    actions: {
+      startLesson,
+      unlockSkill
+    }
+  };
+};
