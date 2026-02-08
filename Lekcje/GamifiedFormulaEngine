@@ -1,0 +1,211 @@
+// components/GamifiedFormulaEngine.tsx - VISUAL SHOWSTOPPER
+'use client';
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Zap, Clock, Puzzle, Battery, Award } from 'lucide-react';
+
+interface Formula {
+  id: string;
+  name: string;
+  funFactor: number;
+  visuals: { bgGradient: string; icon: string };
+  content: any;
+}
+
+const GamifiedFormulaEngine: React.FC<{ userId: string; topic?: string }> = ({ userId, topic = 'SEP_G1' }) => {
+  const [formula, setFormula] = useState<Formula | null>(null);
+  const [progress, setProgress] = useState(0);
+  const [stage, setStage] = useState<'loading' | 'active' | 'complete'>('loading');
+  const [particles, setParticles] = useState<number[]>([]);
+
+  useEffect(() => {
+    fetch(`/api/tasks/nextFormula?userId=${userId}&topic=${topic}`)
+      .then(res => res.json())
+      .then(data => {
+        setFormula(data.formula);
+        setProgress(data.userProgress);
+        setStage('active');
+      });
+  }, [userId, topic]);
+
+  const spawnParticles = () => {
+    const newParticles = Array.from({ length: 12 }, (_, i) => i);
+    setParticles(prev => [...prev, ...newParticles]);
+    setTimeout(() => setParticles(p => p.slice(12)), 2000);
+  };
+
+  const completeFormula = () => {
+    spawnParticles();
+    setStage('complete');
+    setTimeout(() => setStage('active'), 3000);
+  };
+
+  if (stage === 'loading') {
+    return (
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.8 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="glass-card p-12 text-center"
+      >
+        <div className="w-24 h-24 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+        <p className="text-xl font-bold text-white">Analizuję Twój progres...</p>
+      </motion.div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-black via-purple-900 to-black flex items-center justify-center p-8 overflow-hidden">
+      {/* Particle Background */}
+      <AnimatePresence>
+        {particles.map((p, i) => (
+          <motion.div
+            key={i}
+            className="absolute w-2 h-2 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full opacity-70"
+            initial={{ x: '50%', y: '50%' }}
+            animate={{
+              x: [null, Math.random() * 100 + '%'],
+              y: [null, Math.random() * 100 + '%'],
+              scale: [1, 0],
+              opacity: [0.7, 0]
+            }}
+            transition={{ duration: 2, ease: 'easeOut' }}
+          />
+        ))}
+      </AnimatePresence>
+
+      {/* MAIN GLASS CARD */}
+      <motion.div 
+        initial={{ y: 50, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        className={`glass-card relative ${formula?.visuals.bgGradient || 'from-blue-500 to-purple-600'} max-w-4xl w-full p-12 rounded-3xl shadow-2xl backdrop-blur-xl border border-white/20`}
+      >
+        {/* HEADER */}
+        <div className="flex items-center justify-between mb-12">
+          <motion.div 
+            className="flex items-center space-x-4"
+            whileHover={{ scale: 1.05 }}
+          >
+            <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">
+              {formula?.visuals.icon === '⚡' && <Zap className="w-10 h-10 text-yellow-300 drop-shadow-lg" />}
+              {formula?.visuals.icon === '⏰' && <Clock className="w-10 h-10 text-red-300 drop-shadow-lg" />}
+              {/* + inne ikony */}
+            </div>
+            <div>
+              <h1 className="text-4xl font-black text-white drop-shadow-2xl mb-2">{formula?.name}</h1>
+              <div className="flex items-center space-x-4 text-lg text-white/80">
+                <span>Fun: {formula?.funFactor}/10 🔥</span>
+                <div className="w-24 bg-white/10 rounded-full p-1">
+                  <div className="bg-gradient-to-r from-green-400 to-emerald-500 h-4 rounded-full" style={{ width: `${formula?.funFactor * 10}%` }} />
+                </div>
+              </div>
+            </div>
+          </motion.div>
+          <div className="text-right">
+            <p className="text-2xl font-bold text-yellow-400 mb-1">XP: {progress}</p>
+            <div className="w-32 bg-white/10 rounded-full p-1">
+              <div className="bg-gradient-to-r from-yellow-400 to-orange-500 h-3 rounded-full animate-pulse" style={{ width: '75%' }} />
+            </div>
+          </div>
+        </div>
+
+        {/* CONTENT AREA – Różne formuły */}
+        <AnimatePresence mode="wait">
+          {formula?.id === 'circuit-puzzle' && (
+            <CircuitPuzzle content={formula.content} onComplete={completeFormula} />
+          )}
+          {formula?.id === 'bhp-rush' && (
+            <BhpRush content={formula.content} onComplete={completeFormula} />
+          )}
+          {/* Dodaj DragScheme, EVSim podobnie */}
+        </AnimatePresence>
+
+        {/* CONTROLS */}
+        <div className="flex justify-center mt-12 space-x-6">
+          <motion.button
+            whileHover={{ scale: 1.05, boxShadow: '0 20px 40px rgba(0,255,0,0.3)' }}
+            whileTap={{ scale: 0.95 }}
+            className="px-12 py-4 bg-gradient-to-r from-emerald-500 to-green-600 text-xl font-bold rounded-2xl text-white shadow-2xl hover:from-emerald-600"
+            onClick={completeFormula}
+          >
+            ✅ Mission Complete!
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            className="px-8 py-4 bg-white/20 backdrop-blur-xl text-white rounded-2xl font-bold border border-white/30"
+          >
+            🔄 Next Challenge
+          </motion.button>
+        </div>
+
+        {/* ACHIEVEMENT BAR */}
+        <motion.div 
+          initial={{ scaleY: 0 }}
+          animate={{ scaleY: 1 }}
+          className="absolute bottom-4 left-4 right-4 bg-gradient-to-r from-yellow-500/90 to-orange-500/90 backdrop-blur-xl rounded-2xl p-4 flex items-center space-x-4"
+        >
+          <Award className="w-8 h-8 text-black" />
+          <span className="font-black text-lg text-black drop-shadow-lg">Achievement Unlocked: SEP Puzzle Master!</span>
+        </motion.div>
+      </motion.div>
+    </div>
+  );
+};
+
+// SUBKOMPONENTY – PIĘKNE FORMUŁY
+const CircuitPuzzle: React.FC<{ content: any; onComplete: () => void }> = ({ content, onComplete }) => (
+  <motion.div 
+    initial={{ opacity: 0, x: 100 }}
+    animate={{ opacity: 1, x: 0 }}
+    className="p-8 bg-white/10 backdrop-blur-xl rounded-2xl"
+  >
+    <h3 className="text-2xl font-bold mb-8 text-white">Połącz obwód PV! ⚡</h3>
+    <div className="grid grid-cols-4 gap-4 mb-8">
+      {content.components.map((comp: string, i: number) => (
+        <motion.div
+          key={i}
+          drag
+          dragConstraints={{ top: 0, left: 0, right: 0, bottom: 0 }}
+          className="p-6 bg-gradient-to-br from-gray-200 to-gray-300 rounded-xl cursor-grab active:cursor-grabbing shadow-lg hover:shadow-2xl"
+          whileDrag={{ scale: 1.1 }}
+        >
+          {comp}
+        </motion.div>
+      ))}
+    </div>
+    <button onClick={onComplete} className="w-full bg-green-500 text-white py-4 rounded-xl font-bold text-xl hover:bg-green-600">
+      Test Connection
+    </button>
+  </motion.div>
+);
+
+const BhpRush: React.FC<{ content: any; onComplete: () => void }> = ({ content, onComplete }) => (
+  <motion.div 
+    initial={{ opacity: 0, x: -100 }}
+    animate={{ opacity: 1, x: 0 }}
+    className="space-y-6"
+  >
+    <div className="flex items-center justify-between text-3xl font-mono">
+      <span>{content.timeLimit}s</span>
+      <Clock className="w-12 h-12 text-red-400 animate-spin-slow" />
+    </div>
+    {content.questions.map((q: any, i: number) => (
+      <div key={i} className="p-6 bg-white/20 rounded-xl backdrop-blur-sm">
+        <p className="text-xl mb-4">{q.q}</p>
+        <input className="w-full p-4 bg-white rounded-xl text-lg font-mono" placeholder="Twoja odpowiedź" />
+      </div>
+    ))}
+  </motion.div>
+);
+
+const glassCard = `
+  @layer utilities {
+    .glass-card {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+  }
+`;
+
+export default GamifiedFormulaEngine;
