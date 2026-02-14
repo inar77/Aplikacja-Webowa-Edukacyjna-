@@ -1,0 +1,221 @@
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+import {
+  Zap,
+  BookOpen,
+  LayoutDashboard,
+  Menu,
+  X,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { electricianLessons } from "@/lib/learning/electrician-lessons";
+import { loadProgress } from "@/lib/learning/progress";
+import { Dashboard } from "@/components/learning/Dashboard";
+import { LessonsList } from "@/components/learning/LessonsList";
+import { LessonPlayer } from "@/components/learning/LessonPlayer";
+import type { Lesson } from "@/lib/learning/types";
+import type { UserProgress } from "@/lib/learning/types";
+import { cn } from "@/lib/utils";
+
+type View = "dashboard" | "lessons" | "player";
+
+export default function Page() {
+  const [view, setView] = useState<View>("dashboard");
+    const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
+      const [progress, setProgress] = useState<UserProgress | null>(null);
+        const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+          useEffect(() => {
+              setProgress(loadProgress());
+                }, []);
+
+                  const refreshProgress = useCallback(() => {
+                      setProgress(loadProgress());
+                        }, []);
+
+                          const handleSelectLesson = useCallback((lesson: Lesson) => {
+                              setSelectedLesson(lesson);
+                                  setView("player");
+                                      setMobileMenuOpen(false);
+                                        }, []);
+
+                                          const handleBackToList = useCallback(() => {
+                                              setView("lessons");
+                                                  setSelectedLesson(null);
+                                                      refreshProgress();
+                                                        }, [refreshProgress]);
+
+                                                          const handleLessonComplete = useCallback(() => {
+                                                              refreshProgress();
+                                                                  // Stay on player to show completion screen
+                                                                    }, [refreshProgress]);
+
+  const navItems = [
+    { id: "dashboard" as View, label: "Dashboard", icon: LayoutDashboard },
+    { id: "lessons" as View, label: "Lekcje", icon: BookOpen },
+  ];
+
+  if (!progress) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <Zap className="h-8 w-8 animate-pulse text-primary" />
+          <p className="text-sm text-muted-foreground">Ladowanie...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex min-h-screen flex-col bg-background">
+      {/* Header */}
+      <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <Zap className="h-5 w-5" />
+            </div>
+            <span className="text-lg font-bold text-foreground">ElektryQ</span>
+          </div>
+
+          {/* Desktop nav */}
+          <nav className="hidden items-center gap-1 md:flex" aria-label="Nawigacja glowna">
+            {navItems.map((item) => (
+              <Button
+                key={item.id}
+                variant={
+                  view === item.id || (view === "player" && item.id === "lessons")
+                    ? "secondary"
+                    : "ghost"
+                }
+                size="sm"
+                onClick={() => {
+                  setView(item.id);
+                  if (item.id !== "player") setSelectedLesson(null);
+                }}
+                className="gap-2"
+              >
+                <item.icon className="h-4 w-4" />
+                {item.label}
+              </Button>
+            ))}
+          </nav>
+
+          {/* XP badge */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 rounded-full bg-secondary/20 px-3 py-1 text-sm font-semibold text-secondary-foreground">
+              <Zap className="h-4 w-4" />
+              {progress.totalXp} XP
+            </div>
+
+            {/* Mobile menu toggle */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label={mobileMenuOpen ? "Zamknij menu" : "Otworz menu"}
+            >
+              {mobileMenuOpen ? (
+                <X className="h-5 w-5" />
+              ) : (
+                <Menu className="h-5 w-5" />
+              )}
+            </Button>
+          </div>
+        </div>
+
+        {/* Mobile nav */}
+        {mobileMenuOpen && (
+          <div className="border-t border-border p-2 md:hidden">
+            {navItems.map((item) => (
+              <Button
+                key={item.id}
+                variant={
+                  view === item.id || (view === "player" && item.id === "lessons")
+                    ? "secondary"
+                    : "ghost"
+                }
+                className="w-full justify-start gap-2"
+                onClick={() => {
+                  setView(item.id);
+                  if (item.id !== "player") setSelectedLesson(null);
+                  setMobileMenuOpen(false);
+                }}
+              >
+                <item.icon className="h-4 w-4" />
+                {item.label}
+              </Button>
+            ))}
+          </div>
+        )}
+      </header>
+
+      {/* Main content */}
+      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
+        {view === "dashboard" && (
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-1">
+              <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+              <p className="text-sm text-muted-foreground">
+                Twoj postep w nauce zawodu elektryka
+              </p>
+            </div>
+            <Dashboard
+              progress={progress}
+              totalLessons={electricianLessons.length}
+            />
+
+            {/* Quick start */}
+            <div className="flex flex-col gap-3">
+              <h2 className="text-lg font-semibold text-foreground">
+                Szybki start
+              </h2>
+              <Button
+                size="lg"
+                className="w-full gap-2 md:w-fit"
+                onClick={() => setView("lessons")}
+              >
+                <BookOpen className="h-5 w-5" />
+                Przejdz do lekcji
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {view === "lessons" && (
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-1">
+              <h1 className="text-2xl font-bold text-foreground">
+                Lekcje: Elektryk
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                {electricianLessons.length} lekcji - wybierz typ i zacznij nauke
+              </p>
+            </div>
+            <LessonsList
+              lessons={electricianLessons}
+              onSelectLesson={handleSelectLesson}
+            />
+          </div>
+        )}
+
+        {view === "player" && selectedLesson && (
+          <LessonPlayer
+            lesson={selectedLesson}
+            onBack={handleBackToList}
+            onComplete={handleLessonComplete}
+          />
+        )}
+      </main>
+
+      {/* Footer */}
+      <footer className="border-t border-border bg-card px-4 py-4">
+        <div className="mx-auto max-w-5xl text-center text-xs text-muted-foreground">
+          ElektryQ - Nauka zawodow praktycznych
+        </div>
+      </footer>
+    </div>
+  );
+}
