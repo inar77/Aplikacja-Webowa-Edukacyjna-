@@ -1,0 +1,187 @@
+"use client";
+
+import { useState, useCallback } from "react";
+import { RotateCcw, ThumbsDown, ThumbsUp, Trophy, ArrowRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import type { FlashcardLessonData, Flashcard } from "@/lib/learning/types";
+import { sm2 } from "@/lib/learning/progress";
+import { cn } from "@/lib/utils";
+
+interface FlashcardLessonProps {
+  data: FlashcardLessonData;
+  onComplete: (score: number) => void;
+}
+
+export function FlashcardLesson({ data, onComplete }: FlashcardLessonProps) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [flipped, setFlipped] = useState(false);
+  const [knownCount, setKnownCount] = useState(0);
+  const [reviewedCards, setReviewedCards] = useState<Flashcard[]>([]);
+  const [finished, setFinished] = useState(false);
+
+  const card = data.cards[currentIndex];
+  const progressPercent = ((currentIndex + 1) / data.cards.length) * 100;
+
+  const handleFlip = useCallback(() => {
+    setFlipped((f) => !f);
+  }, []);
+
+  const handleRate = useCallback(
+    (quality: number) => {
+      // SM-2 update
+      const updated = sm2(
+        quality,
+        card.repetitions ?? 0,
+        card.easeFactor ?? 2.5,
+        card.interval ?? 0
+      );
+
+      const updatedCard = { ...card, ...updated };
+      setReviewedCards((prev) => [...prev, updatedCard]);
+
+      if (quality >= 3) setKnownCount((c) => c + 1);
+
+      if (currentIndex < data.cards.length - 1) {
+        setCurrentIndex((i) => i + 1);
+        setFlipped(false);
+      } else {
+        setFinished(true);
+        const score = Math.round(
+          ((knownCount + (quality >= 3 ? 1 : 0)) / data.cards.length) * 100
+        );
+        onComplete(score);
+      }
+    },
+    [card, currentIndex, data.cards.length, knownCount, onComplete]
+  );
+
+  if (finished) {
+    return (
+      <div className="flex flex-col items-center gap-6 py-8">
+        <div className="flex h-24 w-24 items-center justify-center rounded-full bg-accent text-accent-foreground">
+          <Trophy className="h-12 w-12" />
+        </div>
+        <h2 className="text-2xl font-bold text-foreground">
+          Fiszki ukonczone!
+        </h2>
+        <p className="text-lg text-muted-foreground">
+          Znales: {knownCount}/{data.cards.length}
+        </p>
+        <div className="flex gap-2">
+          <div className="rounded-full bg-accent/10 px-3 py-1 text-sm text-accent">
+            Znane: {knownCount}
+          </div>
+          <div className="rounded-full bg-destructive/10 px-3 py-1 text-sm text-destructive">
+            Do powtorki: {data.cards.length - knownCount}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      {/* Progress */}
+      <div className="flex items-center gap-3">
+        <span className="text-sm font-medium text-muted-foreground">
+          {currentIndex + 1}/{data.cards.length}
+        </span>
+        <Progress value={progressPercent} className="h-2 flex-1" />
+      </div>
+
+      {/* Flashcard */}
+      <div
+        className="perspective-1000 cursor-pointer"
+        onClick={handleFlip}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") handleFlip();
+        }}
+        aria-label={flipped ? "Odwroc na przod" : "Odwroc na tyl"}
+      >
+        <div
+          className={cn(
+            "relative min-h-[240px] w-full transition-transform duration-500",
+            flipped && "[transform:rotateY(180deg)]"
+          )}
+          style={{ transformStyle: "preserve-3d" }}
+        >
+          {/* Front */}
+          <Card
+            className={cn(
+              "absolute inset-0 flex items-center justify-center",
+              "[backface-visibility:hidden]"
+            )}
+          >
+            <CardContent className="flex flex-col items-center gap-4 p-8 text-center">
+              <span className="text-xs font-bold uppercase tracking-wider text-primary">
+                Pytanie
+              </span>
+              <p className="text-lg font-medium leading-relaxed text-foreground">
+                {card.front}
+              </p>
+              <span className="text-sm text-muted-foreground">
+                Kliknij aby odwrocic
+              </span>
+            </CardContent>
+          </Card>
+
+          {/* Back */}
+          <Card
+            className={cn(
+              "absolute inset-0 flex items-center justify-center",
+              "[backface-visibility:hidden] [transform:rotateY(180deg)]"
+            )}
+          >
+            <CardContent className="flex flex-col items-center gap-4 p-8 text-center">
+              <span className="text-xs font-bold uppercase tracking-wider text-accent">
+                Odpowiedz
+              </span>
+              <p className="text-lg font-medium leading-relaxed text-foreground">
+                {card.back}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Rating buttons (show when flipped) */}
+      {flipped && (
+        <div className="flex flex-col gap-3">
+          <p className="text-center text-sm text-muted-foreground">
+            Jak dobrze znales odpowiedz?
+          </p>
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              className="flex-1 gap-2 border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              onClick={() => handleRate(1)}
+            >
+              <ThumbsDown className="h-4 w-4" />
+              Nie wiedzialem
+            </Button>
+            <Button
+              variant="outline"
+              className="flex-1 gap-2 border-secondary/50 text-secondary-foreground hover:bg-secondary/50"
+              onClick={() => handleRate(3)}
+            >
+              <RotateCcw className="h-4 w-4" />
+              Prawie
+            </Button>
+            <Button
+              variant="outline"
+              className="flex-1 gap-2 border-accent/30 text-accent hover:bg-accent/10 hover:text-accent"
+              onClick={() => handleRate(5)}
+            >
+              <ThumbsUp className="h-4 w-4" />
+              Wiedzialem!
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
