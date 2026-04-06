@@ -1,0 +1,118 @@
+'use client';
+
+import React, { useState, useRef } from 'react';
+import { Camera, Upload, CheckCircle2, RefreshCw } from 'lucide-react';
+
+export default function PhotoTask() {
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [isVerified, setIsVerified] = useState(false);
+  
+  // Referencja do ukrytego inputa
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Funkcja odpalana, gdy użytkownik zrobi zdjęcie
+  const handlePhotoCapture = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Tworzymy tymczasowy URL do wyświetlenia zdjęcia w przeglądarce
+      const imageUrl = URL.createObjectURL(file);
+      setPhotoUrl(imageUrl);
+      setIsVerified(false);
+    }
+  };
+
+  // Symulacja wysyłania do "AI" do oceny
+  const handleVerify = () => {
+    setIsVerifying(true);
+    // Udajemy, że AI myśli przez 2.5 sekundy
+    setTimeout(() => {
+      setIsVerifying(false);
+      setIsVerified(true);
+    }, 2500);
+  };
+
+  return (
+    <div className="max-w-md mx-auto p-6 bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-800">
+      
+      <div className="mb-6">
+        <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">Zadanie Praktyczne</span>
+        <h2 className="text-xl font-bold text-gray-800 dark:text-white mt-1">Połącz przewody L i N</h2>
+        <p className="text-sm text-gray-500 mt-2">
+          Zbuduj układ i zrób mu zdjęcie, aby otrzymać punkty. Zadbaj o dobre światło!
+        </p>
+      </div>
+
+      {/* Główny obszar zdjęcia */}
+      <div className="relative aspect-square w-full bg-gray-50 dark:bg-gray-800 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-700 overflow-hidden mb-6 flex flex-col items-center justify-center">
+        
+        {photoUrl ? (
+          // Pokazujemy zrobione zdjęcie
+          <img src={photoUrl} alt="Twój układ" className="w-full h-full object-cover" />
+        ) : (
+          // Zachęta do zrobienia zdjęcia
+          <div className="text-center p-6">
+            <Camera className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+            <p className="text-gray-500 font-medium">Brak zdjęcia</p>
+          </div>
+        )}
+
+        {/* Ukryty input odpalający natywny aparat na telefonie */}
+        <input 
+          type="file" 
+          accept="image/*" 
+          capture="environment" // "environment" wymusza tylną kamerę
+          className="hidden" 
+          ref={fileInputRef}
+          onChange={handlePhotoCapture}
+        />
+      </div>
+
+      {/* Przyciski Akcji */}
+      <div className="space-y-3">
+        {!photoUrl ? (
+          <button 
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl flex items-center justify-center transition-colors"
+          >
+            <Camera className="w-5 h-5 mr-2" />
+            Otwórz aparat
+          </button>
+        ) : (
+          <>
+            {!isVerified && (
+              <button 
+                onClick={handleVerify}
+                disabled={isVerifying}
+                className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold rounded-xl flex items-center justify-center transition-colors"
+              >
+                {isVerifying ? (
+                  <RefreshCw className="w-5 h-5 mr-2 animate-spin" />
+                ) : (
+                  <Upload className="w-5 h-5 mr-2" />
+                )}
+                {isVerifying ? 'Sztuczna Inteligencja weryfikuje...' : 'Wyślij do oceny'}
+              </button>
+            )}
+
+            {isVerified && (
+              <div className="w-full py-3.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-semibold rounded-xl flex items-center justify-center">
+                <CheckCircle2 className="w-5 h-5 mr-2" />
+                Zadanie zaliczone! +20 XP
+              </div>
+            )}
+
+            {!isVerifying && !isVerified && (
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full py-3 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-xl transition-colors"
+              >
+                Zrób inne zdjęcie
+              </button>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
