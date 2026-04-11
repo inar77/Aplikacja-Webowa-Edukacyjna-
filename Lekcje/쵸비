@@ -1,0 +1,141 @@
+'use client';
+
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Lock, Unlock, Zap, AlertTriangle, Wrench } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+
+export function InteractiveFuseBox({ children }: { children?: React.ReactNode }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+
+  // Funkcja symulująca dźwięk (możesz dodać prawdziwy plik audio)
+  const toggleBox = () => {
+    // const audio = new Audio('/sounds/metal-door-open.mp3');
+    // audio.play();
+    setIsOpen(!isOpen);
+  };
+
+  return (
+    <div className="flex min-h-[600px] w-full items-center justify-center p-4">
+      {/* 
+        GŁÓWNY KONTENER Z PERSPEKTYWĄ 
+        To on daje efekt 3D. perspective-[1200px] oznacza odległość "oka" od ekranu.
+      */}
+      <div className="relative h-[500px] w-[400px] [perspective:1200px]">
+        
+        {/* =========================================
+            WNĘTRZE SKRZYNKI (Zadanie praktyczne)
+            ========================================= */}
+        <div className="absolute inset-0 rounded-xl border-[6px] border-neutral-800 bg-neutral-950 shadow-[inset_0_20px_50px_rgba(0,0,0,0.8)]">
+          {/* Tło wnętrza (szyna DIN / elektronika) */}
+          <div 
+            className="absolute inset-0 opacity-20"
+            style={{ 
+              backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 2px, transparent 2px)',
+              backgroundSize: '100% 40px' 
+            }}
+          />
+          
+          <div className="relative z-10 flex h-full flex-col items-center justify-center p-6 text-center">
+            {children ? children : (
+              // Placeholder, jeśli nie przekażesz zadania z kablami
+              <div className="text-white/50">
+                <Wrench className="mx-auto mb-4 h-12 w-12 opacity-50" />
+                <p className="font-mono text-sm uppercase tracking-widest">
+                  [ Moduł główny online ]<br/>
+                  Czeka na interwencje...
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* =========================================
+            DRZWI SKRZYNKI (Animowane w przestrzeni 3D)
+            ========================================= */}
+        <motion.div
+          className="absolute inset-0 z-20 origin-left"
+          // preserve-3d pozwala drzwiom mieć przód i tył
+          style={{ transformStyle: 'preserve-3d' }}
+          animate={{ 
+            rotateY: isOpen ? -110 : 0, // Kąt otwarcia drzwi (na zewnątrz)
+            boxShadow: isOpen 
+              ? '20px 10px 40px rgba(0,0,0,0.5)' 
+              : '0px 10px 30px rgba(0,0,0,0.7)'
+          }}
+          transition={{ 
+            type: "spring", 
+            stiffness: 40, 
+            damping: 12,
+            mass: 1.5 // Dodaje "ciężaru" metalowym drzwiom
+          }}
+        >
+          {/* FRONT DRZWI */}
+          <div 
+            className="absolute inset-0 flex flex-col items-center justify-center rounded-xl border-[4px] border-neutral-700 bg-gradient-to-br from-neutral-500 to-neutral-700 [backface-visibility:hidden]"
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+          >
+            {/* Tekstura zarysowanego metalu */}
+            <div 
+              className="pointer-events-none absolute inset-0 opacity-10 mix-blend-overlay"
+              style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/brushed-alum.png")' }}
+            />
+
+            {/* Żółto-czarne pasy ostrzegawcze na górze i dole */}
+            <div className="absolute top-0 h-8 w-full bg-[repeating-linear-gradient(45deg,#eab308,#eab308_20px,#000_20px,#000_40px)] opacity-80" />
+            <div className="absolute bottom-0 h-8 w-full bg-[repeating-linear-gradient(45deg,#eab308,#eab308_20px,#000_20px,#000_40px)] opacity-80" />
+
+            {/* Znak ostrzegawczy */}
+            <div className="relative mb-12 flex flex-col items-center rounded-lg border-4 border-yellow-500 bg-yellow-400 p-6 shadow-xl">
+              <Zap className="mb-2 h-16 w-16 text-black" />
+              <h2 className="text-center font-black uppercase tracking-black text-black">
+                Niebezpieczeństwo<br/>
+                Wysokie Napięcie
+              </h2>
+            </div>
+
+            {/* Klamka / Zamek do otwierania */}
+            <Button
+              onClick={toggleBox}
+              className={`
+                relative h-20 w-20 rounded-full border-4 border-neutral-800 bg-gradient-to-b from-neutral-300 to-neutral-500 text-black shadow-[0_10px_20px_rgba(0,0,0,0.5)] transition-all duration-300 hover:scale-105
+                ${isHovered ? 'ring-4 ring-cyan-500/50' : ''}
+              `}
+            >
+              {isOpen ? <Unlock className="h-8 w-8" /> : <Lock className="h-8 w-8" />}
+              {/* Odblask na klamce */}
+              <div className="absolute inset-x-2 top-1 h-4 rounded-full bg-white/30" />
+            </Button>
+            <p className="mt-4 font-mono text-sm font-bold text-neutral-900 mix-blend-overlay">
+              {isOpen ? 'ZAMKNIJ SKRZYNKĘ' : 'KLIKNIJ, ABY OTWORZYĆ'}
+            </p>
+          </div>
+
+          {/* TYŁ DRZWI (widoczny tylko po otwarciu) */}
+          <div 
+            className="absolute inset-0 rounded-xl border-[4px] border-neutral-800 bg-neutral-700 [backface-visibility:hidden] [transform:rotateY(180deg)]"
+          >
+            <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/brushed-alum.png")' }} />
+            
+            {/* Naklejka ze schematem na wewnętrznej stronie drzwi */}
+            <div className="absolute top-10 right-10 h-48 w-32 rotate-2 bg-yellow-100/90 p-2 shadow-sm">
+              <div className="h-2 w-full bg-neutral-300/50" />
+              <div className="mt-2 h-2 w-3/4 bg-neutral-300/50" />
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <div className="h-10 border border-neutral-400" />
+                <div className="h-10 border border-neutral-400" />
+                <div className="col-span-2 h-10 border border-neutral-400" />
+              </div>
+              <div className="absolute -top-3 left-1/2 h-6 w-12 -translate-x-1/2 bg-red-500/80 shadow-sm" /> {/* Taśma klejąca */}
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Cień pod skrzynką */}
+        <div className="absolute -bottom-10 left-1/2 h-4 w-3/4 -translate-x-1/2 rounded-full bg-black/60 blur-xl" />
+      </div>
+    </div>
+  );
+}
