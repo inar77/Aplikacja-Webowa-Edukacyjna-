@@ -1,0 +1,127 @@
+'use client';
+
+import React, { useRef } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { OrbitControls, Stars, Sphere } from '@react-three/drei';
+import * as THREE from 'three';
+
+// 1. Komponent samej kuli i pierścieni
+function HologramPlanet() {
+  const groupRef = useRef<THREE.Group>(null);
+  const ringsRef = useRef<THREE.Group>(null);
+
+  // useFrame działa jak requestAnimationFrame - wykonuje się 60 razy na sekundę
+  useFrame((state) => {
+    if (groupRef.current) {
+      // Powolny obrót samej kuli
+      groupRef.current.rotation.y += 0.002;
+      groupRef.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.5) * 0.1;
+    }
+    if (ringsRef.current) {
+      // Szybszy obrót pierścieni w przeciwną stronę
+      ringsRef.current.rotation.y -= 0.005;
+      ringsRef.current.rotation.z += 0.001;
+    }
+  });
+
+  return (
+    <group>
+      {/* GŁÓWNA KULA (Siatka Wireframe) */}
+      <group ref={groupRef}>
+        <Sphere args={[2, 32, 32]}>
+          <meshBasicMaterial
+            color="#06b6d4" // Cyan-500 z Tailwinda
+            wireframe={true}
+            transparent={true}
+            opacity={0.4}
+          />
+        </Sphere>
+        
+        {/* Wewnętrzny, lekko świecący rdzeń, żeby kula nie była całkiem pusta */}
+        <Sphere args={[1.9, 32, 32]}>
+          <meshBasicMaterial
+            color="#0891b2" // Ciemniejszy cyan
+            transparent={true}
+            opacity={0.1}
+          />
+        </Sphere>
+      </group>
+
+      {/* KRĄŻĄCE PIERŚCIENIE / ORBITY (Osiągnięcia/Dane) */}
+      <group ref={ringsRef} rotation={[Math.PI / 3, 0, 0]}>
+        {/* Zewnętrzny pierścień */}
+        <mesh>
+          <torusGeometry args={[2.8, 0.01, 16, 100]} />
+          <meshBasicMaterial color="#a855f7" transparent opacity={0.6} /> {/* Fioletowy */}
+        </mesh>
+        
+        {/* Krążący punkt danych na zewnętrznym pierścieniu */}
+        <mesh position={[2.8, 0, 0]}>
+          <sphereGeometry args={[0.08, 16, 16]} />
+          <meshBasicMaterial color="#ffffff" />
+        </mesh>
+
+        {/* Wewnętrzny pierścień */}
+        <mesh rotation={[0, Math.PI / 4, 0]}>
+          <torusGeometry args={[2.4, 0.01, 16, 100]} />
+          <meshBasicMaterial color="#22d3ee" transparent opacity={0.4} /> {/* Jasny cyan */}
+        </mesh>
+      </group>
+    </group>
+  );
+}
+
+// 2. Główny kontener z płótnem (Canvas)
+export function CyberGlobe() {
+  return (
+    <div className="relative h-[500px] w-full overflow-hidden rounded-3xl border border-white/10 bg-black/50 shadow-2xl backdrop-blur-md">
+      
+      {/* Nakładka UI (Tekst na górze) */}
+      <div className="pointer-events-none absolute left-6 top-6 z-10">
+        <div className="mb-2 flex items-center gap-2">
+          <div className="h-2 w-2 animate-pulse rounded-full bg-cyan-400" />
+          <span className="font-mono text-xs font-bold tracking-widest text-cyan-400">
+            SYSTEM ONLINE
+          </span>
+        </div>
+        <h2 className="text-2xl font-black text-white">Globalna Sieć</h2>
+        <p className="max-w-xs text-sm text-white/50">
+          Użyj myszy lub palca, aby obracać widok 3D i badać połączenia.
+        </p>
+      </div>
+
+      {/* PŁÓTNO 3D */}
+      <Canvas camera={{ position: [0, 0, 6], fov: 60 }}>
+        {/* Tło jako głęboka czerń kosmosu */}
+        <color attach="background" args={['#03050a']} />
+        
+        {/* Mgła, żeby tył kuli płynnie zanikał */}
+        <fog attach="fog" args={['#03050a', 5, 10]} />
+
+        {/* Gwiazdy (Z biblioteki Drei) */}
+        <Stars 
+          radius={50} 
+          depth={20} 
+          count={3000} 
+          factor={4} 
+          saturation={0} 
+          fade 
+          speed={1} 
+        />
+
+        {/* Nasza Hakerska Kula */}
+        <HologramPlanet />
+
+        {/* Kontrolki myszy (Obracanie, przybliżanie) */}
+        <OrbitControls 
+          enablePan={false} // Wyłączamy przesuwanie (prawy klik)
+          enableZoom={true} 
+          minDistance={3}   // Jak blisko można podejść
+          maxDistance={10}  // Jak daleko można odejść
+          autoRotate={false}
+          dampingFactor={0.05} // Miękki obrót (efekt masła)
+        />
+      </Canvas>
+    </div>
+  );
+}
