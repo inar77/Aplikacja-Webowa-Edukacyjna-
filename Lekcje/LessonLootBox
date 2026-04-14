@@ -1,0 +1,569 @@
+// components/Learning/LessonLootBox.jsx
+import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useCallback } from 'react';
+
+
+const COLORS = {
+  primary: '#7c3aed',
+  pink: '#ec4899',
+  green: '#10b981',
+  gold: '#f59e0b',
+  bg: '#f5f5f5',
+  card: '#ffffff',
+  gradientCTA: 'linear-gradient(135deg, #667eea, #764ba2)',
+  gradientGlow: 'radial-gradient(circle, rgba(124,58,237,0.3) 0%, transparent 70%)',
+  overlay: 'rgba(15, 10, 30, 0.85)',
+};
+
+
+  PARTICLES COMPONENT
+
+function Particles({ count = 20, colors = [COLORS.primary, COLORS.pink, COLORS.gold] }) {
+  return (
+    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
+      {Array.from({ length: count }).map((_, i) => {
+        const color = colors[i % colors.length];
+        const size = Math.random() * 6 + 3;
+        const startX = 50 + (Math.random() - 0.5) * 20;
+        const startY = 50;
+        const endX = Math.random() * 100;
+        const endY = Math.random() * 100;
+        const delay = Math.random() * 0.5;
+        const duration = 1.5 + Math.random();
+
+        return (
+          <motion.div
+            key={i}
+            initial={{ 
+              x: `${startX}%`, y: `${startY}%`, 
+              scale: 0, opacity: 1 
+            }}
+            animate={{ 
+              x: `${endX}%`, y: `${endY}%`, 
+              scale: [0, 1.5, 0], opacity: [1, 1, 0] 
+            }}
+            transition={{ 
+              duration, delay, ease: 'easeOut' 
+            }}
+            style={{
+              position: 'absolute',
+              width: size,
+              height: size,
+              borderRadius: '50%',
+              background: color,
+              boxShadow: `0 0 ${size * 2}px ${color}`,
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+
+function ChestCard({ lesson, phase, onOpen }) {
+  const isLocked = phase === 'locked';
+  const isAvailable = phase === 'available';
+  const isClaimed = phase === 'claimed';
+
+  // Ikony stanu skrzynki
+  const chestEmoji = {
+    locked: '',
+    available: '',
+    opening: '',
+    reveal: '',
+    claimed: '',
+  };
+
+  return (
+    <motion.div
+      whileHover={isAvailable ? { 
+        translateY: -4, 
+        boxShadow: '0 12px 32px rgba(124,58,237,0.25)' 
+      } : {}}
+      whileTap={isAvailable ? { scale: 0.97 } : {}}
+      onClick={isAvailable ? onOpen : undefined}
+      style={{
+        position: 'relative',
+        background: COLORS.card,
+        borderRadius: 20,
+        padding: 24,
+        cursor: isAvailable ? 'pointer' : 'default',
+        border: `2px solid ${isAvailable ? COLORS.primary : isClaimed ? COLORS.green : '#e5e7eb'}`,
+        boxShadow: isAvailable 
+          ? '0 8px 24px rgba(124,58,237,0.15)' 
+          : '0 4px 12px rgba(0,0,0,0.06)',
+        overflow: 'hidden',
+        opacity: isLocked ? 0.5 : 1,
+        filter: isLocked ? 'grayscale(0.6)' : 'none',
+        transition: 'border-color 0.3s, box-shadow 0.3s',
+        minHeight: 280,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 16,
+      }}
+    >
+      {/* Glow tło dla AVAILABLE */}
+      {isAvailable && (
+        <motion.div
+          animate={{ 
+            scale: [1, 1.2, 1], 
+            opacity: [0.3, 0.6, 0.3] 
+          }}
+          transition={{ 
+            duration: 2, repeat: Infinity, ease: 'easeInOut' 
+          }}
+          style={{
+            position: 'absolute',
+            inset: -40,
+            background: COLORS.gradientGlow,
+            pointerEvents: 'none',
+          }}
+        />
+      )}
+
+      {/* Claimed checkmark ribbon */}
+      {isClaimed && (
+        <div style={{
+          position: 'absolute',
+          top: 12,
+          right: 12,
+          background: COLORS.green,
+          color: 'white',
+          borderRadius: 12,
+          padding: '4px 12px',
+          fontSize: 12,
+          fontWeight: 700,
+        }}>
+          UKOŃCZONO
+        </div>
+      )}
+
+      {/* === CHEST ICON === */}
+      <motion.div
+        animate={isAvailable ? {
+          y: [0, -8, 0],
+          rotate: [0, -2, 2, 0],
+        } : {}}
+        transition={isAvailable ? {
+          duration: 3,
+          repeat: Infinity,
+          ease: 'easeInOut',
+        } : {}}
+        style={{ position: 'relative', zIndex: 1 }}
+      >
+        {/* Chest body */}
+        <div style={{
+          width: 100,
+          height: 100,
+          borderRadius: 16,
+          background: isAvailable
+            ? 'linear-gradient(145deg, #8b5cf6, #6d28d9)'
+            : isClaimed
+            ? 'linear-gradient(145deg, #10b981, #059669)'
+            : 'linear-gradient(145deg, #9ca3af, #6b7280)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 48,
+          boxShadow: isAvailable
+            ? '0 8px 32px rgba(124,58,237,0.4), inset 0 1px 0 rgba(255,255,255,0.2)'
+            : '0 4px 12px rgba(0,0,0,0.1)',
+          position: 'relative',
+        }}>
+          {/* Ikona lekcji wewnątrz skrzynki */}
+          <span>{lesson.icon || chestEmoji[phase]}</span>
+
+          {/* Pulsujący ring dla AVAILABLE */}
+          {isAvailable && (
+            <motion.div
+              animate={{ scale: [1, 1.4], opacity: [0.6, 0] }}
+              transition={{ duration: 1.5, repeat: Infinity }}
+              style={{
+                position: 'absolute',
+                inset: -6,
+                borderRadius: 22,
+                border: `2px solid ${COLORS.primary}`,
+              }}
+            />
+          )}
+        </div>
+      </motion.div>
+
+
+      <div style={{ textAlign: 'center', zIndex: 1 }}>
+        <h3 style={{
+          margin: 0,
+          fontSize: 18,
+          fontWeight: 700,
+          color: '#1f2937',
+        }}>
+          {lesson.title}
+        </h3>
+
+        {/* Meta info */}
+        <div style={{
+          display: 'flex',
+          gap: 12,
+          justifyContent: 'center',
+          marginTop: 8,
+          fontSize: 13,
+          color: '#6b7280',
+        }}>
+          <span> {lesson.xp} XP</span>
+          <span> {lesson.duration} min</span>
+          {lesson.xp >= 400 && <span> Odznaka</span>}
+        </div>
+      </div>
+
+      {/* === CTA BUTTON === */}
+      {isAvailable && (
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          style={{
+            background: COLORS.gradientCTA,
+            color: 'white',
+            border: 'none',
+            borderRadius: 14,
+            padding: '12px 32px',
+            fontSize: 15,
+            fontWeight: 700,
+            cursor: 'pointer',
+            zIndex: 1,
+            boxShadow: '0 4px 16px rgba(102,126,234,0.4)',
+            letterSpacing: 0.5,
+          }}
+        >
+           OTWÓRZ SKRZYNKĘ
+        </motion.button>
+      )}
+
+      {isLocked && (
+        <div style={{
+          fontSize: 13,
+          color: '#9ca3af',
+          textAlign: 'center',
+        }}>
+           Wymaga: {lesson.prerequisites?.join(', ') || 'brak'}
+        </div>
+      )}
+
+      {/* Floating particles for AVAILABLE */}
+      {isAvailable && <Particles count={8} colors={[COLORS.primary, COLORS.gold]} />}
+    </motion.div>
+  );
+}
+
+// ==========================================
+
+// ==========================================
+function OpeningOverlay() {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: COLORS.overlay,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+        flexDirection: 'column',
+      }}
+    >
+      {/* Skrzynka się trzęsie */}
+      <motion.div
+        animate={{
+          rotate: [0, -5, 5, -5, 5, -8, 8, -10, 10, 0],
+          scale: [1, 1.02, 0.98, 1.05, 0.97, 1.08, 1],
+        }}
+        transition={{ duration: 2.5, ease: 'easeInOut' }}
+        style={{ position: 'relative' }}
+      >
+        {/* Glow za skrzynką */}
+        <motion.div
+          animate={{
+            scale: [0.8, 2.5],
+            opacity: [0, 0.8],
+          }}
+          transition={{ duration: 2.5, ease: 'easeIn' }}
+          style={{
+            position: 'absolute',
+            width: 200,
+            height: 200,
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            background: 'radial-gradient(circle, rgba(124,58,237,0.6) 0%, rgba(236,72,153,0.3) 50%, transparent 70%)',
+            borderRadius: '50%',
+          }}
+        />
+
+        {/* Chest */}
+        <motion.div
+          animate={{ y: [0, -20, 0] }}
+          transition={{ duration: 0.4, repeat: 5, ease: 'easeInOut' }}
+          style={{
+            width: 140,
+            height: 140,
+            borderRadius: 24,
+            background: 'linear-gradient(145deg, #8b5cf6, #6d28d9)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 72,
+            boxShadow: '0 0 60px rgba(124,58,237,0.6), 0 0 120px rgba(124,58,237,0.3)',
+            position: 'relative',
+            zIndex: 2,
+          }}
+        >
+          
+        </motion.div>
+
+        {/* Light rays — promienie światła */}
+        {Array.from({ length: 12 }).map((_, i) => (
+          <motion.div
+            key={i}
+            initial={{ scaleY: 0, opacity: 0 }}
+            animate={{ scaleY: [0, 1], opacity: [0, 0.8, 0] }}
+            transition={{ duration: 1.5, delay: 1 + i * 0.05, ease: 'easeOut' }}
+            style={{
+              position: 'absolute',
+              width: 3,
+              height: 200,
+              background: `linear-gradient(to top, ${COLORS.primary}, ${COLORS.gold}, transparent)`,
+              top: '50%',
+              left: '50%',
+              transformOrigin: 'bottom center',
+              transform: `translate(-50%, -100%) rotate(${i * 30}deg)`,
+            }}
+          />
+        ))}
+      </motion.div>
+
+      {/* Tekst */}
+      <motion.p
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: [0, 1, 1, 0.5], y: 0 }}
+        transition={{ delay: 0.5, duration: 2 }}
+        style={{
+          color: 'white',
+          fontSize: 18,
+          fontWeight: 600,
+          marginTop: 32,
+          textShadow: '0 2px 10px rgba(124,58,237,0.5)',
+        }}
+      >
+         Otwieranie skrzynki rozdzielczej...
+      </motion.p>
+
+      {/* Particle explosion */}
+      <Particles count={40} colors={[COLORS.primary, COLORS.pink, COLORS.gold, COLORS.green]} />
+    </motion.div>
+  );
+}
+
+// ==========================================
+//  REWARD REVEAL — Nagrody wylatują
+// ==========================================
+function RewardReveal({ rewards }) {
+  if (!rewards) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: COLORS.overlay,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+        gap: 20,
+      }}
+    >
+      {/* Title */}
+      <motion.h2
+        initial={{ scale: 0, rotate: -10 }}
+        animate={{ scale: 1, rotate: 0 }}
+        transition={{ type: 'spring', stiffness: 200, damping: 12 }}
+        style={{
+          color: 'white',
+          fontSize: 28,
+          fontWeight: 800,
+          textShadow: '0 0 30px rgba(124,58,237,0.8)',
+          margin: 0,
+        }}
+      >
+         NAGRODY ZDOBYTE!
+      </motion.h2>
+
+      {/* Reward cards */}
+      <div style={{
+        display: 'flex',
+        gap: 16,
+        flexWrap: 'wrap',
+        justifyContent: 'center',
+        padding: '0 20px',
+      }}>
+        {rewards.map((reward, index) => (
+          <motion.div
+            key={reward.type}
+            initial={{ 
+              y: 100, opacity: 0, scale: 0.3, rotateY: 180 
+            }}
+            animate={{ 
+              y: 0, opacity: 1, scale: 1, rotateY: 0 
+            }}
+            transition={{
+              type: 'spring',
+              stiffness: 150,
+              damping: 15,
+              delay: index * 0.3,
+            }}
+            style={{
+              background: 'rgba(255,255,255,0.08)',
+              backdropFilter: 'blur(20px)',
+              border: `2px solid ${reward.color}`,
+              borderRadius: 20,
+              padding: '24px 32px',
+              textAlign: 'center',
+              minWidth: 120,
+              boxShadow: `0 0 30px ${reward.color}40, 0 8px 32px rgba(0,0,0,0.3)`,
+            }}
+          >
+            {/* Reward icon */}
+            <motion.div
+              animate={{ 
+                y: [0, -8, 0], 
+                scale: [1, 1.1, 1] 
+              }}
+              transition={{ 
+                duration: 2, repeat: Infinity, delay: index * 0.2 
+              }}
+              style={{ fontSize: 48, marginBottom: 8 }}
+            >
+              {reward.icon}
+            </motion.div>
+
+            {/* Reward value */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: index * 0.3 + 0.5 }}
+              style={{
+                color: reward.color,
+                fontSize: 24,
+                fontWeight: 800,
+                textShadow: `0 0 20px ${reward.color}60`,
+              }}
+            >
+              {reward.type === 'badge' ? reward.value : `+${reward.value}`}
+            </motion.div>
+
+            {/* Reward label */}
+            <div style={{
+              color: 'rgba(255,255,255,0.7)',
+              fontSize: 12,
+              fontWeight: 600,
+              textTransform: 'uppercase',
+              letterSpacing: 1,
+              marginTop: 4,
+            }}>
+              {reward.type === 'xp' ? 'Doświadczenie' : reward.type === 'coins' ? 'Monety' : 'Odznaka'}
+            </div>
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Collect button */}
+      <motion.button
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: rewards.length * 0.3 + 0.8 }}
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        style={{
+          background: COLORS.green,
+          color: 'white',
+          border: 'none',
+          borderRadius: 16,
+          padding: '14px 48px',
+          fontSize: 17,
+          fontWeight: 700,
+          cursor: 'pointer',
+          marginTop: 12,
+          boxShadow: `0 4px 20px ${COLORS.green}60`,
+        }}
+      >
+         ODBIERZ NAGRODY!
+      </motion.button>
+
+      {/* Confetti particles */}
+      <Particles count={50} colors={[COLORS.primary, COLORS.pink, COLORS.gold, COLORS.green, '#ffffff']} />
+    </motion.div>
+  );
+}
+
+// ==========================================
+
+// ==========================================
+export function LessonLootBox({ lesson, isUnlocked, isCompleted, onOpen }) {
+  const [phase, setPhase] = useState(
+    isCompleted ? 'claimed' : isUnlocked ? 'available' : 'locked'
+  );
+  const [rewards, setRewards] = useState(null);
+
+  const handleOpen = useCallback(async () => {
+    if (phase !== 'available') return;
+    setPhase('opening');
+
+    // Generuj nagrody
+    const earnedRewards = [
+      { type: 'xp', value: lesson.xp, icon: '', color: COLORS.primary },
+      { type: 'coins', value: Math.floor(lesson.xp * 0.3), icon: '🪙', color: COLORS.gold },
+      lesson.xp >= 400 && { type: 'badge', value: lesson.title, icon: '', color: COLORS.pink },
+    ].filter(Boolean);
+
+    // Po 2.5s przejdź do REVEAL
+    setTimeout(() => {
+      setRewards(earnedRewards);
+      setPhase('reveal');
+    }, 2500);
+
+    // Po 6s — CLAIMED + dispatch events
+    setTimeout(() => {
+      setPhase('claimed');
+      onOpen?.(earnedRewards);
+
+      //  Notyfikacja
+      window.dispatchEvent(new CustomEvent('showNotification', {
+        detail: {
+          type: 'success',
+          message: ` Zdobyto ${lesson.xp} XP i ${Math.floor(lesson.xp * 0.3)} monet!`,
+          duration: 4000,
+        },
+      }));
+    }, 6000);
+  }, [phase, lesson, onOpen]);
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <ChestCard lesson={lesson} phase={phase} onOpen={handleOpen} />
+      <AnimatePresence>
+        {phase === 'opening' && <OpeningOverlay />}
+        {phase === 'reveal' && <RewardReveal rewards={rewards} />}
+      </AnimatePresence>
+    </div>
+  );
+}
