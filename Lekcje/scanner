@@ -1,0 +1,1024 @@
+// components/Scanner/AIScanner.jsx
+import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
+import { useState, useRef, useCallback, useEffect } from 'react';
+
+// ==========================================
+// 🎨 DESIGN TOKENS
+// ==========================================
+const T = {
+  primary: '#7c3aed',
+  pink: '#ec4899',
+  green: '#10b981',
+  gold: '#f59e0b',
+  red: '#ef4444',
+  cyan: '#06b6d4',
+  bg: '#0f0a1e',
+  card: '#1a1235',
+  glass: 'rgba(255,255,255,0.06)',
+  gradientCTA: 'linear-gradient(135deg, #667eea, #764ba2)',
+  glow: (c, a = 0.4) => `0 0 30px ${c}${Math.round(a * 255).toString(16).padStart(2, '0')}`,
+};
+
+// ==========================================
+// ✨ CONFETTI ENGINE (Canvas-based)
+// ==========================================
+function ConfettiCanvas({ active, duration = 4000 }) {
+  const canvasRef = useRef(null);
+  const particles = useRef([]);
+  const animFrame = useRef(null);
+
+  useEffect(() => {
+    if (!active) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const colors = [T.primary, T.pink, T.gold, T.green, T.cyan, '#ffffff', '#ff6b6b', '#48dbfb'];
+    const shapes = ['rect', 'circle', 'strip'];
+
+    // Generuj 200 particli
+    particles.current = Array.from({ length: 200 }, () => ({
+      x: Math.random() * canvas.width,
+      y: -20 - Math.random() * canvas.height * 0.5,
+      vx: (Math.random() - 0.5) * 8,
+      vy: Math.random() * 4 + 2,
+      rotation: Math.random() * 360,
+      rotationSpeed: (Math.random() - 0.5) * 12,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      size: Math.random() * 8 + 3,
+      shape: shapes[Math.floor(Math.random() * shapes.length)],
+      gravity: 0.12 + Math.random() * 0.08,
+      drag: 0.98 + Math.random() * 0.015,
+      opacity: 1,
+      wobble: Math.random() * Math.PI * 2,
+      wobbleSpeed: 0.03 + Math.random() * 0.05,
+    }));
+
+    let startTime = Date.now();
+
+    const draw = () => {
+      const elapsed = Date.now() - startTime;
+      const fade = elapsed > duration * 0.7 ? 1 - (elapsed - duration * 0.7) / (duration * 0.3) : 1;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      particles.current.forEach(p => {
+        p.vy += p.gravity;
+        p.vx *= p.drag;
+        p.x += p.vx + Math.sin(p.wobble) * 1.5;
+        p.y += p.vy;
+        p.rotation += p.rotationSpeed;
+        p.wobble += p.wobbleSpeed;
+        p.opacity = fade;
+
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate((p.rotation * Math.PI) / 180);
+        ctx.globalAlpha = p.opacity;
+        ctx.fillStyle = p.color;
+
+        if (p.shape === 'rect') {
+          ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
+        } else if (p.shape === 'circle') {
+          ctx.beginPath();
+          ctx.arc(0, 0, p.size / 2, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          ctx.fillRect(-p.size / 2, -p.size * 1.5 / 2, p.size * 0.3, p.size * 1.5);
+        }
+        ctx.restore();
+      });
+
+      if (elapsed < duration) {
+        animFrame.current = requestAnimationFrame(draw);
+      }
+    };
+
+    draw();
+    return () => cancelAnimationFrame(animFrame.current);
+  }, [active, duration]);
+
+  if (!active) return null;
+
+  return (
+    <canvas
+      ref={canvasRef}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 9999,
+        pointerEvents: 'none',
+      }}
+    />
+  );
+}
+
+// ==========================================
+// 📐 SCAN LINE COMPONENT
+// ==========================================
+function ScanLine({ scanning }) {
+  return (
+    <motion.div
+      initial={{ top: '0%' }}
+      animate={scanning ? {
+        top: ['0%', '100%', '0%'],
+      } : { top: '0%' }}
+      transition={{
+        duration: 3,
+        repeat: scanning ? Infinity : 0,
+        ease: 'linear',
+      }}
+      style={{
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        height: 3,
+        background: `linear-gradient(90deg, transparent 0%, ${T.cyan} 20%, #ffffff 50%, ${T.cyan} 80%, transparent 100%)`,
+        boxShadow: `0 0 20px ${T.cyan}, 0 0 60px ${T.cyan}80, 0 0 100px ${T.cyan}40`,
+        zIndex: 10,
+        opacity: scanning ? 1 : 0,
+      }}
+    >
+      {/* Side glow wings */}
+      <div style={{
+        position: 'absolute',
+        top: -30,
+        left: 0,
+        right: 0,
+        height: 60,
+        background: `linear-gradient(180deg, transparent, ${T.cyan}15, transparent)`,
+      }} />
+    </motion.div>
+  );
+}
+
+// ==========================================
+// 📍 DETECTION POINT (pulsujący punkt na zdjęciu)
+// ==========================================
+function DetectionPoint({ x, y, label, status, delay, icon }) {
+  const isGood = status === 'ok';
+  const color = isGood ? T.green : T.red;
+
+  return (
+    <motion.div
+      initial={{ scale: 0, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      transition={{
+        type: 'spring',
+        stiffness: 300,
+        damping: 20,
+        delay,
+      }}
+      style={{
+        position: 'absolute',
+        left: `${x}%`,
+        top: `${y}%`,
+        transform: 'translate(-50%, -50%)',
+        zIndex: 20,
+      }}
+    >
+      {/* Outer pulse ring */}
+      <motion.div
+        animate={{
+          scale: [1, 2.5],
+          opacity: [0.6, 0],
+        }}
+        transition={{
+          duration: 1.5,
+          repeat: Infinity,
+          delay: delay + 0.3,
+        }}
+        style={{
+          position: 'absolute',
+          width: 24,
+          height: 24,
+          borderRadius: '50%',
+          border: `2px solid ${color}`,
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+        }}
+      />
+
+      {/* Inner dot */}
+      <motion.div
+        animate={{ scale: [1, 1.2, 1] }}
+        transition={{ duration: 1, repeat: Infinity }}
+        style={{
+          width: 14,
+          height: 14,
+          borderRadius: '50%',
+          background: color,
+          boxShadow: `0 0 12px ${color}, 0 0 24px ${color}80`,
+          border: '2px solid white',
+        }}
+      />
+
+      {/* Label tooltip */}
+      <motion.div
+        initial={{ x: 10, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+        transition={{ delay: delay + 0.4 }}
+        style={{
+          position: 'absolute',
+          left: 22,
+          top: '50%',
+          transform: 'translateY(-50%)',
+          background: 'rgba(0,0,0,0.85)',
+          backdropFilter: 'blur(10px)',
+          border: `1px solid ${color}60`,
+          borderRadius: 10,
+          padding: '6px 12px',
+          whiteSpace: 'nowrap',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+        }}
+      >
+        <span style={{ fontSize: 14 }}>{icon}</span>
+        <span style={{
+          color: 'white',
+          fontSize: 12,
+          fontWeight: 600,
+        }}>
+          {label}
+        </span>
+        <span style={{
+          fontSize: 11,
+          color,
+          fontWeight: 700,
+        }}>
+          {isGood ? '✓' : '✗'}
+        </span>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ==========================================
+// 🔢 XP COUNTER (animowany licznik)
+// ==========================================
+function XPCounter({ target, duration = 2 }) {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    if (target === 0) return;
+    let start = 0;
+    const step = target / (duration * 60);
+    const interval = setInterval(() => {
+      start += step;
+      if (start >= target) {
+        setCount(target);
+        clearInterval(interval);
+      } else {
+        setCount(Math.floor(start));
+      }
+    }, 1000 / 60);
+    return () => clearInterval(interval);
+  }, [target, duration]);
+
+  return (
+    <motion.div
+      initial={{ scale: 0 }}
+      animate={{ scale: 1 }}
+      transition={{ type: 'spring', stiffness: 200, delay: 0.5 }}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+      }}
+    >
+      <motion.span
+        animate={{ rotate: [0, 10, -10, 0] }}
+        transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 2 }}
+        style={{ fontSize: 36 }}
+      >
+        ⚡
+      </motion.span>
+      <span style={{
+        fontSize: 48,
+        fontWeight: 900,
+        background: `linear-gradient(135deg, ${T.primary}, ${T.pink})`,
+        WebkitBackgroundClip: 'text',
+        WebkitTextFillColor: 'transparent',
+        fontFamily: 'monospace',
+      }}>
+        +{count}
+      </span>
+      <span style={{
+        fontSize: 20,
+        fontWeight: 700,
+        color: 'rgba(255,255,255,0.6)',
+      }}>
+        XP
+      </span>
+    </motion.div>
+  );
+}
+
+// ==========================================
+// 📊 SCORE RING (kołowy progress)
+// ==========================================
+function ScoreRing({ score, size = 100 }) {
+  const radius = (size - 12) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const color = score >= 80 ? T.green : score >= 50 ? T.gold : T.red;
+
+  return (
+    <motion.div
+      initial={{ scale: 0, rotate: -90 }}
+      animate={{ scale: 1, rotate: 0 }}
+      transition={{ type: 'spring', stiffness: 150, delay: 0.3 }}
+      style={{ position: 'relative', width: size, height: size }}
+    >
+      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+        {/* Background ring */}
+        <circle
+          cx={size / 2} cy={size / 2} r={radius}
+          fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth={8}
+        />
+        {/* Progress ring */}
+        <motion.circle
+          cx={size / 2} cy={size / 2} r={radius}
+          fill="none"
+          stroke={color}
+          strokeWidth={8}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          initial={{ strokeDashoffset: circumference }}
+          animate={{ strokeDashoffset: circumference * (1 - score / 100) }}
+          transition={{ duration: 2, delay: 0.5, ease: 'easeOut' }}
+          style={{
+            filter: `drop-shadow(0 0 8px ${color})`,
+          }}
+        />
+      </svg>
+      <div style={{
+        position: 'absolute',
+        inset: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'column',
+      }}>
+        <motion.span
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.5 }}
+          style={{ fontSize: 28, fontWeight: 900, color: 'white' }}
+        >
+          {score}%
+        </motion.span>
+      </div>
+    </motion.div>
+  );
+}
+
+// ==========================================
+// 🎯 MAIN: AIScanner Component
+// ==========================================
+const PHASES = {
+  IDLE: 'idle',
+  UPLOADING: 'uploading',
+  SCANNING: 'scanning',
+  DETECTING: 'detecting',
+  RESULTS: 'results',
+  SUCCESS: 'success',
+};
+
+// Symulowane wykrycia AI
+const MOCK_DETECTIONS = [
+  { id: 1, x: 25, y: 35, label: 'Uziemienie PE', status: 'ok', icon: '🟢' },
+  { id: 2, x: 60, y: 25, label: 'Kabel L (faza)', status: 'ok', icon: '🔴' },
+  { id: 3, x: 45, y: 65, label: 'Kabel N (neutral)', status: 'ok', icon: '🔵' },
+  { id: 4, x: 75, y: 50, label: 'Izolacja terminala', status: 'ok', icon: '🛡️' },
+  { id: 5, x: 35, y: 80, label: 'Moment dokręcenia', status: 'ok', icon: '🔧' },
+];
+
+export function AIScanner({ onComplete, lessonContext }) {
+  const [phase, setPhase] = useState(PHASES.IDLE);
+  const [imageUrl, setImageUrl] = useState(null);
+  const [detections, setDetections] = useState([]);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [score, setScore] = useState(0);
+  const [xpEarned, setXpEarned] = useState(0);
+  const fileInputRef = useRef(null);
+
+  // ---- UPLOAD HANDLER ----
+  const handleImageSelect = useCallback((e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setImageUrl(ev.target.result);
+      setPhase(PHASES.UPLOADING);
+
+      // Symuluj upload
+      setTimeout(() => {
+        setPhase(PHASES.SCANNING);
+      }, 800);
+
+      // Po skanowaniu → detekcje
+      setTimeout(() => {
+        setPhase(PHASES.DETECTING);
+        // Dodawaj detekcje jedna po drugiej
+        MOCK_DETECTIONS.forEach((det, i) => {
+          setTimeout(() => {
+            setDetections(prev => [...prev, det]);
+          }, i * 600);
+        });
+      }, 4000);
+
+      // Wyniki
+      setTimeout(() => {
+        setPhase(PHASES.RESULTS);
+        setScore(92);
+        setXpEarned(50);
+      }, 4000 + MOCK_DETECTIONS.length * 600 + 500);
+
+      // Sukces z konfetti
+      setTimeout(() => {
+        setPhase(PHASES.SUCCESS);
+        setShowConfetti(true);
+        setTimeout(() => setShowConfetti(false), 5000);
+      }, 4000 + MOCK_DETECTIONS.length * 600 + 2000);
+    };
+    reader.readAsDataURL(file);
+  }, []);
+
+  // ---- Camera fallback ----
+  const handleCameraCapture = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  // ---- RESET ----
+  const handleReset = useCallback(() => {
+    setPhase(PHASES.IDLE);
+    setImageUrl(null);
+    setDetections([]);
+    setShowConfetti(false);
+    setScore(0);
+    setXpEarned(0);
+  }, []);
+
+  return (
+    <div style={{
+      minHeight: '100vh',
+      background: T.bg,
+      position: 'relative',
+      overflow: 'hidden',
+    }}>
+      {/* CONFETTI */}
+      <ConfettiCanvas active={showConfetti} />
+
+      {/* HIDDEN FILE INPUT */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={handleImageSelect}
+        style={{ display: 'none' }}
+      />
+
+      {/* ============ PHASE: IDLE ============ */}
+      <AnimatePresence mode="wait">
+        {phase === PHASES.IDLE && (
+          <motion.div
+            key="idle"
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -30 }}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minHeight: '100vh',
+              padding: 24,
+              gap: 24,
+            }}
+          >
+            {/* Scanner icon */}
+            <motion.div
+              animate={{
+                boxShadow: [
+                  `0 0 30px ${T.cyan}40`,
+                  `0 0 60px ${T.cyan}60`,
+                  `0 0 30px ${T.cyan}40`,
+                ],
+              }}
+              transition={{ duration: 2, repeat: Infinity }}
+              style={{
+                width: 120,
+                height: 120,
+                borderRadius: 30,
+                background: `linear-gradient(145deg, ${T.card}, rgba(6,182,212,0.15))`,
+                border: `2px solid ${T.cyan}40`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 56,
+              }}
+            >
+              🔍
+            </motion.div>
+
+            <h2 style={{
+              color: 'white',
+              fontSize: 24,
+              fontWeight: 800,
+              textAlign: 'center',
+              margin: 0,
+            }}>
+              Skaner AI Instalacji
+            </h2>
+
+            <p style={{
+              color: 'rgba(255,255,255,0.5)',
+              fontSize: 14,
+              textAlign: 'center',
+              maxWidth: 300,
+              lineHeight: 1.6,
+            }}>
+              Zrób zdjęcie instalacji elektrycznej. AI przeanalizuje poprawność podłączeń.
+            </p>
+
+            {/* CTA Buttons */}
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={handleCameraCapture}
+                style={{
+                  background: T.gradientCTA,
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 16,
+                  padding: '16px 32px',
+                  fontSize: 16,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  boxShadow: T.glow(T.primary),
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                }}
+              >
+                📸 Zrób Zdjęcie
+              </motion.button>
+
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => fileInputRef.current?.click()}
+                style={{
+                  background: T.glass,
+                  color: 'white',
+                  border: `1px solid rgba(255,255,255,0.15)`,
+                  borderRadius: 16,
+                  padding: '16px 32px',
+                  fontSize: 16,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  backdropFilter: 'blur(10px)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                }}
+              >
+                🖼️ Wybierz z Galerii
+              </motion.button>
+            </div>
+
+            {/* Tips */}
+            <div style={{
+              background: T.glass,
+              borderRadius: 16,
+              padding: 16,
+              maxWidth: 350,
+              border: `1px solid rgba(255,255,255,0.08)`,
+            }}>
+              <div style={{ color: T.gold, fontSize: 13, fontWeight: 700, marginBottom: 8 }}>
+                💡 WSKAZÓWKI:
+              </div>
+              {['Dobrze oświetl instalację', 'Zrób zdjęcie z bliska', 'Upewnij się, że kable są widoczne'].map((tip, i) => (
+                <div key={i} style={{
+                  color: 'rgba(255,255,255,0.5)',
+                  fontSize: 12,
+                  padding: '3px 0',
+                }}>
+                  • {tip}
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+
+        {/* ============ PHASE: SCANNING / DETECTING ============ */}
+        {(phase === PHASES.UPLOADING || phase === PHASES.SCANNING || phase === PHASES.DETECTING || phase === PHASES.RESULTS) && (
+          <motion.div
+            key="scanning"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              minHeight: '100vh',
+              padding: 20,
+              gap: 20,
+            }}
+          >
+            {/* Header */}
+            <motion.div
+              initial={{ y: -20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                paddingTop: 20,
+              }}
+            >
+              <motion.div
+                animate={phase === PHASES.SCANNING ? {
+                  rotate: 360,
+                } : {}}
+                transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+                style={{ fontSize: 28 }}
+              >
+                {phase === PHASES.SCANNING ? '🔄' :
+                 phase === PHASES.DETECTING ? '🎯' :
+                 phase === PHASES.RESULTS ? '✅' : '📤'}
+              </motion.div>
+              <div>
+                <h3 style={{ color: 'white', margin: 0, fontSize: 18, fontWeight: 700 }}>
+                  {phase === PHASES.UPLOADING && 'Przesyłanie zdjęcia...'}
+                  {phase === PHASES.SCANNING && 'Skanowanie AI w toku...'}
+                  {phase === PHASES.DETECTING && `Wykrywanie elementów (${detections.length}/${MOCK_DETECTIONS.length})`}
+                  {phase === PHASES.RESULTS && 'Analiza zakończona!'}
+                </h3>
+                <p style={{ color: 'rgba(255,255,255,0.4)', margin: 0, fontSize: 12 }}>
+                  {lessonContext?.title || 'Instalacja elektryczna'}
+                </p>
+              </div>
+            </motion.div>
+
+            {/* IMAGE FRAME ze skanem */}
+            <motion.div
+              layout
+              style={{
+                position: 'relative',
+                width: '100%',
+                maxWidth: 500,
+                borderRadius: 20,
+                overflow: 'hidden',
+                border: `2px solid ${
+                  phase === PHASES.SCANNING ? T.cyan :
+                  phase === PHASES.RESULTS ? T.green : T.primary
+                }40`,
+                boxShadow: T.glow(
+                  phase === PHASES.SCANNING ? T.cyan : T.primary, 0.3
+                ),
+              }}
+            >
+              {/* Image */}
+              <img
+                src={imageUrl}
+                alt="Zdjęcie instalacji"
+                style={{
+                  width: '100%',
+                  display: 'block',
+                  filter: phase === PHASES.SCANNING ? 'brightness(0.7) contrast(1.2)' : 'none',
+                  transition: 'filter 0.5s',
+                }}
+              />
+
+              {/* Scan overlay grid */}
+              {phase === PHASES.SCANNING && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 0.3 }}
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    backgroundImage: `
+                      linear-gradient(${T.cyan}15 1px, transparent 1px),
+                      linear-gradient(90deg, ${T.cyan}15 1px, transparent 1px)
+                    `,
+                    backgroundSize: '40px 40px',
+                  }}
+                />
+              )}
+
+              {/* SCAN LINE */}
+              <ScanLine scanning={phase === PHASES.SCANNING} />
+
+              {/* Corner brackets (scanner frame) */}
+              {[
+                { top: 12, left: 12, borderTop: '3px', borderLeft: '3px' },
+                { top: 12, right: 12, borderTop: '3px', borderRight: '3px' },
+                { bottom: 12, left: 12, borderBottom: '3px', borderLeft: '3px' },
+                { bottom: 12, right: 12, borderBottom: '3px', borderRight: '3px' },
+              ].map((pos, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, scale: 0.5 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.2 + i * 0.1 }}
+                  style={{
+                    position: 'absolute',
+                    width: 24,
+                    height: 24,
+                    ...pos,
+                    borderColor: T.cyan,
+                    borderStyle: 'solid',
+                    borderWidth: 0,
+                    ...Object.fromEntries(
+                      Object.entries(pos)
+                        .filter(([k]) => k.startsWith('border'))
+                        .map(([k, v]) => [k + 'Width', v])
+                    ),
+                    borderTopWidth: pos.borderTop ? 3 : 0,
+                    borderBottomWidth: pos.borderBottom ? 3 : 0,
+                    borderLeftWidth: pos.borderLeft ? 3 : 0,
+                    borderRightWidth: pos.borderRight ? 3 : 0,
+                    borderColor: T.cyan,
+                    borderRadius: 4,
+                  }}
+                />
+              ))}
+
+              {/* DETECTION POINTS */}
+              <AnimatePresence>
+                {detections.map((det, i) => (
+                  <DetectionPoint
+                    key={det.id}
+                    x={det.x}
+                    y={det.y}
+                    label={det.label}
+                    status={det.status}
+                    icon={det.icon}
+                    delay={0}
+                  />
+                ))}
+              </AnimatePresence>
+            </motion.div>
+
+            {/* Detection list */}
+            {detections.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                style={{
+                  width: '100%',
+                  maxWidth: 500,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 6,
+                }}
+              >
+                {detections.map((det, i) => (
+                  <motion.div
+                    key={det.id}
+                    initial={{ x: -30, opacity: 0 }}
+                    animate={{ x: 0, opacity: 1 }}
+                    transition={{ delay: i * 0.1 }}
+                    style={{
+                      background: T.glass,
+                      borderRadius: 12,
+                      padding: '10px 14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      border: `1px solid ${det.status === 'ok' ? T.green : T.red}20`,
+                    }}
+                  >
+                    <span style={{ fontSize: 18 }}>{det.icon}</span>
+                    <span style={{
+                      flex: 1,
+                      color: 'white',
+                      fontSize: 13,
+                      fontWeight: 600,
+                    }}>
+                      {det.label}
+                    </span>
+                    <motion.span
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: 'spring', delay: 0.2 }}
+                      style={{
+                        background: det.status === 'ok' ? `${T.green}20` : `${T.red}20`,
+                        color: det.status === 'ok' ? T.green : T.red,
+                        padding: '4px 10px',
+                        borderRadius: 8,
+                        fontSize: 11,
+                        fontWeight: 700,
+                      }}
+                    >
+                      {det.status === 'ok' ? '✓ POPRAWNE' : '✗ BŁĄD'}
+                    </motion.span>
+                  </motion.div>
+                ))}
+              </motion.div>
+            )}
+
+            {/* Progress bar */}
+            {(phase === PHASES.SCANNING || phase === PHASES.DETECTING) && (
+              <div style={{
+                width: '100%',
+                maxWidth: 500,
+                height: 4,
+                background: 'rgba(255,255,255,0.1)',
+                borderRadius: 2,
+                overflow: 'hidden',
+              }}>
+                <motion.div
+                  initial={{ width: '0%' }}
+                  animate={{
+                    width: phase === PHASES.SCANNING ? '60%' :
+                      `${(detections.length / MOCK_DETECTIONS.length) * 100}%`,
+                  }}
+                  transition={{ duration: 0.5 }}
+                  style={{
+                    height: '100%',
+                    background: `linear-gradient(90deg, ${T.cyan}, ${T.primary})`,
+                    borderRadius: 2,
+                    boxShadow: `0 0 10px ${T.cyan}`,
+                  }}
+                />
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {/* ============ PHASE: SUCCESS ============ */}
+        {phase === PHASES.SUCCESS && (
+          <motion.div
+            key="success"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minHeight: '100vh',
+              padding: 24,
+              gap: 24,
+            }}
+          >
+            {/* Big success badge */}
+            <motion.div
+              initial={{ scale: 0, rotate: -180 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ type: 'spring', stiffness: 150, damping: 15 }}
+              style={{
+                width: 100,
+                height: 100,
+                borderRadius: '50%',
+                background: `linear-gradient(145deg, ${T.green}, #059669)`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 48,
+                boxShadow: `0 0 40px ${T.green}60`,
+              }}
+            >
+              ✅
+            </motion.div>
+
+            <motion.h2
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.3 }}
+              style={{
+                color: 'white',
+                fontSize: 28,
+                fontWeight: 900,
+                textAlign: 'center',
+                margin: 0,
+              }}
+            >
+              Instalacja Poprawna!
+            </motion.h2>
+
+            {/* Score + XP Row */}
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.5 }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 32,
+              }}
+            >
+              <ScoreRing score={score} />
+              <XPCounter target={xpEarned} />
+            </motion.div>
+
+            {/* Stats cards */}
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.8 }}
+              style={{
+                display: 'flex',
+                gap: 12,
+                flexWrap: 'wrap',
+                justifyContent: 'center',
+              }}
+            >
+              {[
+                { label: 'Elementy', value: `${detections.length}/${MOCK_DETECTIONS.length}`, icon: '🎯', color: T.cyan },
+                { label: 'Poprawne', value: detections.filter(d => d.status === 'ok').length, icon: '✅', color: T.green },
+                { label: 'Monety', value: `+${Math.floor(xpEarned * 0.3)}`, icon: '🪙', color: T.gold },
+              ].map((stat, i) => (
+                <motion.div
+                  key={stat.label}
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ delay: 1 + i * 0.15, type: 'spring' }}
+                  style={{
+                    background: T.glass,
+                    border: `1px solid ${stat.color}30`,
+                    borderRadius: 16,
+                    padding: '16px 20px',
+                    textAlign: 'center',
+                    minWidth: 90,
+                    backdropFilter: 'blur(10px)',
+                  }}
+                >
+                  <div style={{ fontSize: 24 }}>{stat.icon}</div>
+                  <div style={{ color: 'white', fontSize: 20, fontWeight: 800 }}>{stat.value}</div>
+                  <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: 600 }}>{stat.label}</div>
+                </motion.div>
+              ))}
+            </motion.div>
+
+            {/* Action buttons */}
+            <motion.div
+              initial={{ y: 30, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 1.5 }}
+              style={{ display: 'flex', gap: 12 }}
+            >
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  onComplete?.({ score, xp: xpEarned, detections });
+                  window.dispatchEvent(new CustomEvent('showNotification', {
+                    detail: {
+                      type: 'success',
+                      message: `🎉 Skan ukończony! +${xpEarned} XP`,
+                      duration: 4000,
+                    },
+                  }));
+                }}
+                style={{
+                  background: T.gradientCTA,
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 14,
+                  padding: '14px 32px',
+                  fontSize: 15,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  boxShadow: T.glow(T.primary),
+                }}
+              >
+                ✨ Odbierz Nagrody
+              </motion.button>
+
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={handleReset}
+                style={{
+                  background: T.glass,
+                  color: 'white',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  borderRadius: 14,
+                  padding: '14px 32px',
+                  fontSize: 15,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  backdropFilter: 'blur(10px)',
+                }}
+              >
+                🔄 Skanuj Ponownie
+              </motion.button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
