@@ -1,0 +1,1156 @@
+// components/Tools/MultimeterSimulator.jsx
+import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+
+// ==========================================
+// 🎨 DESIGN TOKENS
+// ==========================================
+const T = {
+  primary: '#7c3aed',
+  green: '#10b981',
+  gold: '#f59e0b',
+  red: '#ef4444',
+  cyan: '#06b6d4',
+  bg: '#0f0a1e',
+  card: '#1a1235',
+  glass: 'rgba(255,255,255,0.06)',
+  multimeterBody: '#2d2d3a',
+  multimeterFace: '#1a1a26',
+  lcdGreen: '#39ff14',
+  lcdBg: '#1a2e1a',
+};
+
+// ==========================================
+// 🔧 MULTIMETER MODES
+// ==========================================
+const MODES = [
+  { id: 'off', label: 'OFF', angle: -150, symbol: '⊘', unit: '' },
+  { id: 'acv', label: 'ACV', angle: -120, symbol: 'V~', unit: 'V AC' },
+  { id: 'dcv', label: 'DCV', angle: -90, symbol: 'V⎓', unit: 'V DC' },
+  { id: 'dcv200', label: '200V', angle: -60, symbol: '200', unit: 'V DC' },
+  { id: 'dcv20', label: '20V', angle: -30, symbol: '20', unit: 'V DC' },
+  { id: 'dcv2', label: '2V', angle: 0, symbol: '2', unit: 'V DC' },
+  { id: 'ohm', label: 'Ω', angle: 30, symbol: 'Ω', unit: 'Ω' },
+  { id: 'ohm2k', label: '2kΩ', angle: 60, symbol: '2k', unit: 'kΩ' },
+  { id: 'cont', label: '))))', angle: 90, symbol: '🔊', unit: '' },
+  { id: 'dca', label: 'DCA', angle: 120, symbol: 'A⎓', unit: 'mA' },
+  { id: 'dca200', label: '200mA', angle: 150, symbol: '200m', unit: 'mA' },
+];
+
+// ==========================================
+// 📐 CIRCUIT POINTS (Punkty na obwodzie)
+// ==========================================
+const CIRCUIT_POINTS = [
+  { id: 'battery_plus', x: 120, y: 100, label: 'Bateria +', voltage: 9, resistance: 0, type: 'source' },
+  { id: 'battery_minus', x: 120, y: 260, label: 'Bateria −', voltage: 0, resistance: 0, type: 'ground' },
+  { id: 'resistor_in', x: 250, y: 100, label: 'Rezystor IN', voltage: 9, resistance: 0, type: 'node' },
+  { id: 'resistor_out', x: 250, y: 180, label: 'Rezystor OUT', voltage: 3.6, resistance: 470, type: 'node' },
+  { id: 'led_anode', x: 320, y: 180, label: 'LED Anoda', voltage: 3.6, resistance: 0, type: 'node' },
+  { id: 'led_cathode', x: 320, y: 260, label: 'LED Katoda', voltage: 0, resistance: 0, type: 'node' },
+  { id: 'junction_a', x: 380, y: 100, label: 'Węzeł A', voltage: 9, resistance: 0, type: 'node' },
+  { id: 'switch', x: 50, y: 180, label: 'Przełącznik', voltage: 9, resistance: 0, type: 'switch' },
+];
+
+// Połączenia (wires)
+const WIRES = [
+  { from: 'battery_plus', to: 'resistor_in', color: '#ef4444' },
+  { from: 'resistor_in', to: 'resistor_out', color: '#a855f7', isResistor: true },
+  { from: 'resistor_out', to: 'led_anode', color: '#3b82f6' },
+  { from: 'led_anode', to: 'led_cathode', color: '#22c55e', isLED: true },
+  { from: 'led_cathode', to: 'battery_minus', color: '#1e1e1e' },
+  { from: 'battery_plus', to: 'junction_a', color: '#ef4444' },
+  { from: 'battery_minus', to: 'switch', color: '#1e1e1e' },
+  { from: 'switch', to: 'battery_plus', color: '#ef4444' },
+];
+
+// ==========================================
+// 🔌 PROBE COMPONENT (Drag & Drop próbnik)
+// ==========================================
+function Probe({ color, label, position, onDrag, onDrop, attachedTo, circuitPoints }) {
+  const probeRef = useRef(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragPos, setDragPos] = useState(position);
+
+  const handleDragStart = () => setIsDragging(true);
+
+  const handleDrag = (e, info) => {
+    setDragPos({
+      x: info.point.x,
+      y: info.point.y,
+    });
+    onDrag?.({ x: info.point.x, y: info.point.y });
+  };
+
+  const handleDragEnd = (e, info) => {
+    setIsDragging(false);
+    // Sprawdź czy blisko punktu na obwodzie
+    onDrop?.({
+      x: info.point.x,
+      y: info.point.y,
+    });
+  };
+
+  return (
+    <motion.div
+      ref={probeRef}
+      drag
+      dragMomentum={false}
+      onDragStart={handleDragStart}
+      onDrag={handleDrag}
+      onDragEnd={handleDragEnd}
+      whileDrag={{ scale: 1.1, zIndex: 100 }}
+      initial={position}
+      style={{
+        position: 'absolute',
+        cursor: 'grab',
+        zIndex: isDragging ? 100 : 10,
+        touchAction: 'none',
+      }}
+    >
+      {/* Cable line (from bottom of multimeter) */}
+      <svg
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: 300,
+          height: 300,
+          pointerEvents: 'none',
+          overflow: 'visible',
+        }}
+      >
+        <path
+          d={`M 15 0 Q 15 -40 0 -80`}
+          stroke={color}
+          strokeWidth={3}
+          fill="none"
+          strokeLinecap="round"
+        />
+      </svg>
+
+      {/* Probe tip */}
+      <motion.div
+        animate={attachedTo ? {
+          boxShadow: [
+            `0 0 10px ${color}`,
+            `0 0 25px ${color}`,
+            `0 0 10px ${color}`,
+          ],
+        } : {}}
+        transition={{ duration: 1, repeat: Infinity }}
+        style={{
+          width: 30,
+          height: 50,
+          background: `linear-gradient(180deg, #444, ${color})`,
+          borderRadius: '6px 6px 3px 3px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          position: 'relative',
+          boxShadow: `0 2px 10px ${color}60`,
+        }}
+      >
+        {/* Metal tip */}
+        <div style={{
+          width: 4,
+          height: 16,
+          background: 'linear-gradient(180deg, #999, #ddd)',
+          borderRadius: '0 0 2px 2px',
+          marginBottom: -8,
+        }} />
+
+        {/* Label */}
+        <div style={{
+          position: 'absolute',
+          top: -24,
+          fontSize: 10,
+          fontWeight: 700,
+          color: 'white',
+          background: color,
+          padding: '2px 8px',
+          borderRadius: 6,
+          whiteSpace: 'nowrap',
+        }}>
+          {label}
+        </div>
+      </motion.div>
+
+      {/* Connection indicator */}
+      {attachedTo && (
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: [1, 1.3, 1] }}
+          transition={{ duration: 0.5, repeat: Infinity }}
+          style={{
+            position: 'absolute',
+            bottom: -6,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: 10,
+            height: 10,
+            borderRadius: '50%',
+            background: T.green,
+            boxShadow: `0 0 8px ${T.green}`,
+          }}
+        />
+      )}
+    </motion.div>
+  );
+}
+
+// ==========================================
+// 📟 LCD DISPLAY
+// ==========================================
+function LCDDisplay({ value, unit, mode, isOn }) {
+  const displayValue = isOn ? (value !== null ? value.toFixed(2) : '0.00') : '';
+
+  return (
+    <div style={{
+      width: 200,
+      height: 70,
+      background: isOn
+        ? `linear-gradient(180deg, ${T.lcdBg}, #0d1f0d)`
+        : '#111',
+      borderRadius: 8,
+      border: '3px solid #333',
+      padding: '8px 14px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      boxShadow: isOn
+        ? `inset 0 0 20px ${T.lcdGreen}20, 0 2px 8px rgba(0,0,0,0.5)`
+        : 'inset 0 0 10px rgba(0,0,0,0.5)',
+      position: 'relative',
+      overflow: 'hidden',
+    }}>
+      {/* LCD scanlines */}
+      {isOn && (
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.15) 2px, rgba(0,0,0,0.15) 4px)',
+          pointerEvents: 'none',
+        }} />
+      )}
+
+      {/* Value */}
+      <motion.span
+        key={displayValue}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        style={{
+          fontFamily: '"Courier New", monospace',
+          fontSize: 36,
+          fontWeight: 700,
+          color: isOn ? T.lcdGreen : '#222',
+          textShadow: isOn ? `0 0 10px ${T.lcdGreen}80` : 'none',
+          letterSpacing: 2,
+        }}
+      >
+        {displayValue}
+      </motion.span>
+
+      {/* Unit */}
+      <span style={{
+        fontFamily: 'monospace',
+        fontSize: 14,
+        color: isOn ? `${T.lcdGreen}99` : '#222',
+        alignSelf: 'flex-end',
+        paddingBottom: 4,
+      }}>
+        {isOn ? unit : ''}
+      </span>
+
+      {/* Mode indicator */}
+      {isOn && mode !== 'off' && (
+        <div style={{
+          position: 'absolute',
+          top: 4,
+          right: 8,
+          fontSize: 9,
+          color: `${T.lcdGreen}60`,
+          fontFamily: 'monospace',
+        }}>
+          {mode.toUpperCase()}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ==========================================
+// 🎛️ ROTARY DIAL (Pokrętło)
+// ==========================================
+function RotaryDial({ currentMode, onModeChange }) {
+  const currentModeObj = MODES.find(m => m.id === currentMode);
+  const currentAngle = currentModeObj?.angle || -150;
+
+  const handleClick = (modeId) => {
+    onModeChange(modeId);
+    // Klik sound
+    if (typeof Audio !== 'undefined') {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.frequency.value = 800;
+        gain.gain.value = 0.1;
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.03);
+      } catch (e) {}
+    }
+  };
+
+  return (
+    <div style={{
+      position: 'relative',
+      width: 220,
+      height: 220,
+    }}>
+      {/* Outer ring with mode labels */}
+      {MODES.map((mode) => {
+        const rad = (mode.angle - 90) * (Math.PI / 180);
+        const r = 95;
+        const x = 110 + Math.cos(rad) * r;
+        const y = 110 + Math.sin(rad) * r;
+        const isActive = currentMode === mode.id;
+
+        return (
+          <motion.div
+            key={mode.id}
+            whileHover={{ scale: 1.2 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => handleClick(mode.id)}
+            style={{
+              position: 'absolute',
+              left: x - 16,
+              top: y - 10,
+              width: 32,
+              height: 20,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              fontSize: 10,
+              fontWeight: isActive ? 800 : 600,
+              color: isActive ? T.gold : 'rgba(255,255,255,0.5)',
+              textShadow: isActive ? `0 0 8px ${T.gold}` : 'none',
+              zIndex: 5,
+              userSelect: 'none',
+            }}
+          >
+            {mode.symbol}
+          </motion.div>
+        );
+      })}
+
+      {/* Dial center */}
+      <div style={{
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        width: 80,
+        height: 80,
+        borderRadius: '50%',
+        background: 'linear-gradient(145deg, #4a4a5c, #2d2d3a)',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+        {/* Rotating pointer */}
+        <motion.div
+          animate={{ rotate: currentAngle }}
+          transition={{ type: 'spring', stiffness: 200, damping: 20 }}
+          style={{
+            width: 60,
+            height: 60,
+            borderRadius: '50%',
+            position: 'relative',
+            background: 'linear-gradient(145deg, #3a3a4c, #252535)',
+            boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.3)',
+          }}
+        >
+          {/* Pointer arrow */}
+          <div style={{
+            position: 'absolute',
+            top: 2,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: 3,
+            height: 20,
+            background: T.gold,
+            borderRadius: 2,
+            boxShadow: `0 0 6px ${T.gold}`,
+          }} />
+
+          {/* Center dot */}
+          <div style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            background: '#666',
+            border: '1px solid #888',
+          }} />
+        </motion.div>
+      </div>
+
+      {/* Tick marks */}
+      {MODES.map((mode) => {
+        const rad = (mode.angle - 90) * (Math.PI / 180);
+        const r1 = 52;
+        const r2 = 65;
+        const x1 = 110 + Math.cos(rad) * r1;
+        const y1 = 110 + Math.sin(rad) * r1;
+        const x2 = 110 + Math.cos(rad) * r2;
+        const y2 = 110 + Math.sin(rad) * r2;
+
+        return (
+          <svg key={`tick-${mode.id}`} style={{
+            position: 'absolute',
+            inset: 0,
+            pointerEvents: 'none',
+          }}>
+            <line
+              x1={x1} y1={y1} x2={x2} y2={y2}
+              stroke={currentMode === mode.id ? T.gold : '#555'}
+              strokeWidth={currentMode === mode.id ? 2 : 1}
+            />
+          </svg>
+        );
+      })}
+    </div>
+  );
+}
+
+// ==========================================
+// ⚡ CIRCUIT DIAGRAM (SVG)
+// ==========================================
+function CircuitDiagram({ points, wires, probeRed, probeBlack, onPointClick }) {
+  const getPoint = (id) => points.find(p => p.id === id);
+
+  return (
+    <div style={{
+      position: 'relative',
+      width: 440,
+      height: 340,
+      background: 'rgba(255,255,255,0.03)',
+      borderRadius: 16,
+      border: '1px solid rgba(255,255,255,0.08)',
+      overflow: 'hidden',
+    }}>
+      {/* Grid background */}
+      <div style={{
+        position: 'absolute',
+        inset: 0,
+        backgroundImage: `
+          linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)
+        `,
+        backgroundSize: '20px 20px',
+      }} />
+
+      <svg width="440" height="340" style={{ position: 'absolute', inset: 0 }}>
+        {/* Wires */}
+        {wires.map((wire, i) => {
+          const from = getPoint(wire.from);
+          const to = getPoint(wire.to);
+          if (!from || !to) return null;
+
+          return (
+            <g key={i}>
+              {wire.isResistor ? (
+                // Rezystor symbol (zigzag)
+                <path
+                  d={`M ${from.x} ${from.y}
+                      L ${from.x} ${from.y + 15}
+                      L ${from.x - 10} ${from.y + 25}
+                      L ${from.x + 10} ${from.y + 35}
+                      L ${from.x - 10} ${from.y + 45}
+                      L ${from.x + 10} ${from.y + 55}
+                      L ${from.x - 10} ${from.y + 65}
+                      L ${from.x} ${from.y + 75}
+                      L ${to.x} ${to.y}`}
+                  stroke={wire.color}
+                  strokeWidth={2.5}
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              ) : wire.isLED ? (
+                // LED symbol (triangle + line)
+                <>
+                  <line
+                    x1={from.x} y1={from.y}
+                    x2={from.x} y2={from.y + 20}
+                    stroke={wire.color}
+                    strokeWidth={2.5}
+                  />
+                  <polygon
+                    points={`${from.x},${from.y + 20} ${from.x - 12},${from.y + 50} ${from.x + 12},${from.y + 50}`}
+                    fill={wire.color}
+                    opacity={0.6}
+                  />
+                  <line
+                    x1={from.x - 14} y1={from.y + 50}
+                    x2={from.x + 14} y2={from.y + 50}
+                    stroke={wire.color}
+                    strokeWidth={3}
+                  />
+                  {/* LED glow */}
+                  <motion.circle
+                    cx={from.x} cy={from.y + 35}
+                    r={18}
+                    fill="none"
+                    stroke={T.green}
+                    strokeWidth={1}
+                    animate={{
+                      opacity: [0.2, 0.6, 0.2],
+                      r: [18, 22, 18],
+                    }}
+                    transition={{ duration: 1.5, repeat: Infinity }}
+                  />
+                  {/* LED light arrows */}
+                  {[25, 40].map((angle, j) => (
+                    <motion.line
+                      key={j}
+                      x1={from.x + 16}
+                      y1={from.y + 30 + j * 3}
+                      x2={from.x + 28}
+                      y2={from.y + 25 + j * 3}
+                      stroke={T.gold}
+                      strokeWidth={1.5}
+                      animate={{ opacity: [0.3, 1, 0.3] }}
+                      transition={{ duration: 1, repeat: Infinity, delay: j * 0.3 }}
+                      markerEnd="url(#arrowhead)"
+                    />
+                  ))}
+                  <line
+                    x1={from.x} y1={from.y + 50}
+                    x2={to.x} y2={to.y}
+                    stroke={wire.color}
+                    strokeWidth={2.5}
+                  />
+                </>
+              ) : (
+                <line
+                  x1={from.x} y1={from.y}
+                  x2={to.x} y2={to.y}
+                  stroke={wire.color}
+                  strokeWidth={2.5}
+                  strokeLinecap="round"
+                />
+              )}
+            </g>
+          );
+        })}
+
+        {/* Arrow marker definition */}
+        <defs>
+          <marker id="arrowhead" markerWidth="6" markerHeight="4" refX="6" refY="2" orient="auto">
+            <polygon points="0 0, 6 2, 0 4" fill={T.gold} />
+          </marker>
+        </defs>
+
+        {/* Battery symbol */}
+        {(() => {
+          const bp = getPoint('battery_plus');
+          const bm = getPoint('battery_minus');
+          if (!bp || !bm) return null;
+          const midY = (bp.y + bm.y) / 2;
+          return (
+            <>
+              <line x1={bp.x - 15} y1={midY - 10} x2={bp.x + 15} y2={midY - 10}
+                    stroke="#ef4444" strokeWidth={3} />
+              <line x1={bp.x - 8} y1={midY} x2={bp.x + 8} y2={midY}
+                    stroke="#666" strokeWidth={3} />
+              <line x1={bp.x - 15} y1={midY + 10} x2={bp.x + 15} y2={midY + 10}
+                    stroke="#ef4444" strokeWidth={3} />
+              <line x1={bp.x - 8} y1={midY + 20} x2={bp.x + 8} y2={midY + 20}
+                    stroke="#666" strokeWidth={3} />
+              <text x={bp.x + 20} y={midY + 5} fill="rgba(255,255,255,0.4)"
+                    fontSize={11} fontFamily="monospace">9V</text>
+            </>
+          );
+        })()}
+      </svg>
+
+      {/* Interactive circuit points */}
+      {points.map(point => {
+        const isRedAttached = probeRed === point.id;
+        const isBlackAttached = probeBlack === point.id;
+        const isAttached = isRedAttached || isBlackAttached;
+
+        return (
+          <motion.div
+            key={point.id}
+            whileHover={{ scale: 1.4 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => onPointClick(point.id)}
+            style={{
+              position: 'absolute',
+              left: point.x - 10,
+              top: point.y - 10,
+              width: 20,
+              height: 20,
+              borderRadius: '50%',
+              background: isAttached
+                ? (isRedAttached ? T.red : '#333')
+                : 'rgba(255,255,255,0.15)',
+              border: `2px solid ${
+                isRedAttached ? T.red :
+                isBlackAttached ? '#999' :
+                'rgba(255,255,255,0.3)'
+              }`,
+              cursor: 'pointer',
+              zIndex: 10,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: isAttached
+                ? `0 0 12px ${isRedAttached ? T.red : '#666'}`
+                : 'none',
+            }}
+          >
+            {isAttached && (
+              <motion.div
+                animate={{ scale: [1, 1.5, 1], opacity: [0.6, 0, 0.6] }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+                style={{
+                  position: 'absolute',
+                  inset: -6,
+                  borderRadius: '50%',
+                  border: `1px solid ${isRedAttached ? T.red : '#999'}`,
+                }}
+              />
+            )}
+          </motion.div>
+        );
+      })}
+
+      {/* Point labels */}
+      {points.map(point => (
+        <div
+          key={`label-${point.id}`}
+          style={{
+            position: 'absolute',
+            left: point.x + 14,
+            top: point.y - 8,
+            fontSize: 9,
+            color: 'rgba(255,255,255,0.35)',
+            fontFamily: 'monospace',
+            pointerEvents: 'none',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {point.label}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ==========================================
+// 🎯 MEASUREMENT LOGIC
+// ==========================================
+function calculateMeasurement(mode, redPoint, blackPoint, points) {
+  if (!redPoint || !blackPoint || mode === 'off') return null;
+
+  const red = points.find(p => p.id === redPoint);
+  const black = points.find(p => p.id === blackPoint);
+  if (!red || !black) return null;
+
+  if (mode.includes('dcv') || mode === 'acv') {
+    // Voltage measurement
+    const voltage = Math.abs(red.voltage - black.voltage);
+    // Add some realistic noise
+    const noise = (Math.random() - 0.5) * 0.04;
+    return voltage + noise;
+  }
+
+  if (mode.includes('ohm')) {
+    // Resistance measurement (simplified)
+    if (red.resistance > 0) return red.resistance + (Math.random() - 0.5) * 5;
+    if (black.resistance > 0) return black.resistance + (Math.random() - 0.5) * 5;
+    // OL (overload) for wire-to-wire
+    return 99999;
+  }
+
+  if (mode === 'cont') {
+    // Continuity
+    const voltage = Math.abs(red.voltage - black.voltage);
+    return voltage < 0.5 ? 0.001 : null;
+  }
+
+  if (mode.includes('dca')) {
+    // Current (simplified: V/R)
+    const voltage = Math.abs(red.voltage - black.voltage);
+    return voltage > 0 ? (voltage / 470) * 1000 : 0; // mA through 470Ω
+  }
+
+  return null;
+}
+
+// ==========================================
+// 🎮 MAIN: MultimeterSimulator
+// ==========================================
+export function MultimeterSimulator({ onComplete }) {
+  const [mode, setMode] = useState('off');
+  const [probeRed, setProbeRed] = useState(null);
+  const [probeBlack, setProbeBlack] = useState(null);
+  const [measurement, setMeasurement] = useState(null);
+  const [probeAssigning, setProbeAssigning] = useState('red'); // which probe to assign next
+  const [history, setHistory] = useState([]);
+  const [showTutorial, setShowTutorial] = useState(true);
+
+  const isOn = mode !== 'off';
+  const currentModeObj = MODES.find(m => m.id === mode);
+
+  // Calculate measurement when probes or mode change
+  useEffect(() => {
+    if (!isOn || !probeRed || !probeBlack) {
+      setMeasurement(null);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const value = calculateMeasurement(mode, probeRed, probeBlack, CIRCUIT_POINTS);
+      setMeasurement(value);
+    }, 500);
+
+    return () => clearInterval(interval);
+  }, [mode, probeRed, probeBlack, isOn]);
+
+  // Handle circuit point click
+  const handlePointClick = useCallback((pointId) => {
+    if (probeAssigning === 'red') {
+      setProbeRed(pointId);
+      setProbeAssigning('black');
+    } else {
+      setProbeBlack(pointId);
+      setProbeAssigning('red');
+
+      // Add to history
+      if (isOn) {
+        const value = calculateMeasurement(mode, probeAssigning === 'red' ? pointId : probeRed, probeAssigning === 'black' ? pointId : probeBlack, CIRCUIT_POINTS);
+        if (value !== null) {
+          setHistory(prev => [...prev.slice(-4), {
+            mode: currentModeObj?.label,
+            unit: currentModeObj?.unit,
+            value,
+            red: probeAssigning === 'red' ? pointId : probeRed,
+            black: pointId,
+            timestamp: Date.now(),
+          }]);
+        }
+      }
+    }
+  }, [probeAssigning, probeRed, probeBlack, mode, isOn, currentModeObj]);
+
+  // Beep for continuity mode
+  useEffect(() => {
+    if (mode === 'cont' && measurement !== null && measurement < 1) {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.frequency.value = 2000;
+        gain.gain.value = 0.08;
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.3);
+      } catch (e) {}
+    }
+  }, [mode, measurement]);
+
+  return (
+    <div style={{
+      minHeight: '100vh',
+      background: T.bg,
+      padding: 20,
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      gap: 20,
+    }}>
+      {/* HEADER */}
+      <motion.div
+        initial={{ y: -20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          width: '100%',
+          maxWidth: 800,
+        }}
+      >
+        <div style={{
+          width: 48,
+          height: 48,
+          borderRadius: 14,
+          background: `linear-gradient(145deg, ${T.primary}, #4c1d95)`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 24,
+        }}>
+          📊
+        </div>
+        <div>
+          <h2 style={{ color: 'white', margin: 0, fontSize: 20, fontWeight: 800 }}>
+            Symulator Multimetru
+          </h2>
+          <p style={{ color: 'rgba(255,255,255,0.4)', margin: 0, fontSize: 12 }}>
+            Zmierz napięcie, rezystancję i prąd w obwodzie
+          </p>
+        </div>
+
+        {/* Probe selector */}
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+          <motion.button
+            whileTap={{ scale: 0.9 }}
+            onClick={() => setProbeAssigning('red')}
+            style={{
+              background: probeAssigning === 'red' ? T.red : 'rgba(239,68,68,0.2)',
+              color: 'white',
+              border: `2px solid ${T.red}`,
+              borderRadius: 10,
+              padding: '6px 14px',
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            🔴 Czerwony
+          </motion.button>
+          <motion.button
+            whileTap={{ scale: 0.9 }}
+            onClick={() => setProbeAssigning('black')}
+            style={{
+              background: probeAssigning === 'black' ? '#333' : 'rgba(100,100,100,0.2)',
+              color: 'white',
+              border: '2px solid #666',
+              borderRadius: 10,
+              padding: '6px 14px',
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            ⚫ Czarny
+          </motion.button>
+        </div>
+      </motion.div>
+
+      {/* Tutorial overlay */}
+      <AnimatePresence>
+        {showTutorial && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            style={{
+              background: `linear-gradient(135deg, ${T.primary}20, ${T.cyan}15)`,
+              border: `1px solid ${T.primary}40`,
+              borderRadius: 16,
+              padding: 16,
+              maxWidth: 800,
+              width: '100%',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 12,
+            }}
+          >
+            <span style={{ fontSize: 24 }}>💡</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ color: 'white', fontSize: 14, fontWeight: 700, marginBottom: 6 }}>
+                Jak korzystać z symulatora:
+              </div>
+              <ol style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, margin: 0, paddingLeft: 18, lineHeight: 1.8 }}>
+                <li>Ustaw <b>pokrętło</b> na odpowiedni tryb pomiaru (DCV, Ω, itp.)</li>
+                <li>Wybierz <b style={{ color: T.red }}>czerwony próbnik</b> → kliknij punkt na obwodzie</li>
+                <li>Wybierz <b style={{ color: '#999' }}>czarny próbnik</b> → kliknij drugi punkt</li>
+                <li>Odczytaj wynik na <b style={{ color: T.lcdGreen }}>ekranie LCD</b></li>
+              </ol>
+            </div>
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={() => setShowTutorial(false)}
+              style={{
+                background: 'rgba(255,255,255,0.1)',
+                border: 'none',
+                color: 'rgba(255,255,255,0.5)',
+                borderRadius: 8,
+                padding: '4px 10px',
+                cursor: 'pointer',
+                fontSize: 12,
+              }}
+            >
+              ✕
+            </motion.button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* MAIN LAYOUT */}
+      <div style={{
+        display: 'flex',
+        gap: 24,
+        maxWidth: 800,
+        width: '100%',
+        flexWrap: 'wrap',
+        justifyContent: 'center',
+      }}>
+        {/* LEFT: Multimeter */}
+        <motion.div
+          initial={{ x: -30, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          transition={{ delay: 0.2 }}
+          style={{
+            background: T.multimeterBody,
+            borderRadius: 24,
+            padding: 24,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 16,
+            boxShadow: '0 8px 40px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05)',
+            border: '1px solid rgba(255,255,255,0.05)',
+            minWidth: 280,
+          }}
+        >
+          {/* Brand */}
+          <div style={{
+            color: T.gold,
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: 3,
+            textTransform: 'uppercase',
+          }}>
+            PathFinder Pro DM-400
+          </div>
+
+          {/* LCD */}
+          <LCDDisplay
+            value={measurement}
+            unit={currentModeObj?.unit || ''}
+            mode={mode}
+            isOn={isOn}
+          />
+
+          {/* Active probes display */}
+          <div style={{
+            display: 'flex',
+            gap: 8,
+            width: '100%',
+          }}>
+            <div style={{
+              flex: 1,
+              background: 'rgba(239,68,68,0.1)',
+              border: `1px solid ${T.red}30`,
+              borderRadius: 8,
+              padding: '6px 10px',
+              fontSize: 10,
+              color: probeRed ? T.red : 'rgba(255,255,255,0.3)',
+              fontFamily: 'monospace',
+              textAlign: 'center',
+            }}>
+              🔴 {probeRed ? CIRCUIT_POINTS.find(p => p.id === probeRed)?.label : '—'}
+            </div>
+            <div style={{
+              flex: 1,
+              background: 'rgba(150,150,150,0.1)',
+              border: '1px solid rgba(150,150,150,0.2)',
+              borderRadius: 8,
+              padding: '6px 10px',
+              fontSize: 10,
+              color: probeBlack ? '#ccc' : 'rgba(255,255,255,0.3)',
+              fontFamily: 'monospace',
+              textAlign: 'center',
+            }}>
+              ⚫ {probeBlack ? CIRCUIT_POINTS.find(p => p.id === probeBlack)?.label : '—'}
+            </div>
+          </div>
+
+          {/* Rotary Dial */}
+          <RotaryDial currentMode={mode} onModeChange={setMode} />
+
+          {/* Port labels */}
+          <div style={{
+            display: 'flex',
+            gap: 12,
+            justifyContent: 'center',
+          }}>
+            {[
+              { label: '10A', color: T.red },
+              { label: 'mA/µA', color: T.red },
+              { label: 'COM', color: '#333' },
+              { label: 'V/Ω', color: T.red },
+            ].map((port, i) => (
+              <div key={i} style={{
+                width: 28,
+                height: 28,
+                borderRadius: '50%',
+                background: port.color,
+                border: '2px solid #555',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 7,
+                color: 'white',
+                fontWeight: 700,
+              }}>
+                {port.label}
+              </div>
+            ))}
+          </div>
+        </motion.div>
+
+        {/* RIGHT: Circuit */}
+        <motion.div
+          initial={{ x: 30, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          transition={{ delay: 0.4 }}
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 16,
+            flex: 1,
+            minWidth: 300,
+          }}
+        >
+          <div style={{
+            color: 'rgba(255,255,255,0.5)',
+            fontSize: 12,
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+          }}>
+            <span style={{
+              background: probeAssigning === 'red' ? `${T.red}20` : 'rgba(150,150,150,0.15)',
+              color: probeAssigning === 'red' ? T.red : '#999',
+              padding: '4px 10px',
+              borderRadius: 8,
+              fontSize: 11,
+              fontWeight: 700,
+            }}>
+              {probeAssigning === 'red' ? '🔴 Kliknij punkt dla CZERWONEGO' : '⚫ Kliknij punkt dla CZARNEGO'}
+            </span>
+          </div>
+
+          <CircuitDiagram
+            points={CIRCUIT_POINTS}
+            wires={WIRES}
+            probeRed={probeRed}
+            probeBlack={probeBlack}
+            onPointClick={handlePointClick}
+          />
+
+          {/* Measurement History */}
+          {history.length > 0 && (
+            <div style={{
+              background: T.glass,
+              borderRadius: 14,
+              padding: 14,
+              border: '1px solid rgba(255,255,255,0.06)',
+            }}>
+              <div style={{
+                color: 'rgba(255,255,255,0.4)',
+                fontSize: 11,
+                fontWeight: 700,
+                marginBottom: 8,
+                textTransform: 'uppercase',
+                letterSpacing: 1,
+              }}>
+                📋 Historia pomiarów
+              </div>
+              {history.map((h, i) => (
+                <motion.div
+                  key={h.timestamp}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '4px 0',
+                    borderBottom: i < history.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+                  }}
+                >
+                  <span style={{
+                    background: `${T.primary}20`,
+                    color: T.primary,
+                    fontSize: 9,
+                    fontWeight: 700,
+                    padding: '2px 6px',
+                    borderRadius: 4,
+                  }}>
+                    {h.mode}
+                  </span>
+                  <span style={{
+                    color: T.lcdGreen,
+                    fontFamily: 'monospace',
+                    fontSize: 14,
+                    fontWeight: 700,
+                    flex: 1,
+                  }}>
+                    {h.value >= 99999 ? 'OL' : h.value.toFixed(2)} {h.unit}
+                  </span>
+                  <span style={{
+                    color: 'rgba(255,255,255,0.2)',
+                    fontSize: 9,
+                    fontFamily: 'monospace',
+                  }}>
+                    {CIRCUIT_POINTS.find(p => p.id === h.red)?.label} → {CIRCUIT_POINTS.find(p => p.id === h.black)?.label}
+                  </span>
+                </motion.div>
+              ))}
+            </div>
+          )}
+
+          {/* Quick reference */}
+          <div style={{
+            background: T.glass,
+            borderRadius: 14,
+            padding: 14,
+            border: '1px solid rgba(255,255,255,0.06)',
+          }}>
+            <div style={{
+              color: 'rgba(255,255,255,0.4)',
+              fontSize: 11,
+              fontWeight: 700,
+              marginBottom: 8,
+              textTransform: 'uppercase',
+              letterSpacing: 1,
+            }}>
+              📐 Obwód: LED z rezystorem 470Ω
+            </div>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: 6,
+              fontSize: 11,
+              color: 'rgba(255,255,255,0.35)',
+            }}>
+              <span>Zasilanie: <b style={{ color: T.gold }}>9V DC</b></span>
+              <span>Rezystor: <b style={{ color: T.primary }}>470Ω</b></span>
+              <span>Napięcie LED: <b style={{ color: T.green }}>~5.4V</b></span>
+              <span>Prąd: <b style={{ color: T.cyan }}>~11.5mA</b></span>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    </div>
+  );
+}
