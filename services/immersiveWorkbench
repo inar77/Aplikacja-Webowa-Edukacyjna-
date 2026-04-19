@@ -1,0 +1,571 @@
+// core/components/Shell/ImmersiveWorkbenchShell.tsx
+'use client'
+import React, { useReducer, useMemo, useCallback, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { sceneReducer, createInitialSceneState, type SceneEvent, type SceneState } from '../../machines/sceneMachine';
+import { immersiveTokens as iT } from '../../../design/immersiveTokens';
+import { useReducedMotion } from '../../hooks/useReducedMotion';
+import type { CareerDefinition, SceneDefinition } from '../../types/career';
+
+import { EnvironmentLayer } from './EnvironmentLayer';
+import { WorkSurfaceLayer } from './WorkSurfaceLayer';
+import { HUDLayer } from './HUDLayer';
+
+interface WorkbenchShellProps {
+  career: CareerDefinition;
+  sceneId: string;
+  onComplete?: (result: any) => void;
+  onExit?: () => void;
+}
+
+export function ImmersiveWorkbenchShell({
+  career,
+  sceneId,
+  onComplete,
+  onExit,
+}: WorkbenchShellProps) {
+  const reducedMotion = useReducedMotion();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [mousePos, setMousePos] = React.useState({ x: 50, y: 50 });
+
+  const [state, dispatch] = useReducer(
+    sceneReducer,
+    createInitialSceneState(sceneId, reducedMotion)
+  );
+
+  const send = useCallback((event: SceneEvent) => dispatch(event), []);
+
+  const scene = useMemo(
+    () => career.scenes.find(s => s.id === sceneId) ?? null,
+    [career.scenes, sceneId]
+  );
+
+  // Load scene on mount
+  useEffect(() => {
+    if (scene) {
+      // Simulate asset loading
+      const timer = setTimeout(() => {
+        send({ type: 'SCENE_LOADED', scene });
+      }, 600);
+      return () => clearTimeout(timer);
+    }
+  }, [scene, send]);
+
+  // Auto-advance from intro
+  useEffect(() => {
+    if (state.phase === 'intro') {
+      const timer = setTimeout(() => {
+        send({ type: 'INTRO_COMPLETE' });
+      }, reducedMotion ? 500 : 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [state.phase, reducedMotion, send]);
+
+  // Track mouse for parallax (desktop only)
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (reducedMotion) return;
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setMousePos({
+      x: ((e.clientX - rect.left) / rect.width) * 100,
+      y: ((e.clientY - rect.top) / rect.height) * 100,
+    });
+  }, [reducedMotion]);
+
+  // Keyboard shortcuts for tools
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      const tool = career.toolSet.find(t => t.hotkey?.toLowerCase() === e.key.toLowerCase());
+      if (tool) {
+        send({ type: 'SELECT_TOOL', toolId: state.selectedTool === tool.id ? null : tool.id });
+      }
+      if (e.key === 'Escape') {
+        if (state.selectedTool) {
+          send({ type: 'SELECT_TOOL', toolId: null });
+        } else {
+          send({ type: 'TOGGLE_HUD' });
+        }
+      }
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        send({ type: 'TOGGLE_MISSION_PANEL' });
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [career.toolSet, state.selectedTool, send]);
+
+  const theme = career.theme;
+  const motionVariant = reducedMotion ? iT.motion.reduced.sceneEnter : iT.motion.sceneEnter;
+
+  return (
+    <motion.div
+      ref={containerRef}
+      onMouseMove={handleMouseMove}
+      {...motionVariant}
+      style={{
+        position: 'relative',
+        width: '100%',
+        height: '100vh',
+        overflow: 'hidden',
+        background: theme.environment.bgGradient,
+        cursor: state.selectedTool ? 'crosshair' : 'default',
+        userSelect: 'none',
+      }}
+      role="application"
+      aria-label={`${career.learningMetaphor.workplaceNoun}: ${scene?.name ?? sceneId}`}
+      aria-roledescription="Immersyjne stanowisko treningowe"
+    >
+      {/* ========================================== */}
+      {/* LAYER 0: ENVIRONMENT (tło, ściany, światło) */}
+      {/* ========================================== */}
+      <EnvironmentLayer
+        scene={scene}
+        theme={theme}
+        mousePos={mousePos}
+        phase={state.phase}
+        lightsOn={state.environment.lightsOn}
+        reducedMotion={reducedMotion}
+      />
+
+      {/* ========================================== */}
+      {/* LAYER 1: WORK SURFACE (obiekt centralny + interakcje) */}
+      {/* ========================================== */}
+      <WorkSurfaceLayer
+        scene={scene}
+        career={career}
+        state={state}
+        send={send}
+        reducedMotion={reducedMotion}
+      />
+
+      {/* ========================================== */}
+      {/* LAYER 2: HUD (panele, narzędzia, misja) */}
+      {/* ========================================== */}
+      <AnimatePresence>
+        {state.hudVisible && (
+          <HUDLayer
+            career={career}
+            state={state}
+            send={send}
+            onExit={onExit}
+            reducedMotion={reducedMotion}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ========================================== */}
+      {/* LOADING SCREEN */}
+      {/* ========================================== */}
+      <AnimatePresence>
+        {state.phase === 'loading' && (
+          <LoadingScreen career={career} scene={scene} reducedMotion={reducedMotion} />
+        )}
+      </AnimatePresence>
+
+      {/* ========================================== */}
+      {/* INTRO CINEMATIC */}
+      {/* ========================================== */}
+      <AnimatePresence>
+        {state.phase === 'intro' && scene && (
+          <IntroOverlay scene={scene} career={career} reducedMotion={reducedMotion} />
+        )}
+      </AnimatePresence>
+
+      {/* ========================================== */}
+      {/* TASK BRIEFING */}
+      {/* ========================================== */}
+      <AnimatePresence>
+        {state.phase === 'task_briefing' && state.currentTask && (
+          <TaskBriefing
+            task={state.currentTask}
+            career={career}
+            onAcknowledge={() => send({ type: 'BRIEFING_ACKNOWLEDGED' })}
+            reducedMotion={reducedMotion}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* SCREEN READER STATUS */}
+      <div role="status" aria-live="polite" aria-atomic style={{
+        position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0,0,0,0)',
+      }}>
+        {state.phase === 'loading' && 'Ładowanie stanowiska pracy...'}
+        {state.phase === 'intro' && `Witaj na stanowisku: ${scene?.name}`}
+        {state.phase === 'exploration' && 'Rozejrzyj się po stanowisku. Kliknij podświetlone elementy.'}
+        {state.phase === 'task_active' && state.currentTask && `Aktywne zadanie: ${state.currentTask.objective}`}
+      </div>
+    </motion.div>
+  );
+}
+
+// ==========================================
+// 🔄 LOADING SCREEN
+// ==========================================
+
+function LoadingScreen({
+  career,
+  scene,
+  reducedMotion,
+}: {
+  career: CareerDefinition;
+  scene: SceneDefinition | null;
+  reducedMotion: boolean;
+}) {
+  const theme = career.theme;
+
+  return (
+    <motion.div
+      initial={{ opacity: 1 }}
+      exit={reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 1.02, filter: 'blur(4px)' }}
+      transition={{ duration: reducedMotion ? 0.2 : 0.8 }}
+      style={{
+        position: 'absolute',
+        inset: 0,
+        zIndex: iT.depth.modal.zIndex,
+        background: career.theme.environment.bgPrimary,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 24,
+      }}
+    >
+      {/* Icon */}
+      <motion.div
+        animate={!reducedMotion ? { 
+          scale: [1, 1.05, 1],
+          opacity: [0.8, 1, 0.8],
+        } : {}}
+        transition={{ duration: 2, repeat: Infinity }}
+        style={{
+          width: 80,
+          height: 80,
+          borderRadius: 20,
+          background: `linear-gradient(135deg, ${theme.system.accent}20, ${theme.system.accent}10)`,
+          border: `2px solid ${theme.system.accent}30`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 40,
+        }}
+      >
+        {career.icon}
+      </motion.div>
+
+      {/* Text */}
+      <div style={{ textAlign: 'center' }}>
+        <h2 style={{ ...iT.hud.title, margin: 0, fontSize: 20 }}>
+          {scene?.name ?? 'Ładowanie...'}
+        </h2>
+        <p style={{
+          ...iT.hud.label,
+          margin: '8px 0 0',
+          color: 'rgba(255,255,255,0.35)',
+          textTransform: 'none',
+          letterSpacing: 0,
+          fontSize: 13,
+        }}>
+          Przygotowywanie {career.learningMetaphor.workplaceNoun.toLowerCase()}a
+        </p>
+      </div>
+
+      {/* Loading bar */}
+      <div style={{
+        width: 200,
+        height: 3,
+        background: 'rgba(255,255,255,0.08)',
+        borderRadius: 2,
+        overflow: 'hidden',
+      }}>
+        <motion.div
+          animate={{ x: ['-100%', '100%'] }}
+          transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
+          style={{
+            width: '40%',
+            height: '100%',
+            background: `linear-gradient(90deg, transparent, ${theme.system.accent}, transparent)`,
+          }}
+        />
+      </div>
+    </motion.div>
+  );
+}
+
+// ==========================================
+// 🎬 INTRO OVERLAY
+// ==========================================
+
+function IntroOverlay({
+  scene,
+  career,
+  reducedMotion,
+}: {
+  scene: SceneDefinition;
+  career: CareerDefinition;
+  reducedMotion: boolean;
+}) {
+  const theme = career.theme;
+
+  return (
+    <motion.div
+      initial={{ opacity: 1 }}
+      exit={reducedMotion ? { opacity: 0 } : { opacity: 0, y: -20 }}
+      transition={{ duration: reducedMotion ? 0.2 : 0.6 }}
+      style={{
+        position: 'absolute',
+        inset: 0,
+        zIndex: iT.depth.overlay.zIndex,
+        display: 'flex',
+        alignItems: 'flex-end',
+        justifyContent: 'center',
+        padding: 32,
+        background: 'linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.7) 100%)',
+        pointerEvents: 'none',
+      }}
+    >
+      <motion.div
+        initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: reducedMotion ? 0.1 : 0.5, duration: reducedMotion ? 0.2 : 0.6 }}
+        style={{
+          textAlign: 'center',
+          maxWidth: 500,
+        }}
+      >
+        {/* Location badge */}
+        <div style={{
+          ...iT.hud.badge,
+          background: `${theme.system.accent}20`,
+          color: theme.system.accent,
+          display: 'inline-block',
+          marginBottom: 12,
+          border: `1px solid ${theme.system.accent}30`,
+        }}>
+          📍 {scene.name}
+        </div>
+
+        <h1 style={{
+          color: 'white',
+          fontSize: 24,
+          fontWeight: 800,
+          margin: '0 0 8px',
+          textShadow: '0 2px 12px rgba(0,0,0,0.6)',
+        }}>
+          {scene.description}
+        </h1>
+
+        <p style={{
+          color: 'rgba(255,255,255,0.5)',
+          fontSize: 14,
+          margin: 0,
+        }}>
+          Rozejrzyj się po stanowisku i przygotuj do pracy
+        </p>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ==========================================
+// 📋 TASK BRIEFING
+// ==========================================
+
+function TaskBriefing({
+  task,
+  career,
+  onAcknowledge,
+  reducedMotion,
+}: {
+  task: any;
+  career: CareerDefinition;
+  onAcknowledge: () => void;
+  reducedMotion: boolean;
+}) {
+  const theme = career.theme;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      style={{
+        position: 'absolute',
+        inset: 0,
+        zIndex: iT.depth.overlay.zIndex,
+        background: 'rgba(0,0,0,0.75)',
+        backdropFilter: 'blur(8px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+      }}
+    >
+      <motion.div
+        initial={reducedMotion ? { opacity: 0 } : { y: 30, opacity: 0, scale: 0.95 }}
+        animate={{ y: 0, opacity: 1, scale: 1 }}
+        transition={reducedMotion ? { duration: 0.2 } : { type: 'spring', stiffness: 150, damping: 20, delay: 0.2 }}
+        style={{
+          background: iT.materials.glass.background,
+          backdropFilter: iT.materials.glass.backdropFilter,
+          border: iT.materials.glass.border,
+          borderRadius: 20,
+          padding: 32,
+          maxWidth: 520,
+          width: '100%',
+        }}
+      >
+        {/* Header */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          marginBottom: 20,
+        }}>
+          <div style={{
+            width: 48,
+            height: 48,
+            borderRadius: 14,
+            background: `${theme.system.accent}15`,
+            border: `1px solid ${theme.system.accent}30`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 24,
+          }}>
+            📋
+          </div>
+          <div>
+            <div style={{ ...iT.hud.label, marginBottom: 2 }}>
+              {career.learningMetaphor.taskNoun.toUpperCase()}
+            </div>
+            <h2 style={{ ...iT.hud.title, margin: 0 }}>
+              {task.title}
+            </h2>
+          </div>
+        </div>
+
+        {/* Scenario */}
+        <div style={{
+          background: 'rgba(255,255,255,0.04)',
+          borderRadius: 12,
+          padding: 16,
+          marginBottom: 16,
+          borderLeft: `3px solid ${theme.system.accent}`,
+        }}>
+          <div style={{ ...iT.hud.label, marginBottom: 8, color: theme.system.accent }}>
+            SYTUACJA
+          </div>
+          <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, lineHeight: 1.6, margin: 0 }}>
+            📍 {task.scenario.location}
+          </p>
+          <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, lineHeight: 1.6, margin: '8px 0 0' }}>
+            {task.scenario.situation}
+          </p>
+          {task.scenario.clientNote && (
+            <p style={{
+              color: theme.system.warning,
+              fontSize: 12,
+              margin: '8px 0 0',
+              fontStyle: 'italic',
+            }}>
+              💬 Klient: „{task.scenario.clientNote}"
+            </p>
+          )}
+        </div>
+
+        {/* Objective */}
+        <div style={{
+          background: 'rgba(255,255,255,0.04)',
+          borderRadius: 12,
+          padding: 16,
+          marginBottom: 16,
+        }}>
+          <div style={{ ...iT.hud.label, marginBottom: 8 }}>
+            CEL
+          </div>
+          <p style={{ color: 'white', fontSize: 14, fontWeight: 600, margin: 0, lineHeight: 1.5 }}>
+            🎯 {task.objective}
+          </p>
+        </div>
+
+        {/* Safety requirements */}
+        {task.safetyRequirements.length > 0 && (
+          <div style={{
+            background: `${theme.system.danger}08`,
+            border: `1px solid ${theme.system.danger}20`,
+            borderRadius: 12,
+            padding: 14,
+            marginBottom: 20,
+          }}>
+            <div style={{ ...iT.hud.label, color: theme.system.danger, marginBottom: 8 }}>
+              ⚠️ WYMOGI BHP
+            </div>
+            {task.safetyRequirements.map((req: any) => (
+              <div key={req.id} style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '4px 0',
+                color: 'rgba(255,255,255,0.6)',
+                fontSize: 12,
+              }}>
+                <span>{req.icon}</span>
+                <span>{req.label}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Meta */}
+        <div style={{
+          display: 'flex',
+          gap: 16,
+          marginBottom: 24,
+          flexWrap: 'wrap',
+        }}>
+          {[
+            { icon: '⏱', label: `~${task.estimatedMinutes} min`, color: theme.system.info },
+            { icon: '⚡', label: `${task.maxXP} XP`, color: theme.system.accent },
+            { icon: '📊', label: task.difficulty === 'beginner' ? 'Podstawowy' : task.difficulty === 'intermediate' ? 'Średni' : 'Zaawansowany', color: theme.system.warning },
+          ].map(meta => (
+            <div key={meta.label} style={{
+              ...iT.hud.badge,
+              background: `${meta.color}15`,
+              color: meta.color,
+              border: `1px solid ${meta.color}25`,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+            }}>
+              {meta.icon} {meta.label}
+            </div>
+          ))}
+        </div>
+
+        {/* CTA */}
+        <motion.button
+          whileHover={!reducedMotion ? { scale: 1.03 } : {}}
+          whileTap={!reducedMotion ? { scale: 0.97 } : {}}
+          onClick={onAcknowledge}
+          style={{
+            width: '100%',
+            background: `linear-gradient(135deg, ${theme.system.accent}, ${theme.system.accent}cc)`,
+            color: 'white',
+            border: 'none',
+            borderRadius: 14,
+            padding: '14px 0',
+            fontSize: 15,
+            fontWeight: 700,
+            cursor: 'pointer',
+            boxShadow: `0 4px 20px ${theme.system.accent}40`,
+            letterSpacing: 0.5,
+          }}
+          aria-label="Rozpocznij zadanie"
+        >
+          Rozpocznij {career.learningMetaphor.taskNoun.toLowerCase()}
+        </motion.button>
+      </motion.div>
+    </motion.div>
+  );
+}
