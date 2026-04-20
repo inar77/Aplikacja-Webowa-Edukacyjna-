@@ -1,0 +1,182 @@
+// design/immersiveTokens.ts
+
+export const immersiveTokens = {
+  // Materiały — odwzorowanie fizycznych materiałów
+  materials: {
+    metal: {
+      gradient: 'linear-gradient(180deg, #475569, #334155, #1e293b)',
+      highlight: 'inset 0 1px 0 rgba(255,255,255,0.08)',
+      shadow: '0 2px 8px rgba(0,0,0,0.4)',
+      border: '1px solid rgba(255,255,255,0.06)',
+      borderRadius: 4,
+    },
+    metalBrushed: {
+      gradient: 'linear-gradient(180deg, #4a5568, #2d3748)',
+      highlight: 'inset 0 1px 0 rgba(255,255,255,0.12)',
+      texture: `repeating-linear-gradient(
+        90deg,
+        transparent,
+        transparent 2px,
+        rgba(255,255,255,0.02) 2px,
+        rgba(255,255,255,0.02) 3px
+      )`,
+    },
+    plastic: {
+      gradient: 'linear-gradient(180deg, #f1f5f9, #e2e8f0, #cbd5e1)',
+      highlight: 'inset 0 1px 0 rgba(255,255,255,0.6)',
+      shadow: '0 2px 6px rgba(0,0,0,0.15)',
+      border: '1px solid rgba(0,0,0,0.1)',
+      borderRadius: 3,
+    },
+    copper: {
+      gradient: 'linear-gradient(135deg, #d97706, #b45309, #92400e)',
+      highlight: 'inset 0 1px 0 rgba(255,255,255,0.2)',
+      glow: '0 0 6px rgba(217,119,6,0.3)',
+    },
+    rubber: {
+      gradient: 'linear-gradient(180deg, #374151, #1f2937)',
+      highlight: 'none',
+      shadow: '0 1px 3px rgba(0,0,0,0.3)',
+      borderRadius: 6,
+    },
+    glass: {
+      background: 'rgba(255,255,255,0.04)',
+      backdropFilter: 'blur(16px)',
+      border: '1px solid rgba(255,255,255,0.06)',
+      highlight: 'inset 0 1px 0 rgba(255,255,255,0.08)',
+    },
+  },
+
+  // Efekty elektryczne
+  electrical: {
+    liveGlow: (intensity = 1) => ({
+      boxShadow: `0 0 ${8 * intensity}px rgba(239,68,68,${0.3 * intensity}), 0 0 ${20 * intensity}px rgba(239,68,68,${0.15 * intensity})`,
+    }),
+    neutralGlow: (intensity = 1) => ({
+      boxShadow: `0 0 ${6 * intensity}px rgba(59,130,246,${0.2 * intensity})`,
+    }),
+    earthGlow: (intensity = 1) => ({
+      boxShadow: `0 0 ${6 * intensity}px rgba(34,197,94,${0.2 * intensity})`,
+    }),
+    spark: {
+      background: 'radial-gradient(circle, #ffffff, #fbbf24, transparent)',
+      boxShadow: '0 0 20px #fbbf24, 0 0 40px #f59e0b',
+    },
+    arc: {
+      background: `linear-gradient(90deg, transparent, #60a5fa, #ffffff, #60a5fa, transparent)`,
+      height: 2,
+      filter: 'blur(1px)',
+    },
+  },
+
+  // Warstwy głębi
+  depth: {
+    background: { zIndex: 0, blur: 2, brightness: 0.6 },
+    midground: { zIndex: 10, blur: 0, brightness: 1 },
+    foreground: { zIndex: 20, blur: 0, brightness: 1.05 },
+    hud: { zIndex: 100, blur: 0, brightness: 1 },
+    overlay: { zIndex: 200 },
+    modal: { zIndex: 300 },
+  },
+
+  // Oświetlenie
+  lighting: {
+    spotlight: (x: number, y: number, radius: number, color: string, intensity: number) =>
+      `radial-gradient(ellipse at ${x}% ${y}%, ${color}${Math.round(intensity * 25).toString(16).padStart(2, '0')} 0%, transparent ${radius}%)`,
+    
+    rimLight: (side: 'left' | 'right' | 'top', color: string, width = 2) => {
+      const pos = side === 'left' ? 'to right' : side === 'right' ? 'to left' : 'to bottom';
+      return `linear-gradient(${pos}, ${color}20, transparent ${width * 20}px)`;
+    },
+    
+    ambientOcclusion: 'inset 0 -4px 12px rgba(0,0,0,0.3), inset 0 4px 8px rgba(0,0,0,0.1)',
+  },
+
+  // Animacje immersyjne
+  motion: {
+    sceneEnter: {
+      initial: { opacity: 0, scale: 1.05, filter: 'blur(8px) brightness(0.3)' },
+      animate: { opacity: 1, scale: 1, filter: 'blur(0px) brightness(1)' },
+      transition: { duration: 1.2, ease: [0.25, 0.1, 0.25, 1] },
+    },
+    
+    objectReveal: {
+      initial: { opacity: 0, y: 20 },
+      animate: { opacity: 1, y: 0 },
+      transition: { duration: 0.6, ease: [0.25, 0.1, 0.25, 1] },
+    },
+    
+    hudSlideIn: {
+      initial: { x: -30, opacity: 0 },
+      animate: { x: 0, opacity: 1 },
+      transition: { duration: 0.4, ease: [0.25, 0.1, 0.25, 1] },
+    },
+    
+    pulseAttention: {
+      animate: {
+        boxShadow: [
+          '0 0 0 0 rgba(6,182,212,0)',
+          '0 0 0 8px rgba(6,182,212,0.2)',
+          '0 0 0 0 rgba(6,182,212,0)',
+        ],
+      },
+      transition: { duration: 2, repeat: Infinity },
+    },
+    
+    electricFlicker: {
+      animate: { opacity: [1, 0.7, 1, 0.85, 1] },
+      transition: { duration: 0.3, repeat: Infinity, repeatDelay: 3 + Math.random() * 5 },
+    },
+    
+    wireConnect: {
+      initial: { scale: 0.8, opacity: 0 },
+      animate: { scale: [0.8, 1.1, 1], opacity: 1 },
+      transition: { duration: 0.4, type: 'spring', stiffness: 300 },
+    },
+
+    // Reduced motion fallbacks
+    reduced: {
+      sceneEnter: {
+        initial: { opacity: 0 },
+        animate: { opacity: 1 },
+        transition: { duration: 0.3 },
+      },
+      objectReveal: {
+        initial: { opacity: 0 },
+        animate: { opacity: 1 },
+        transition: { duration: 0.2 },
+      },
+    },
+  },
+
+  // Typografia HUD
+  hud: {
+    label: {
+      fontFamily: '"JetBrains Mono", "Courier New", monospace',
+      fontSize: 10,
+      fontWeight: 600,
+      letterSpacing: 1.5,
+      textTransform: 'uppercase' as const,
+      color: 'rgba(255,255,255,0.45)',
+    },
+    value: {
+      fontFamily: '"JetBrains Mono", monospace',
+      fontSize: 14,
+      fontWeight: 700,
+      color: '#ffffff',
+    },
+    title: {
+      fontSize: 16,
+      fontWeight: 800,
+      color: '#ffffff',
+      letterSpacing: 0.5,
+    },
+    badge: {
+      fontSize: 10,
+      fontWeight: 700,
+      letterSpacing: 0.5,
+      padding: '2px 8px',
+      borderRadius: 4,
+    },
+  },
+} as const;
