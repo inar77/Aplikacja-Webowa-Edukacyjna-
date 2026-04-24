@@ -1,0 +1,34 @@
+// components/Learning/LessonGrid.jsx
+import { LessonLootBox } from './LessonLootBox';
+import { useApp } from '../../hooks/useApp';
+
+export function LessonGrid({ lessons, completedIds }) {
+  const { updateUser } = useApp();
+
+  const handleLootOpen = (rewards) => {
+    const xpReward = rewards.find(r => r.type === 'xp');
+    const coinReward = rewards.find(r => r.type === 'coins');
+    
+    if (xpReward) updateUser(prev => ({ ...prev, xp: prev.xp + xpReward.value }));
+    if (coinReward) updateUser(prev => ({ ...prev, coins: prev.coins + coinReward.value }));
+  };
+
+  return (
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+      gap: 20,
+      padding: 20,
+    }}>
+      {lessons.map(lesson => (
+        <LessonLootBox
+          key={lesson.id}
+          lesson={lesson}
+          isUnlocked={lesson.prerequisites.every(id => completedIds.includes(id))}
+          isCompleted={completedIds.includes(lesson.id)}
+          onOpen={(rewards) => handleLootOpen(rewards)}
+        />
+      ))}
+    </div>
+  );
+}
