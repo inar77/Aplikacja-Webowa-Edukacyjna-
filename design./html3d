@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>PathFinder - HUDLayer Scene 3D</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  body { margin: 0; background: #000; overflow: hidden; font-family: 'Courier New', monospace; }
+  @keyframes scan {
+    0% { transform: translateY(-100%); }
+    100% { transform: translateY(100vh); }
+  }
+  @keyframes pulse-ring {
+    0% { transform: scale(0.8); opacity: 1; }
+    100% { transform: scale(2); opacity: 0; }
+  }
+  @keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0.3; }
+  }
+  @keyframes flicker {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.85; }
+  }
+  .scan-line {
+    animation: scan 4s linear infinite;
+  }
+  .pulse-ring {
+    animation: pulse-ring 2s ease-out infinite;
+  }
+  .blink {
+    animation: blink 1.5s ease-in-out infinite;
+  }
+  .hud-flicker {
+    animation: flicker 3s ease-in-out infinite;
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="typescript,react">
+const { useState, useEffect, useRef, useMemo } = React;
+
+interface Vec3 { x: number; y: number; z: number; }
+interface Waypoint { id: number; pos: Vec3; label: string; type: 'start' | 'end' | 'node'; }
+
+const project = (p: Vec3, w: number, h: number, rotY: number, rotX: number) => {
+  const cosY = Math.cos(rotY), sinY = Math.sin(rotY);
+  const cosX = Math.cos(rotX), sinX = Math.sin(rotX);
+  let x = p.x * cosY - p.z * sinY;
+  let z = p.x * sinY + p.z * cosY;
+  let y = p.y * cosX - z * sinX;
+  z = p.y * sinX + z * cosX;
+  const d = 600;
+  const f = d / (d + z + 400);
+  return {
+    x: w / 2 + x * f,
+    y: h / 2 + y * f,
+    scale: f,
+    depth: z
+  };
+};
+
+const HUDLayer3DScene = () => {
+  const [size, setSize] = useState({ w: window.innerWidth, h: window.innerHeight });
+  const [time, setTime] = useState(0);
+  const [rotY, setRotY] = useState(0);
+  const [rotX, setRotX] = useState(-0.4);
+  const [pathProgress, setPathProgress] = useState(0);
+  const [scanActive, setScanActive] = useState(true);
+  const [selectedWaypoint, setSelectedWaypoint] = useState<number | null>(null);
+  const dragRef = useRef<{ x: number; y: number; rotY: number; rotX: number } | null>(null);
+  const startTime = useRef(Date.now());
+
+  useEffect(() => {
+    const onResize = () => setSize({ w: window.innerWidth, h: window.innerHeight });
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  useEffect(() => {
+    let raf: number;
+    const loop = () => {
+      const t = (Date.now() - startTime.current) / 1000;
+      setTime(t);
+      if (!dragRef.current) {
+        setRotY(prev => prev + 0.003);
+      }
+      setPathProgress(prev => (prev + 0.005) % 1.2);
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  const waypoints: Waypoint[] = useMemo(() => [
+    { id: 0, pos: { x: -300, y: 0, z: -300 }, label: 'ALPHA-01', type: 'start' },
+    { id: 1, pos: { x: -150, y: -50, z: -100 }, label: 'NODE-A2', type: 'node' },
+    { id: 2, pos: { x: 50, y: -30, z: 50 }, label: 'NODE-B3', type: 'node' },
+    { id: 3, pos: { x: 200, y: -80, z: 200 }, label: 'NODE-C4', type: 'node' },
+    { id: 4, pos: { x: 350, y: 0, z: 350 }, label: 'OMEGA-99', type: 'end' },
+  ], []);
+
+  const gridLines = useMemo(() => {
+    const lines: { a: Vec3; b: Vec3 }[] = [];
+    const size = 500, step = 50;
+    for (let i = -size; i <= size; i += step) {
+      lines.push({ a: { x: i, y: 0, z: -size }, b: { x: i, y: 0, z: size } });
+      lines.push({ a: { x: -size, y: 0, z: i }, b: { x: size, y: 0, z: i } });
+    }
+    return lines;
+  }, []);
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    dragRef.current = { x: e.clientX, y: e.clientY, rotY, rotX };
+    (e.target as Element).setPointerCapture(e.pointerId);
+  };
+  const onPointerMove = (e: React.PointerEvent
