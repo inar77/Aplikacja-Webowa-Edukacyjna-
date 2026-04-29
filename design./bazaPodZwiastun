@@ -1,0 +1,222 @@
+import React from 'react';
+import { motion } from 'framer-motion';
+
+const previewItems = [
+  {
+    id: 'bhp',
+    title: 'BHP',
+    subtitle: 'Zagrożenia i reakcje',
+    x: '18%',
+    y: '30%',
+    color: '#facc15',
+  },
+  {
+    id: 'multimeter',
+    title: 'Multimetr',
+    subtitle: 'Pomiar napięcia i oporu',
+    x: '58%',
+    y: '62%',
+    color: '#22c55e',
+  },
+  {
+    id: 'ohm',
+    title: 'Prawo Ohma',
+    subtitle: 'Napięcie, prąd, rezystancja',
+    x: '72%',
+    y: '24%',
+    color: '#60a5fa',
+  },
+];
+
+export default function LearningPreview({ onEnterLearning, onSelectLesson }) {
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 18 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      style={{
+        position: 'relative',
+        overflow: 'hidden',
+        borderRadius: 28,
+        minHeight: 360,
+        padding: 28,
+        background:
+          'linear-gradient(180deg, #26184b 0%, #1a1333 45%, #0f172a 100%)',
+        border: '1px solid rgba(255,255,255,0.08)',
+        boxShadow: '0 24px 60px rgba(0,0,0,0.35)',
+      }}
+    >
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background:
+            'radial-gradient(circle at 20% 20%, rgba(168,85,247,0.22), transparent 30%), radial-gradient(circle at 80% 30%, rgba(59,130,246,0.18), transparent 32%), radial-gradient(circle at 50% 85%, rgba(34,197,94,0.12), transparent 28%)',
+          pointerEvents: 'none',
+        }}
+      />
+
+      <motion.div
+        animate={{ opacity: [0.45, 0.7, 0.45] }}
+        transition={{ duration: 4, repeat: Infinity }}
+        style={{
+          position: 'absolute',
+          top: '8%',
+          left: '12%',
+          width: 320,
+          height: 320,
+          borderRadius: '50%',
+          background: 'rgba(255,255,255,0.05)',
+          filter: 'blur(60px)',
+          pointerEvents: 'none',
+        }}
+      />
+
+      <div style={{ position: 'relative', zIndex: 2, maxWidth: 440 }}>
+        <div
+          style={{
+            display: 'inline-flex',
+            padding: '6px 12px',
+            borderRadius: 999,
+            background: 'rgba(255,255,255,0.08)',
+            color: '#d8ccff',
+            fontSize: 13,
+            marginBottom: 14,
+          }}
+        >
+          Tryb Nauki
+        </div>
+
+        <h2
+          style={{
+            margin: 0,
+            color: 'white',
+            fontSize: 34,
+            lineHeight: 1.05,
+            fontWeight: 800,
+          }}
+        >
+          Zobacz, co czeka Cię
+          <br />
+          w warsztacie
+        </h2>
+
+        <p
+          style={{
+            color: 'rgba(255,255,255,0.72)',
+            marginTop: 14,
+            fontSize: 15,
+            lineHeight: 1.6,
+            maxWidth: 380,
+          }}
+        >
+          Zanim wejdziesz do nauki, zobacz przedsmak lekcji, narzędzi i zadań,
+          które odblokujesz w tej ścieżce.
+        </p>
+
+        <button
+          onClick={onEnterLearning}
+          style={{
+            marginTop: 20,
+            border: 'none',
+            borderRadius: 14,
+            padding: '12px 18px',
+            background: 'linear-gradient(90deg, #7c3aed, #9333ea)',
+            color: 'white',
+            fontWeight: 700,
+            cursor: 'pointer',
+          }}
+        >
+          Wejdź do nauki
+        </button>
+      </div>
+
+      <div style={{ position: 'absolute', inset: 0, zIndex: 1 }}>
+        <div
+          style={{
+            position: 'absolute',
+            left: '10%',
+            bottom: '18%',
+            width: 180,
+            height: 120,
+            borderRadius: 18,
+            background: 'rgba(255,255,255,0.05)',
+            border: '1px solid rgba(255,255,255,0.08)',
+          }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            right: '12%',
+            bottom: '20%',
+            width: 140,
+            height: 90,
+            borderRadius: 16,
+            background: 'rgba(255,255,255,0.04)',
+            border: '1px solid rgba(255,255,255,0.07)',
+          }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            left: '43%',
+            top: '18%',
+            width: 120,
+            height: 170,
+            borderRadius: 20,
+            background: 'rgba(255,255,255,0.05)',
+            border: '1px solid rgba(255,255,255,0.08)',
+          }}
+        />
+      </div>
+
+      {previewItems.map((item) => (
+        <motion.button
+          key={item.id}
+          whileHover={{ scale: 1.06 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => onSelectLesson?.(item.id)}
+          style={{
+            position: 'absolute',
+            left: item.x,
+            top: item.y,
+            zIndex: 3,
+            border: 'none',
+            background: 'transparent',
+            cursor: 'pointer',
+          }}
+        >
+          <motion.div
+            animate={{ boxShadow: [`0 0 0 0 ${item.color}55`, `0 0 0 10px transparent`, `0 0 0 0 transparent`] }}
+            transition={{ duration: 2.2, repeat: Infinity }}
+            style={{
+              width: 18,
+              height: 18,
+              borderRadius: '50%',
+              background: item.color,
+              margin: '0 auto 10px',
+            }}
+          />
+          <div
+            style={{
+              minWidth: 150,
+              padding: '10px 12px',
+              borderRadius: 14,
+              background: 'rgba(10,14,30,0.72)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              backdropFilter: 'blur(8px)',
+              textAlign: 'left',
+            }}
+          >
+            <div style={{ color: 'white', fontSize: 14, fontWeight: 700 }}>
+              {item.title}
+            </div>
+            <div style={{ color: 'rgba(255,255,255,0.65)', fontSize: 12, marginTop: 4 }}>
+              {item.subtitle}
+            </div>
+          </div>
+        </motion.button>
+      ))}
+    </motion.section>
+  );
+}
