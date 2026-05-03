@@ -1,0 +1,959 @@
+
+import React, { useState, useMemo } from "react";
+import LearningPreviewPanel from "../Tasks/LearningPreviewPanel";
+import WorkshopIntegrityPanel from "./WorkshopIntegrityPanel";
+
+import WorkshopStatusPanel from "./WorkshopStatusPanel";
+// ──────────────────────────────────────────────────────────────
+// Inline SVG ikony (custom, w klimacie preview)
+// ──────────────────────────────────────────────────────────────
+const Icons = {
+  bolt: (
+    <svg viewBox="0 0 48 48" width="48" height="48">
+      <defs>
+        <linearGradient id="ig-b" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#ffd96a" />
+          <stop offset="1" stopColor="#ff7a00" />
+        </linearGradient>
+      </defs>
+      <path
+        d="M27 4 L10 28 L22 28 L19 44 L38 18 L26 18 Z"
+        fill="url(#ig-b)"
+        stroke="#0e1320"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+    </svg>
+  ),
+  multimeter: (
+    <svg viewBox="0 0 48 48" width="48" height="48">
+      <rect x="8" y="6" width="32" height="36" rx="4" fill="#ffb84a" stroke="#0e1320" strokeWidth="2" />
+      <rect x="12" y="10" width="24" height="10" fill="#0e2214" stroke="#0a0d14" strokeWidth="1.5" />
+      <text x="34" y="18" fontFamily="monospace" fontSize="7" fill="#7cff8a" textAnchor="end">230</text>
+      <circle cx="24" cy="30" r="6" fill="#1a1a1a" stroke="#0e1320" strokeWidth="1.5" />
+      <line x1="24" y1="26" x2="27" y2="32" stroke="#ffd27a" strokeWidth="2" strokeLinecap="round" />
+      <circle cx="14" cy="38" r="2" fill="#111" />
+      <circle cx="34" cy="38" r="2" fill="#c41a1a" />
+    </svg>
+  ),
+  wires: (
+    <svg viewBox="0 0 48 48" width="48" height="48">
+      <path d="M4 14 Q14 4 24 14 T44 14" stroke="#d63a3a" strokeWidth="3.5" fill="none" strokeLinecap="round" />
+      <path d="M4 24 Q14 14 24 24 T44 24" stroke="#1f6fd6" strokeWidth="3.5" fill="none" strokeLinecap="round" />
+      <path d="M4 34 Q14 24 24 34 T44 34" stroke="#e6c84a" strokeWidth="3.5" fill="none" strokeLinecap="round" />
+      <circle cx="4" cy="14" r="3" fill="#0e1320" />
+      <circle cx="44" cy="14" r="3" fill="#0e1320" />
+    </svg>
+  ),
+  code: (
+    <svg viewBox="0 0 48 48" width="48" height="48">
+      <rect x="4" y="8" width="40" height="32" rx="3" fill="#1a1a3a" stroke="#0e1320" strokeWidth="2" />
+      <rect x="4" y="8" width="40" height="6" fill="#2a2c4e" />
+      <circle cx="8" cy="11" r="1" fill="#ff5f56" />
+      <circle cx="12" cy="11" r="1" fill="#ffbd2e" />
+      <circle cx="16" cy="11" r="1" fill="#27c93f" />
+      <text x="9" y="26" fontFamily="monospace" fontSize="6" fill="#7cff8a">const</text>
+      <text x="9" y="34" fontFamily="monospace" fontSize="6" fill="#ffb547">{`{...}`}</text>
+    </svg>
+  ),
+};
+
+const FONT_DISPLAY = "'Press Start 2P','VT323','Rajdhani','Inter',sans-serif";
+const FONT_BODY = "'Inter','Rajdhani',system-ui,-apple-system,sans-serif";
+
+// ──────────────────────────────────────────────────────────────
+// Karta lekcji (dark / gaming-startup)
+// ──────────────────────────────────────────────────────────────
+function ElectricianLessonCard({ lesson, index, onClick }) {
+  const isLocked = lesson.prerequisites?.length > 0;
+  const [hover, setHover] = useState(false);
+
+  return (
+    <div
+      onClick={!isLocked ? onClick : undefined}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        position: "relative",
+        padding: 22,
+        borderRadius: 16,
+        background:
+          "linear-gradient(180deg, rgba(26,22,52,0.96) 0%, rgba(14,12,32,0.96) 100%)",
+        border: hover ? "1px solid rgba(255,181,71,0.55)" : "1px solid rgba(255,255,255,0.06)",
+        cursor: isLocked ? "not-allowed" : "pointer",
+        transition: "transform 220ms cubic-bezier(.2,.8,.2,1), box-shadow 220ms, border-color 220ms",
+        opacity: isLocked ? 0.55 : 1,
+        transform: hover && !isLocked ? "translateY(-4px)" : "translateY(0)",
+        boxShadow: hover && !isLocked
+          ? "0 24px 50px -20px rgba(255,150,40,0.35), 0 0 0 1px rgba(255,181,71,0.25), inset 0 0 0 1px rgba(255,255,255,0.04)"
+          : "0 12px 28px -16px rgba(0,0,0,0.7), inset 0 0 0 1px rgba(255,255,255,0.03)",
+        animation: `slideIn 0.55s cubic-bezier(.2,.8,.2,1) ${index * 0.08}s backwards`,
+        overflow: "hidden",
+        fontFamily: FONT_BODY,
+      }}
+    >
+      {/* Glow akcent w rogu */}
+      <div
+        style={{
+          position: "absolute",
+          top: -40,
+          right: -40,
+          width: 140,
+          height: 140,
+          borderRadius: "50%",
+          background:
+            "radial-gradient(circle, rgba(255,181,71,0.25) 0%, rgba(255,181,71,0) 70%)",
+          opacity: hover ? 1 : 0.6,
+          transition: "opacity 220ms",
+          pointerEvents: "none",
+        }}
+      />
+      {/* Subtelna siatka */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          backgroundImage:
+            "repeating-linear-gradient(0deg, rgba(255,255,255,0.025) 0 1px, transparent 1px 28px), repeating-linear-gradient(90deg, rgba(255,255,255,0.025) 0 1px, transparent 1px 28px)",
+          pointerEvents: "none",
+          opacity: 0.6,
+        }}
+      />
+
+      {isLocked && (
+        <div
+          style={{
+            position: "absolute",
+            top: 14,
+            right: 14,
+            background: "#10122a",
+            color: "#ffb547",
+            padding: "5px 10px",
+            borderRadius: 6,
+            border: "1px solid rgba(255,181,71,0.4)",
+            fontSize: 10,
+            fontWeight: 800,
+            letterSpacing: 1.5,
+            textTransform: "uppercase",
+            fontFamily: FONT_DISPLAY,
+            zIndex: 2,
+          }}
+        >
+          ◆ Zablokowane
+        </div>
+      )}
+
+      {/* Tag kategorii */}
+      <div
+        style={{
+          position: "relative",
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          padding: "4px 9px",
+          borderRadius: 4,
+          background: "rgba(255,181,71,0.08)",
+          border: "1px solid rgba(255,181,71,0.3)",
+          color: "#ffd27a",
+          fontSize: 9,
+          fontWeight: 800,
+          letterSpacing: 2,
+          textTransform: "uppercase",
+          marginBottom: 18,
+          zIndex: 2,
+        }}
+      >
+        <span style={{ width: 5, height: 5, background: "#ffb547", boxShadow: "0 0 6px #ffb547" }} />
+        Lekcja {String(index + 1).padStart(2, "0")}
+      </div>
+
+      <div style={{ position: "relative", marginBottom: 14, zIndex: 2 }}>
+        <div
+          style={{
+            display: "inline-flex",
+            padding: 10,
+            borderRadius: 12,
+            background: "rgba(255,255,255,0.03)",
+            border: "1px solid rgba(255,255,255,0.06)",
+            transform: hover ? "rotate(-4deg) scale(1.05)" : "rotate(0) scale(1)",
+            transition: "transform 280ms cubic-bezier(.2,.8,.2,1)",
+          }}
+        >
+          {lesson.iconNode || Icons.bolt}
+        </div>
+      </div>
+
+      <h3
+        style={{
+          fontSize: 18,
+          fontWeight: 800,
+          color: "#f4f1ff",
+          marginBottom: 6,
+          letterSpacing: -0.2,
+          lineHeight: 1.3,
+          fontFamily: FONT_BODY,
+          position: "relative",
+          zIndex: 2,
+        }}
+      >
+        {lesson.title}
+      </h3>
+
+      <p
+        style={{
+          fontSize: 13,
+          color: "rgba(220,225,245,0.62)",
+          marginBottom: 18,
+          lineHeight: 1.55,
+          position: "relative",
+          zIndex: 2,
+        }}
+      >
+        {lesson.description}
+      </p>
+
+      {/* Stats */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(3,1fr)",
+          gap: 10,
+          paddingTop: 16,
+          borderTop: "1px dashed rgba(255,255,255,0.08)",
+          position: "relative",
+          zIndex: 2,
+        }}
+      >
+        {[
+          { v: lesson.content?.length ?? lesson.tasks ?? 0, l: "zadań", c: "#b8a4ff" },
+          { v: `+${lesson.xp}`, l: "XP", c: "#7cff8a" },
+          { v: lesson.duration, l: "czas", c: "#ffb547" },
+        ].map((s, i) => (
+          <div key={i} style={{ textAlign: "left" }}>
+            <div
+              style={{
+                fontSize: 16,
+                fontWeight: 900,
+                color: s.c,
+                fontFamily: "'VT323','Courier New',monospace",
+                letterSpacing: 0.5,
+              }}
+            >
+              {s.v}
+            </div>
+            <div
+              style={{
+                fontSize: 9,
+                color: "rgba(220,225,245,0.4)",
+                letterSpacing: 1.5,
+                textTransform: "uppercase",
+                fontWeight: 700,
+                marginTop: 2,
+              }}
+            >
+              {s.l}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* CTA pasek */}
+      <div
+        style={{
+          marginTop: 16,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "10px 12px",
+          borderRadius: 8,
+          background: hover
+            ? "linear-gradient(90deg,#ffc356,#e08a14)"
+            : "rgba(255,255,255,0.04)",
+          border: hover ? "1px solid #0e1320" : "1px solid rgba(255,255,255,0.06)",
+          color: hover ? "#1a0e02" : "rgba(220,225,245,0.7)",
+          fontSize: 11,
+          fontWeight: 900,
+          letterSpacing: 2,
+          textTransform: "uppercase",
+          transition: "all 220ms",
+          position: "relative",
+          zIndex: 2,
+        }}
+      >
+        <span>▶ Rozpocznij</span>
+        <span style={{ transform: hover ? "translateX(4px)" : "translateX(0)", transition: "transform 220ms" }}>→</span>
+      </div>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────
+// Główny widok
+// ──────────────────────────────────────────────────────────────
+export default function LessonsVieww() {
+  const [selectedLesson, setSelectedLesson] = useState(null);
+  const [currentTask, setCurrentTask] = useState(0);
+  const [score, setScore] = useState(0);
+  const [selectedAnswer, setSelectedAnswer] = useState(null);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [matchPicks, setMatchPicks] = useState({});
+  const [search, setSearch] = useState("");
+  const [toast, setToast] = useState(null);
+
+  const lessons = [
+    {
+      id: "electrical",
+      iconNode: Icons.bolt,
+      title: "Instalacje elektryczne",
+      description: "Podstawy bezpiecznej pracy z prądem",
+      hotspotId: "panel",
+      tasks: 4,
+      xp: 275,
+      duration: "15 min",
+      content: [
+        {
+          type: "multiple-choice",
+          question: "Jakie napięcie jest standardowo w gniazdku domowym w Polsce?",
+          options: ["110V", "230V", "380V", "12V"],
+          correct: 1,
+          points: 50,
+        },
+        {
+          type: "matching",
+          question: "Dopasuj narzędzia do ich zastosowania:",
+          pairs: [
+            { left: "Multimetr", right: "Pomiar napięcia i rezystancji" },
+            { left: "Ściągacz izolacji", right: "Zdejmowanie izolacji z przewodów" },
+            { left: "Próbnik napięcia", right: "Sprawdzanie obecności napięcia" },
+            { left: "Zaciskarka", right: "Montaż końcówek kablowych" },
+          ],
+          points: 100,
+        },
+      ],
+    },
+    {
+      id: "multimeter",
+      iconNode: Icons.multimeter,
+      title: "Pomiary multimetrem",
+      description: "Bezpieczne mierzenie napięcia, prądu i rezystancji",
+      hotspotId: "multimeter",
+      tasks: 3,
+      xp: 220,
+      duration: "12 min",
+      content: [
+        {
+          type: "multiple-choice",
+          question: "Który zakres ustawisz, aby zmierzyć 230 V AC?",
+          options: ["200 mV DC", "20 V AC", "750 V AC", "10 A DC"],
+          correct: 2,
+          points: 60,
+        },
+      ],
+    },
+    {
+      id: "circuit",
+      iconNode: Icons.wires,
+      title: "Budowa obwodu",
+      description: "Kolory żył, zaciski, prowadzenie przewodów",
+      hotspotId: "wires",
+      tasks: 3,
+      xp: 240,
+      duration: "14 min",
+      content: [
+        {
+          type: "multiple-choice",
+          question: "Jaki kolor ma przewód ochronny PE?",
+          options: ["Niebieski", "Brązowy", "Żółto-zielony", "Czarny"],
+          correct: 2,
+          points: 60,
+        },
+      ],
+    },
+    {
+      id: "javascript",
+      iconNode: Icons.code,
+      title: "JavaScript Podstawy",
+      description: "Zmienne, funkcje i pętle",
+      tasks: 5,
+      xp: 300,
+      duration: "20 min",
+      content: [
+        {
+          type: "multiple-choice",
+          question: "Jak deklarujemy stałą w JavaScript?",
+          options: ["var", "let", "const", "static"],
+          correct: 2,
+          points: 60,
+        },
+      ],
+    },
+  ];
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return lessons;
+    return lessons.filter(
+      (l) => l.title.toLowerCase().includes(q) || l.description.toLowerCase().includes(q)
+    );
+  }, [search]);
+
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2400);
+  };
+
+  const openLesson = (id) => {
+    setSelectedLesson(id);
+    setCurrentTask(0);
+    setScore(0);
+    setSelectedAnswer(null);
+    setShowFeedback(false);
+    setMatchPicks({});
+  };
+   const handleRepair = (lessonId ) => openLesson(lessonId);
+  const handleHotspotStart = (hotspot) => {
+    const lesson = lessons.find((l) => l.hotspotId === hotspot?.id);
+    if (lesson) openLesson(lesson.id);
+  };
+
+  // ─────────── LESSON VIEW (dark, spójny z preview) ───────────
+  if (selectedLesson) {
+    const lesson = lessons.find((l) => l.id === selectedLesson);
+    const task = lesson.content[currentTask];
+    const totalTasks = lesson.content.length;
+
+    const goNextOrFinish = (gained) => {
+      const newScore = score + (gained || 0);
+      if (currentTask < totalTasks - 1) {
+        setCurrentTask(currentTask + 1);
+        setSelectedAnswer(null);
+        setShowFeedback(false);
+        setMatchPicks({});
+        setScore(newScore);
+      } else {
+        showToast(`🎉 Lekcja ukończona! +${newScore} XP`);
+        setSelectedLesson(null);
+        setCurrentTask(0);
+        setScore(0);
+      }
+    };
+
+    return (
+      <div style={{ fontFamily: FONT_BODY }}>
+        <style>{`@keyframes slideIn {from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}`}</style>
+
+        <button
+          onClick={() => setSelectedLesson(null)}
+          style={{
+            background: "rgba(124,58,237,0.08)",
+            border: "1px solid rgba(124,58,237,0.25)",
+            color: "#b8a4ff",
+            cursor: "pointer",
+            fontSize: 12,
+            padding: "8px 14px",
+            borderRadius: 8,
+            marginBottom: 16,
+            fontWeight: 700,
+            letterSpacing: 1,
+            textTransform: "uppercase",
+          }}
+        >
+          ← Wróć do lekcji
+        </button>
+
+        {/* Header panel — ten sam klimat co preview */}
+        <div
+          style={{
+            position: "relative",
+            padding: "24px 28px",
+            borderRadius: 18,
+            background:
+              "radial-gradient(120% 90% at 0% 0%, #1a1530 0%, #0c0a1c 60%, #050410 100%)",
+            border: "1px solid rgba(255,181,71,0.25)",
+            boxShadow: "0 30px 60px -20px rgba(20,5,60,0.55), inset 0 0 0 1px rgba(255,255,255,0.04)",
+            overflow: "hidden",
+            marginBottom: 18,
+          }}
+        >
+          <div
+            style={{
+              position: "absolute",
+              top: -60,
+              right: -60,
+              width: 220,
+              height: 220,
+              borderRadius: "50%",
+              background: "radial-gradient(circle, rgba(255,181,71,0.25) 0%, rgba(255,181,71,0) 70%)",
+            }}
+          />
+          <div style={{ display: "flex", alignItems: "center", gap: 16, position: "relative" }}>
+            <div
+              style={{
+                padding: 10,
+                borderRadius: 12,
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.08)",
+              }}
+            >
+              {lesson.iconNode}
+            </div>
+            <div style={{ flex: 1 }}>
+              <div
+                style={{
+                  fontSize: 9,
+                  letterSpacing: 2,
+                  textTransform: "uppercase",
+                  color: "#ffb547",
+                  fontWeight: 900,
+                  marginBottom: 4,
+                  fontFamily: FONT_DISPLAY,
+                }}
+              >
+                ▶ Trwa lekcja
+              </div>
+              <h1 style={{ fontSize: 26, fontWeight: 900, color: "#f4f1ff", letterSpacing: -0.5, margin: 0 }}>
+                {lesson.title}
+              </h1>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <div style={{ fontSize: 9, color: "rgba(220,225,245,0.5)", letterSpacing: 2, textTransform: "uppercase", fontWeight: 700 }}>
+                Postęp
+              </div>
+              <div
+                style={{
+                  fontFamily: "'VT323',monospace",
+                  fontSize: 24,
+                  color: "#ffd27a",
+                  fontWeight: 900,
+                }}
+              >
+                {currentTask + 1}/{totalTasks}
+              </div>
+            </div>
+          </div>
+
+          {/* Progress + score */}
+          <div style={{ display: "flex", gap: 14, alignItems: "center", marginTop: 18, position: "relative" }}>
+            <div
+              style={{
+                flex: 1,
+                height: 8,
+                background: "rgba(255,255,255,0.06)",
+                borderRadius: 999,
+                overflow: "hidden",
+                border: "1px solid rgba(255,255,255,0.05)",
+              }}
+            >
+              <div
+                style={{
+                  width: `${((currentTask + 1) / totalTasks) * 100}%`,
+                  height: "100%",
+                  background: "linear-gradient(90deg,#ffd96a,#ff7a00)",
+                  boxShadow: "0 0 12px rgba(255,150,40,0.6)",
+                  transition: "width 0.5s cubic-bezier(.2,.8,.2,1)",
+                }}
+              />
+            </div>
+            <div
+              style={{
+                padding: "6px 12px",
+                background: "rgba(124,255,138,0.08)",
+                border: "1px solid rgba(124,255,138,0.3)",
+                borderRadius: 8,
+                color: "#7cff8a",
+                fontFamily: "'VT323',monospace",
+                fontSize: 18,
+                fontWeight: 900,
+              }}
+            >
+              {score} XP
+            </div>
+          </div>
+        </div>
+
+        {/* Karta zadania */}
+        <div
+          style={{
+            position: "relative",
+            padding: 28,
+            borderRadius: 16,
+            background: "linear-gradient(180deg,#1a1638 0%,#0e0c20 100%)",
+            border: "1px solid rgba(255,255,255,0.06)",
+            boxShadow: "0 20px 50px -20px rgba(0,0,0,0.6)",
+          }}
+        >
+          <h2 style={{ fontSize: 19, fontWeight: 800, color: "#f4f1ff", marginBottom: 22, lineHeight: 1.4 }}>
+            {task.question}
+          </h2>
+
+          {task.type === "multiple-choice" && (
+            <>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 22 }}>
+                {task.options.map((option, idx) => {
+                  const isPicked = selectedAnswer === idx;
+                  const isCorrect = showFeedback && idx === task.correct;
+                  const isWrong = showFeedback && isPicked && idx !== task.correct;
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => !showFeedback && setSelectedAnswer(idx)}
+                      disabled={showFeedback}
+                      style={{
+                        padding: "14px 18px",
+                        background: isCorrect
+                          ? "rgba(124,255,138,0.12)"
+                          : isWrong
+                          ? "rgba(255,90,90,0.12)"
+                          : isPicked
+                          ? "rgba(255,181,71,0.12)"
+                          : "rgba(255,255,255,0.03)",
+                        border: isCorrect
+                          ? "1px solid #7cff8a"
+                          : isWrong
+                          ? "1px solid #ff5a5a"
+                          : isPicked
+                          ? "1px solid #ffb547"
+                          : "1px solid rgba(255,255,255,0.08)",
+                        borderRadius: 10,
+                        textAlign: "left",
+                        fontSize: 14,
+                        color: "#f4f1ff",
+                        cursor: showFeedback ? "default" : "pointer",
+                        fontWeight: 600,
+                        transition: "all 180ms",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: 26,
+                          height: 26,
+                          borderRadius: 6,
+                          background: "rgba(255,255,255,0.05)",
+                          border: "1px solid rgba(255,255,255,0.1)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontFamily: "'VT323',monospace",
+                          fontSize: 14,
+                          color: "#ffb547",
+                          fontWeight: 900,
+                        }}
+                      >
+                        {String.fromCharCode(65 + idx)}
+                      </span>
+                      {option}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                onClick={() => {
+                  if (showFeedback) return;
+                  setShowFeedback(true);
+                  const gained = selectedAnswer === task.correct ? task.points : 0;
+                  setTimeout(() => goNextOrFinish(gained), 1400);
+                }}
+                disabled={selectedAnswer === null}
+                style={{
+                  width: "100%",
+                  padding: 14,
+                  background:
+                    selectedAnswer !== null
+                      ? "linear-gradient(180deg,#ffc356,#e08a14)"
+                      : "rgba(255,255,255,0.04)",
+                  color: selectedAnswer !== null ? "#1a0e02" : "rgba(220,225,245,0.4)",
+                  border:
+                    selectedAnswer !== null
+                      ? "1px solid #0e1320"
+                      : "1px solid rgba(255,255,255,0.06)",
+                  borderRadius: 10,
+                  fontSize: 12,
+                  fontWeight: 900,
+                  letterSpacing: 2,
+                  textTransform: "uppercase",
+                  cursor: selectedAnswer !== null ? "pointer" : "not-allowed",
+                  fontFamily: FONT_DISPLAY,
+                  boxShadow:
+                    selectedAnswer !== null
+                      ? "0 10px 24px -8px rgba(255,150,40,0.5)"
+                      : "none",
+                }}
+              >
+                ▶ Potwierdź
+              </button>
+            </>
+          )}
+
+          {task.type === "matching" && (
+            <>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 22 }}>
+                {task.pairs.map((p, i) => (
+                  <React.Fragment key={i}>
+                    <div
+                      style={{
+                        padding: "12px 14px",
+                        background: "rgba(255,181,71,0.08)",
+                        border: "1px solid rgba(255,181,71,0.25)",
+                        borderRadius: 10,
+                        fontWeight: 700,
+                        color: "#ffd27a",
+                        fontSize: 13,
+                      }}
+                    >
+                      {p.left}
+                    </div>
+                    <select
+                      value={matchPicks[i] ?? ""}
+                      onChange={(e) => setMatchPicks({ ...matchPicks, [i]: e.target.value })}
+                      disabled={showFeedback}
+                      style={{
+                        padding: "12px 14px",
+                        borderRadius: 10,
+                        border: "1px solid rgba(255,255,255,0.1)",
+                        background: "rgba(255,255,255,0.03)",
+                        color: "#f4f1ff",
+                        fontSize: 13,
+                        fontFamily: FONT_BODY,
+                        outline: "none",
+                      }}
+                    >
+                      <option value="" style={{ background: "#10122a" }}>
+                        — wybierz —
+                      </option>
+                      {task.pairs.map((p2, j) => (
+                        <option key={j} value={p2.right} style={{ background: "#10122a" }}>
+                          {p2.right}
+                        </option>
+                      ))}
+                    </select>
+                  </React.Fragment>
+                ))}
+              </div>
+
+              <button
+                onClick={() => {
+                  if (showFeedback) return;
+                  const ok = task.pairs.every((p, i) => matchPicks[i] === p.right);
+                  setShowFeedback(true);
+                  setTimeout(() => goNextOrFinish(ok ? task.points : 0), 1400);
+                }}
+                disabled={Object.values(matchPicks).filter(Boolean).length < task.pairs.length}
+                style={{
+                  width: "100%",
+                  padding: 14,
+                  background:
+                    Object.values(matchPicks).filter(Boolean).length === task.pairs.length
+                      ? "linear-gradient(180deg,#ffc356,#e08a14)"
+                      : "rgba(255,255,255,0.04)",
+                  color:
+                    Object.values(matchPicks).filter(Boolean).length === task.pairs.length
+                      ? "#1a0e02"
+                      : "rgba(220,225,245,0.4)",
+                  border: "1px solid rgba(0,0,0,0.4)",
+                  borderRadius: 10,
+                  fontSize: 12,
+                  fontWeight: 900,
+                  letterSpacing: 2,
+                  textTransform: "uppercase",
+                  cursor: "pointer",
+                  fontFamily: FONT_DISPLAY,
+                }}
+              >
+                ▶ Sprawdź dopasowania
+              </button>
+            </>
+          )}
+        </div>
+
+        {toast && <Toast message={toast} />}
+      </div>
+    );
+  }
+
+  // ─────────── LISTA LEKCJI ───────────
+  return (
+    <div style={{ fontFamily: FONT_BODY }}>
+      <style>{`
+        @keyframes slideIn {
+          from { opacity: 0; transform: translateY(14px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes pulse-glow {
+          0%,100% { box-shadow: 0 0 0 0 rgba(255,181,71,0.4); }
+          50%     { box-shadow: 0 0 0 6px rgba(255,181,71,0); }
+        }
+      `}</style>
+
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 20 }}>
+        <h1
+          style={{
+            fontSize: 28,
+            fontWeight: 900,
+            color: "#1f2937",
+            letterSpacing: -0.5,
+            margin: 0,
+          }}
+        >
+          Dostępne lekcje
+        </h1>
+        <div
+          style={{
+            fontSize: 11,
+            color: "#7c3aed",
+            fontWeight: 800,
+            letterSpacing: 2,
+            textTransform: "uppercase",
+            fontFamily: FONT_DISPLAY,
+          }}
+        >
+          ◆ {lessons.length} modułów
+        </div>
+      </div>
+
+      <div
+  style={{
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1.55fr) minmax(0, 1fr)",
+    gap: 16,
+    marginBottom: 28,
+  }}
+>
+  <LearningPreviewPanel onStartLesson={handleHotspotStart} />
+  <WorkshopIntegrityPanel
+    profession="electrician"
+    paused={!!selectedLesson}
+    onRepair={() => openLesson("electrical")}
+    initialIntegrity={78}
+    decayPerSecond={0.6}
+  />
+</div>
+
+      {/* Search bar — w stylu preview */}
+      <div
+        style={{
+          display: "flex",
+          gap: 10,
+          marginBottom: 20,
+          alignItems: "center",
+        }}
+      >
+        <div
+          style={{
+            flex: 1,
+            position: "relative",
+            background: "linear-gradient(180deg,#1a1638,#0e0c20)",
+            borderRadius: 12,
+            border: "1px solid rgba(255,255,255,0.08)",
+            padding: "0 16px",
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            boxShadow: "0 8px 24px -10px rgba(0,0,0,0.5)",
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <circle cx="11" cy="11" r="7" stroke="#ffb547" strokeWidth="2" />
+            <path d="M20 20 L16 16" stroke="#ffb547" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+          <input
+            type="text"
+            placeholder="Szukaj lekcji…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{
+              flex: 1,
+              padding: "14px 0",
+              border: "none",
+              background: "transparent",
+              fontSize: 14,
+              color: "#f4f1ff",
+              outline: "none",
+              fontFamily: FONT_BODY,
+            }}
+          />
+        </div>
+        <div
+          style={{
+            padding: "12px 16px",
+            background: "rgba(255,181,71,0.08)",
+            color: "#ffd27a",
+            borderRadius: 12,
+            fontWeight: 900,
+            fontSize: 12,
+            letterSpacing: 1.5,
+            border: "1px solid rgba(255,181,71,0.25)",
+            fontFamily: "'VT323',monospace",
+          }}
+        >
+          {filtered.length} / {lessons.length}
+        </div>
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+          gap: 16,
+        }}
+      >
+        {filtered.map((lesson, i) => (
+          <ElectricianLessonCard
+            key={lesson.id}
+            lesson={lesson}
+            index={i}
+            onClick={() => openLesson(lesson.id)}
+          />
+        ))}
+        {filtered.length === 0 && (
+          <div
+            style={{
+              gridColumn: "1 / -1",
+              padding: 50,
+              textAlign: "center",
+              color: "rgba(220,225,245,0.5)",
+              background: "linear-gradient(180deg,#1a1638,#0e0c20)",
+              borderRadius: 16,
+              border: "1px dashed rgba(255,255,255,0.1)",
+              fontSize: 14,
+            }}
+          >
+            Brak wyników dla „{search}”
+          </div>
+        )}
+      </div>
+
+      {toast && <Toast message={toast} />}
+    </div>
+  );
+}
+
+function Toast({ message }) {
+  return (
+    <div
+      style={{
+        position: "fixed",
+        bottom: 28,
+        left: "50%",
+        transform: "translateX(-50%)",
+        background: "linear-gradient(180deg,#1a1638,#0e0c20)",
+        color: "#ffd27a",
+        padding: "14px 22px",
+        borderRadius: 12,
+        border: "1px solid rgba(255,181,71,0.4)",
+        boxShadow: "0 20px 50px -10px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,181,71,0.15)",
+        fontWeight: 800,
+        fontSize: 13,
+        letterSpacing: 0.5,
+        zIndex: 9999,
+        animation: "slideIn 0.35s cubic-bezier(.2,.8,.2,1)",
+        fontFamily: FONT_BODY,
+      }}
+    >
+      {message}
+    </div>
+  );
+}
