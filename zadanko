@@ -1,0 +1,546 @@
+Oto kompletna, modularna implementacja w TS + Tailwind. 4 pliki, każdy gotowy do wklejenia.
+
+### 1) `types.ts`
+```ts
+export type TaskId = "distribution-box" | "satellite-dish";
+
+export interface Task {
+  id: TaskId;
+  title: string;
+  description: string;
+  xpReward: number;
+}
+
+export interface TaskComponentProps {
+  onComplete: (xp: number) => void;
+  onAbort: () => void;
+}
+
+export interface Wire {
+  id: string;
+  label: string;
+  colorClass: string; // tailwind text/stroke
+  hex: string;        // dla SVG stroke
+  glow: string;
+}
+```
+
+### 2) `TaskRouter.tsx`
+```tsx
+import React, { useState } from "react";
+import { Task, TaskId } from "./types";
+import DistributionBoxTask from "./DistributionBoxTask";
+import SatelliteAlignTask from "./SatelliteAlignTask";
+
+const TASKS: Task[] = [
+  {
+    id: "distribution-box",
+    title: "Naprawa rozdzielnicy",
+    description: "Połącz fazy L1/L2/L3, neutralny i ochronny w skrzynce 380V.",
+    xpReward: 150,
+  },
+  {
+    id: "satellite-dish",
+    title: "Justowanie anteny satelitarnej",
+    description: "Ustaw azymut i elewację talerza, by złapać sygnał.",
+    xpReward: 200,
+  },
+];
+
+interface Props {
+  onTotalXp?: (xp: number) => void;
+}
+
+const TaskRouter: React.FC<Props> = ({ onTotalXp }) => {
+  const [activeTask, setActiveTask] = useState<TaskId | null>(null);
+  const [completedXp, setCompletedXp] = useState<Record<TaskId, boolean>>(
+    {} as Record<TaskId, boolean>
+  );
+
+  const handleComplete = (xp: number, id: TaskId) => {
+    setCompletedXp((p) => ({ ...p, [id]: true }));
+    onTotalXp?.(xp);
+    setActiveTask(null);
+  };
+
+  const handleAbort = () => setActiveTask(null);
+
+  if (activeTask === "distribution-box") {
+    return (
+      <DistributionBoxTask
+        onComplete={(xp) => handleComplete(xp, "distribution-box")}
+        onAbort={handleAbort}
+      />
+    );
+  }
+  if (activeTask === "satellite-dish") {
+    return (
+      <SatelliteAlignTask
+        onComplete={(xp) => handleComplete(xp, "satellite-dish")}
+        onAbort={handleAbort}
+      />
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {TASKS.map((t) => (
+        <div
+          key={t.id}
+          className="relative p-5 rounded-xl bg-gradient-to-b from-zinc-900 to-zinc-950 border border-amber-500/20 hover:border-amber-500/50 transition group overflow-hidden"
+        >
+          <div className="absolute -top-12 -right-12 w-32 h-32 rounded-full bg-amber-500/10 blur-2xl group-hover:bg-amber-500/20 transition" />
+          <div className="relative flex items-center gap-2 mb-2">
+            <span className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_8px_#fbbf24] animate-pulse" />
+            <span className="text-[10px] tracking-[0.2em] text-amber-300 font-mono font-bold uppercase">
+              Zadanie · {t.id.toUpperCase()}
+            </span>
+          </div>
+          <h3 className="relative text-lg font-bold text-zinc-100 mb-1">{t.title}</h3>
+          <p className="relative text-sm text-zinc-400 mb-4 leading-relaxed">
+            {t.description}
+          </p>
+          <div className="relative flex items-center justify-between">
+            <span className="text-xs font-mono text-emerald-400">+{t.xpReward} XP</span>
+            <button
+              onClick={() => setActiveTask(t.id)}
+              disabled={completedXp[t.id]}
+              className="px-4 py-2 rounded-md bg-gradient-to-b from-amber-400 to-amber-600 text-zinc-950 text-xs font-black tracking-widest uppercase border-2 border-zinc-950 hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            >
+              {completedXp[t.id] ? "✓ Ukończone" : "▶ Rozpocznij"}
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+export default TaskRouter;
+```
+
+### 3) `DistributionBoxTask.tsx`
+```tsx
+import React, { useState, useRef, useCallback, useEffect } from "react";
+import { TaskComponentProps, Wire } from "./types";
+
+const WIRES: Wire[] = [
+  { id: "L1", label: "L1", colorClass: "text-amber-700", hex: "#8b4513", glow: "#d4691e" },
+  { id: "L2", label: "L2", colorClass: "text-zinc-900", hex: "#1a1a1a", glow: "#666" },
+  { id: "L3", label: "L3", colorClass: "text-zinc-400", hex: "#888888", glow: "#bbb" },
+  { id: "N",  label: "N",  colorClass: "text-blue-500", hex: "#1f6fd6", glow: "#5aa5ff" },
+  { id: "PE", label: "PE", colorClass: "text-lime-500", hex: "#7cc450", glow: "#caf57a" },
+];
+
+const shuffle = <T,>(arr: T[]): T[] => {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
+
+const DistributionBoxTask: React.FC<TaskComponentProps> = ({ onComplete, onAbort }) => {
+  const [leftOrder] = useState<Wire[]>(() => shuffle(WIRES));
+  const [rightOrder] = useState<Wire[]>(() => shuffle(WIRES));
+  const [connections, setConnections] = useState<Record<string, boolean>>({});
+  const [active, setActive] = useState<string | null>(null);
+  const [mouse, setMouse] = useState({ x: 0, y: 0 });
+  const [errorFlash, setErrorFlash] = useState(false);
+  const [sparkAt, setSparkAt] = useState<{ id: string; y: number } | null>(null);
+  const [done, setDone] = useState(false);
+  const [time, setTime] = useState(60);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const ROW = 70, TOP = 90, LX = 90, RX = 510;
+  const yOf = (i: number) => TOP + i * ROW;
+  const lY = (id: string) => yOf(leftOrder.findIndex((w) => w.id === id));
+  const rY = (id: string) => yOf(rightOrder.findIndex((w) => w.id === id));
+
+  useEffect(() => {
+    if (done) return;
+    const t = setInterval(() => setTime((s) => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(t);
+  }, [done]);
+
+  const handleMove = useCallback((e: React.MouseEvent) => {
+    if (!active || !ref.current) return;
+    const r = ref.current.getBoundingClientRect();
+    setMouse({ x: e.clientX - r.left, y: e.clientY - r.top });
+  }, [active]);
+
+  const pickLeft = (id: string) => {
+    if (connections[id] || done) return;
+    setActive(id);
+    setMouse({ x: LX, y: lY(id) });
+  };
+
+  const pickRight = (id: string) => {
+    if (!active || done) return;
+    if (active === id) {
+      const next = { ...connections, [active]: true };
+      setConnections(next);
+      setSparkAt({ id: active, y: rY(active) });
+      setTimeout(() => setSparkAt(null), 500);
+      setActive(null);
+      if (Object.keys(next).length === WIRES.length) {
+        setDone(true);
+        setTimeout(() => onComplete(150), 2200);
+      }
+    } else {
+      setErrorFlash(true);
+      setTimeout(() => setErrorFlash(false), 350);
+      setActive(null);
+    }
+  };
+
+  const path = (x1: number, y1: number, x2: number, y2: number) => {
+    const dx = (x2 - x1) * 0.55;
+    return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
+  };
+
+  const failed = time === 0 && !done;
+  const pct = (time / 60) * 100;
+
+  return (
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-5 backdrop-blur-md"
+      style={{ background: "rgba(5,4,10,0.92)" }}
+      onClick={() => setActive(null)}
+    >
+      <div
+        ref={ref}
+        onClick={(e) => e.stopPropagation()}
+        onMouseMove={handleMove}
+        className="relative w-[600px] max-w-full rounded-2xl border-4 border-zinc-900 overflow-hidden font-sans"
+        style={{
+          height: 480,
+          background: "#0a0c10",
+          backgroundImage: `
+            repeating-linear-gradient(0deg, rgba(255,255,255,0.018) 0 1px, transparent 1px 4px),
+            repeating-linear-gradient(90deg, rgba(255,255,255,0.025) 0 2px, transparent 2px 10px),
+            radial-gradient(80% 60% at 50% 30%, rgba(80,40,20,0.4), transparent 70%)`,
+          boxShadow: "inset 0 0 60px rgba(0,0,0,0.85), 0 30px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,181,71,0.15)",
+          cursor: active ? "crosshair" : "default",
+        }}
+      >
+        {/* scanlines */}
+        <div className="pointer-events-none absolute inset-0 z-50 mix-blend-overlay opacity-50"
+          style={{ backgroundImage: "repeating-linear-gradient(0deg, rgba(255,255,255,0.04) 0 1px, transparent 1px 3px)" }} />
+
+        {errorFlash && <div className="absolute inset-0 z-[60] bg-red-500/40 animate-pulse" />}
+
+        {/* HEADER */}
+        <div className="relative z-10 flex items-center justify-between px-5 py-3 border-b border-amber-500/20"
+          style={{ background: "linear-gradient(180deg, rgba(255,40,40,0.08), transparent)" }}>
+          <div className="flex items-center gap-2.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"
+              style={{ boxShadow: "0 0 10px #ff3b30" }} />
+            <span className="text-[11px] tracking-[0.2em] font-black text-red-300 font-mono">
+              ▲ NAPRAWA · POŁĄCZ FAZY
+            </span>
+          </div>
+          <button onClick={onAbort}
+            className="px-2.5 py-1 text-[10px] tracking-wider uppercase rounded text-zinc-400 bg-white/5 border border-white/10 hover:bg-white/10">
+            ✕ Anuluj
+          </button>
+        </div>
+
+        {/* TIMER */}
+        <div className="relative z-10 px-5 py-2 flex items-center gap-3 border-b border-white/5">
+          <span className="text-[9px] tracking-wider text-zinc-500 uppercase font-mono">CZAS</span>
+          <div className="flex-1 h-1.5 bg-black border border-zinc-700 overflow-hidden">
+            <div className="h-full transition-all"
+              style={{
+                width: `${pct}%`,
+                background: pct > 50 ? "#7cff8a" : pct > 25 ? "#ffb547" : "#ff3b30",
+                boxShadow: `0 0 8px ${pct > 50 ? "#7cff8a" : pct > 25 ? "#ffb547" : "#ff3b30"}`,
+              }} />
+          </div>
+          <span className="font-mono font-black text-amber-300 min-w-[40px] text-right">
+            {time.toString().padStart(2, "0")}s
+          </span>
+          <span className="px-2 py-0.5 rounded text-xs font-black text-emerald-400 font-mono bg-emerald-500/10 border border-emerald-500/30">
+            {Object.keys(connections).length}/{WIRES.length}
+          </span>
+        </div>
+
+        {/* SVG SCENA */}
+        <svg width="100%" height="370" viewBox="0 0 600 370" className="relative z-[2] block">
+          <text x="90" y="40" fontFamily="monospace" fontSize="14" fill="rgba(180,190,210,0.5)" letterSpacing="2">ŹRÓDŁO</text>
+          <text x="510" y="40" fontFamily="monospace" fontSize="14" fill="rgba(180,190,210,0.5)" letterSpacing="2" textAnchor="end">ZACISKI</text>
+
+          <rect x="20" y="60" width="140" height={WIRES.length * ROW + 20} rx="6" fill="#0d1116" stroke="#2a2e36" strokeWidth="1.5" />
+          <rect x="440" y="60" width="140" height={WIRES.length * ROW + 20} rx="6" fill="#0d1116" stroke="#2a2e36" strokeWidth="1.5" />
+
+          {/* połączone kable */}
+          {Object.keys(connections).map((id) => {
+            const w = WIRES.find((x) => x.id === id)!;
+            return (
+              <g key={id}>
+                <path d={path(LX, lY(id), RX, rY(id))} stroke={w.hex} strokeWidth="6" fill="none" strokeLinecap="round" />
+                <path d={path(LX, lY(id), RX, rY(id))} stroke={w.glow} strokeWidth="2" fill="none" strokeLinecap="round" opacity="0.7" />
+              </g>
+            );
+          })}
+
+          {/* aktywny */}
+          {active && (
+            <path d={path(LX, lY(active), mouse.x, mouse.y)}
+              stroke={WIRES.find((w) => w.id === active)!.hex}
+              strokeWidth="6" fill="none" strokeLinecap="round" opacity="0.85" />
+          )}
+
+          {/* iskrzenie po połączeniu */}
+          {sparkAt && Array.from({ length: 8 }).map((_, i) => {
+            const a = (i / 8) * Math.PI * 2;
+            return (
+              <circle key={i} cx={RX} cy={sparkAt.y} r="2" fill="#fff4b0">
+                <animate attributeName="cx" from={RX} to={RX + Math.cos(a) * 30} dur="0.5s" fill="freeze" />
+                <animate attributeName="cy" from={sparkAt.y} to={sparkAt.y + Math.sin(a) * 30} dur="0.5s" fill="freeze" />
+                <animate attributeName="opacity" from="1" to="0" dur="0.5s" fill="freeze" />
+              </circle>
+            );
+          })}
+
+          {/* lewe końcówki */}
+          {leftOrder.map((w, i) => {
+            const y = yOf(i);
+            const isConn = connections[w.id];
+            const isAct = active === w.id;
+            return (
+              <g key={`L-${w.id}`} style={{ cursor: isConn ? "default" : "pointer" }}
+                onClick={(e) => { e.stopPropagation(); pickLeft(w.id); }}>
+                <rect x="30" y={y - 18} width="50" height="36" rx="3" fill="#1a1d22" stroke={w.hex} strokeWidth="1.5" />
+                <text x="55" y={y + 5} fontFamily="monospace" fontSize="18" fill={w.hex} textAnchor="middle" fontWeight="bold">{w.label}</text>
+                <line x1="80" y1={y} x2="90" y2={y} stroke={w.hex} strokeWidth="6" strokeLinecap="round" />
+                <circle cx="90" cy={y} r="9" fill={w.hex} stroke={isAct ? "#fff" : "#000"} strokeWidth={isAct ? 2 : 1} />
+                {!isConn && (
+                  <circle cx="90" cy={y} r="9" fill="none" stroke={w.glow} strokeWidth="1.5">
+                    <animate attributeName="r" values="9;16;9" dur="1.5s" repeatCount="indefinite" />
+                    <animate attributeName="opacity" values="0.7;0;0.7" dur="1.5s" repeatCount="indefinite" />
+                  </circle>
+                )}
+              </g>
+            );
+          })}
+
+          {/* prawe gniazda */}
+          {rightOrder.map((w, i) => {
+            const y = yOf(i);
+            const isConn = connections[w.id];
+            const canMatch = active === w.id;
+            return (
+              <g key={`R-${w.id}`} style={{ cursor: active && !isConn ? "pointer" : "default" }}
+                onClick={(e) => { e.stopPropagation(); pickRight(w.id); }}>
+                <line x1="510" y1={y} x2="520" y2={y} stroke={isConn ? w.hex : "#444"} strokeWidth="6" strokeLinecap="round" />
+                <circle cx="510" cy={y} r="11" fill={isConn ? w.hex : "#0d1116"}
+                  stroke={canMatch ? "#fff" : isConn ? w.glow : "#444"} strokeWidth={canMatch ? 2.5 : 1.5} />
+                <circle cx="510" cy={y} r="5" fill={isConn ? "#000" : "#1a1d22"} />
+                <rect x="530" y={y - 18} width="50" height="36" rx="3" fill="#1a1d22"
+                  stroke={isConn ? w.hex : "#2a2e36"} strokeWidth="1.5" />
+                <text x="555" y={y + 5} fontFamily="monospace" fontSize="18"
+                  fill={isConn ? w.hex : "rgba(180,190,210,0.4)"} textAnchor="middle" fontWeight="bold">{w.label}</text>
+              </g>
+            );
+          })}
+        </svg>
+
+        {/* SUKCES */}
+        {done && (
+          <div className="absolute inset-0 z-[100] flex flex-col items-center justify-center"
+            style={{ background: "radial-gradient(circle at 50% 50%, rgba(124,255,138,0.25), rgba(0,0,0,0.85))" }}>
+            <div className="text-3xl font-black tracking-[0.25em] text-emerald-300 font-mono text-center"
+              style={{ textShadow: "0 0 20px #7cff8a, 0 0 40px #7cff8a" }}>
+              ⚡ NAPRAWA<br />ZAKOŃCZONA ⚡
+            </div>
+            <button onClick={() => onComplete(150)}
+              className="mt-6 px-6 py-3 bg-gradient-to-b from-emerald-400 to-emerald-600 text-zinc-950 font-black tracking-widest text-xs uppercase border-2 border-zinc-950 rounded">
+              ▶ Powrót +150 XP
+            </button>
+          </div>
+        )}
+
+        {failed && (
+          <div className="absolute inset-0 z-[100] flex flex-col items-center justify-center"
+            style={{ background: "radial-gradient(circle, rgba(255,40,40,0.4), rgba(0,0,0,0.9))" }}>
+            <div className="text-2xl font-black text-red-500 font-mono tracking-widest"
+              style={{ textShadow: "0 0 14px #ff3b30" }}>▲ AWARIA · CZAS UPŁYNĄŁ ▲</div>
+            <button onClick={onAbort}
+              className="mt-5 px-5 py-2.5 bg-gradient-to-b from-red-500 to-red-700 border-2 border-zinc-950 text-white font-black tracking-widest text-xs uppercase rounded">
+              ▶ Powrót
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default DistributionBoxTask;
+```
+
+### 4) `SatelliteAlignTask.tsx`
+```tsx
+import React, { useState, useEffect } from "react";
+import { TaskComponentProps } from "./types";
+
+const SatelliteAlignTask: React.FC<TaskComponentProps> = ({ onComplete, onAbort }) => {
+  // cel: azymut 138°, elewacja 32° (tolerancja ±3°)
+  const TARGET_AZ = 138, TARGET_EL = 32, TOL = 3;
+  const [az, setAz] = useState(75);
+  const [el, setEl] = useState(15);
+  const [done, setDone] = useState(false);
+  const [holdTime, setHoldTime] = useState(0);
+
+  const azDiff = Math.abs(az - TARGET_AZ);
+  const elDiff = Math.abs(el - TARGET_EL);
+  const inLock = azDiff <= TOL && elDiff <= TOL;
+  const signal = Math.max(0, 100 - (azDiff + elDiff) * 1.5);
+
+  useEffect(() => {
+    if (done) return;
+    if (inLock) {
+      const t = setInterval(() => setHoldTime((h) => h + 0.1), 100);
+      return () => clearInterval(t);
+    } else {
+      setHoldTime(0);
+    }
+  }, [inLock, done]);
+
+  useEffect(() => {
+    if (holdTime >= 2 && !done) {
+      setDone(true);
+      setTimeout(() => onComplete(200), 1800);
+    }
+  }, [holdTime, done, onComplete]);
+
+  const sigColor = signal > 80 ? "#7cff8a" : signal > 50 ? "#ffb547" : "#ff3b30";
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-5 backdrop-blur-md"
+      style={{ background: "rgba(5,4,10,0.92)" }}>
+      <div className="relative w-[640px] max-w-full rounded-2xl border-4 border-zinc-900 p-6 font-sans"
+        style={{
+          background: "#0a0c10",
+          backgroundImage: `
+            repeating-linear-gradient(0deg, rgba(255,255,255,0.02) 0 1px, transparent 1px 4px),
+            radial-gradient(circle at 50% 0%, rgba(60,120,200,0.25), transparent 60%)`,
+          boxShadow: "inset 0 0 60px rgba(0,0,0,0.85), 0 30px 80px rgba(0,0,0,0.7)",
+        }}>
+        {/* HEADER */}
+        <div className="flex items-center justify-between mb-5 pb-3 border-b border-cyan-500/20">
+          <div className="flex items-center gap-2.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"
+              style={{ boxShadow: "0 0 10px #22d3ee" }} />
+            <span className="text-[11px] tracking-[0.2em] font-black text-cyan-300 font-mono">
+              📡 JUSTOWANIE ANTENY · DVB-S2
+            </span>
+          </div>
+          <button onClick={onAbort}
+            className="px-2.5 py-1 text-[10px] tracking-wider uppercase rounded text-zinc-400 bg-white/5 border border-white/10 hover:bg-white/10">
+            ✕ Anuluj
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-5">
+          {/* WIDOK NIEBA */}
+          <div className="relative h-72 rounded-lg overflow-hidden border border-cyan-500/20"
+            style={{ background: "radial-gradient(ellipse at 50% 100%, #1a2a4a 0%, #050810 70%)" }}>
+            {/* gwiazdy */}
+            {Array.from({ length: 30 }).map((_, i) => (
+              <div key={i} className="absolute w-0.5 h-0.5 bg-white rounded-full"
+                style={{ left: `${(i * 37) % 100}%`, top: `${(i * 53) % 70}%`, opacity: 0.5 + (i % 3) * 0.15 }} />
+            ))}
+            {/* satelita */}
+            <div className="absolute w-3 h-3 transition-all"
+              style={{
+                left: `${(TARGET_AZ / 360) * 200 - 50}%`,
+                top: `${100 - TARGET_EL * 2}%`,
+                transform: "translate(-50%,-50%)",
+                background: sigColor,
+                boxShadow: `0 0 12px ${sigColor}, 0 0 24px ${sigColor}`,
+                borderRadius: "50%",
+              }} />
+            {/* talerz (crosshair) */}
+            <div className="absolute transition-all duration-100"
+              style={{
+                left: `${(az / 360) * 200 - 50}%`,
+                top: `${100 - el * 2}%`,
+                transform: "translate(-50%,-50%)",
+              }}>
+              <div className="w-12 h-12 rounded-full border-2 border-cyan-400/70"
+                style={{ boxShadow: inLock ? `0 0 20px ${sigColor}` : "none" }} />
+              <div className="absolute top-1/2 left-1/2 w-8 h-px bg-cyan-400/70 -translate-x-1/2 -translate-y-1/2" />
+              <div className="absolute top-1/2 left-1/2 w-px h-8 bg-cyan-400/70 -translate-x-1/2 -translate-y-1/2" />
+            </div>
+            {/* HUD */}
+            <div className="absolute top-2 left-2 font-mono text-[10px] text-cyan-300 space-y-0.5">
+              <div>AZ: {az.toFixed(0)}° / {TARGET_AZ}°</div>
+              <div>EL: {el.toFixed(0)}° / {TARGET_EL}°</div>
+            </div>
+          </div>
+
+          {/* KONTROLKI */}
+          <div className="space-y-4">
+            <div>
+              <div className="flex justify-between text-[10px] font-mono text-zinc-400 uppercase tracking-wider mb-1.5">
+                <span>Sygnał</span>
+                <span style={{ color: sigColor }}>{signal.toFixed(0)}%</span>
+              </div>
+              <div className="h-3 bg-black border border-zinc-700 overflow-hidden flex gap-px p-0.5">
+                {Array.from({ length: 20 }).map((_, i) => (
+                  <div key={i} className="flex-1"
+                    style={{
+                      background: i < (signal / 100) * 20 ? sigColor : "rgba(255,255,255,0.05)",
+                      boxShadow: i < (signal / 100) * 20 ? `0 0 4px ${sigColor}` : "none",
+                    }} />
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider">Azymut</label>
+              <input type="range" min={0} max={360} value={az} onChange={(e) => setAz(+e.target.value)}
+                className="w-full accent-cyan-400" disabled={done} />
+            </div>
+
+            <div>
+              <label className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider">Elewacja</label>
+              <input type="range" min={0} max={90} value={el} onChange={(e) => setEl(+e.target.value)}
+                className="w-full accent-cyan-400" disabled={done} />
+            </div>
+
+            <div className="p-2.5 rounded border font-mono text-[10px] tracking-wider uppercase text-center font-black"
+              style={{
+                background: inLock ? "rgba(124,255,138,0.1)" : "rgba(255,181,71,0.05)",
+                borderColor: inLock ? "#7cff8a" : "rgba(255,181,71,0.3)",
+                color: inLock ? "#7cff8a" : "#ffd27a",
+              }}>
+              {inLock ? `◉ LOCK · ${(2 - holdTime).toFixed(1)}s` : "● Szukam sygnału..."}
+            </div>
+          </div>
+        </div>
+
+        {done && (
+          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center rounded-2xl"
+            style={{ background: "radial-gradient(circle, rgba(124,255,138,0.25), rgba(0,0,0,0.9))" }}>
+            <div className="text-3xl font-black tracking-[0.25em] text-emerald-300 font-mono text-center"
+              style={{ textShadow: "0 0 20px #7cff8a" }}>
+              📡 SYGNAŁ<br />ZBLOKOWANY
+            </div>
+            <button onClick={() => onComplete(200)}
+              className="mt-6 px-6 py-3 bg-gradient-to-b from-emerald-400 to-emerald-600 text-zinc-950 font-black tracking-widest text-xs uppercase border-2 border-zinc-950 rounded">
+              ▶ Powrót +200 XP
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default SatelliteAlignTask;
+```
+
