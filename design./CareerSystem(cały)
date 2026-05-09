@@ -1,0 +1,505 @@
+CareerSystem.tsx zawiera 5 sekcji oddzielonych komentarzami: TYPES → THEME MAP → CONTEXT/HOOK → THEMED DistributionBoxTask → CareerRoadmapView. Wszystko exportowane nazwane, jeden Provider opakowuje aplikację, useCareer() daje dostęp do XP/tieru/motywu wszędzie. Kluczowa decyzja: motyw to funkcja czysta od currentTier trzymana w useMemo w Providerze, żeby żaden konsument nie re-renderował się bez zmiany tieru. Promocja jest detektowana przez useEffect na zmianie currentTier → odpalenie ekranu awansu.
+
+// /career/CareerSystem.tsx
+import React, {
+  createContext, useContext, useState, useMemo, useEffect, useRef, useCallback, ReactNode,
+} from "react";
+
+/* ════════════════════ 1. TYPES ════════════════════ */
+
+export type TierLevel = 1 | 2 | 3;
+export type Profession = "electrician"; // ready do rozszerzenia
+
+export interface ThemeConfig {
+  id: TierLevel;
+  name: string;
+  rank: string;
+  location: string;
+  // tła
+  shellBg: string;
+  shellBgImage: string;
+  shellBorder: string;
+  shellShadow: string;
+  // SVG
+  wireBaseColor: string;
+  portStroke: string;
+  portFill: string;
+  glowColor: string;
+  cableShadowFilter: string;
+  // typografia
+  fontHeading: string;
+  fontMono: string;
+  // akcenty
+  accent: string;
+  accentSoft: string;
+  textMuted: string;
+  textHi: string;
+  // dekory
+  scanlineOpacity: number;
+  decorPattern: string; // dodatkowe tło CSS
+  borderStyle: "rough" | "industrial" | "neon";
+}
+
+export interface CareerState {
+  totalXP: number;
+  currentTier: TierLevel;
+  jobTitle: string;
+  theme: ThemeConfig;
+  profession: Profession;
+}
+
+export interface CareerActions {
+  addXP: (amount: number) => void;
+  resetCareer: () => void;
+}
+
+export type CareerContextValue = CareerState & CareerActions;
+
+/* ════════════════════ 2. THEME MAP ════════════════════ */
+
+const TIER_THRESHOLDS: Record<TierLevel, number> = { 1: 0, 2: 5000, 3: 15000 };
+
+const RANKS: Record<Profession, Record<TierLevel, { rank: string; location: string }>> = {
+  electrician: {
+    1: { rank: "Praktykant Elektryk", location: "Plac Budowy · Stara Kamienica" },
+    2: { rank: "Specjalista Automatyk", location: "Fabryka · Utrzymanie Ruchu" },
+    3: { rank: "Główny Inżynier Systemowy", location: "SpaceX · Data Center A1" },
+  },
+};
+
+export const THEMES: Record<TierLevel, ThemeConfig> = {
+  1: {
+    id: 1, name: "RUST", rank: "", location: "",
+    shellBg: "#1a1410",
+    shellBgImage: `repeating-linear-gradient(0deg, rgba(255,180,80,0.04) 0 1px, transparent 1px 4px), radial-gradient(80% 60% at 50% 30%, rgba(120,60,20,0.35), transparent 70%)`,
+    shellBorder: "border-amber-900/40",
+    shellShadow: "inset 0 0 60px rgba(0,0,0,0.85), 0 30px 80px rgba(0,0,0,0.7)",
+    wireBaseColor: "#8b6f47",
+    portStroke: "#3a2818",
+    portFill: "#0d0805",
+    glowColor: "#ffb547",
+    cableShadowFilter: "none",
+    fontHeading: "'Special Elite','Courier New',monospace",
+    fontMono: "'VT323',monospace",
+    accent: "#ffb547",
+    accentSoft: "rgba(255,181,71,0.15)",
+    textMuted: "rgba(220,180,140,0.5)",
+    textHi: "#ffd27a",
+    scanlineOpacity: 0.35,
+    decorPattern: "repeating-linear-gradient(45deg, rgba(80,40,10,0.05) 0 6px, transparent 6px 12px)",
+    borderStyle: "rough",
+  },
+  2: {
+    id: 2, name: "INDUSTRIAL", rank: "", location: "",
+    shellBg: "#1c2026",
+    shellBgImage: `repeating-linear-gradient(90deg, rgba(255,255,255,0.025) 0 2px, transparent 2px 12px), linear-gradient(180deg, rgba(40,50,60,0.4), transparent 70%)`,
+    shellBorder: "border-orange-500/30",
+    shellShadow: "inset 0 0 40px rgba(0,0,0,0.7), 0 30px 80px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05)",
+    wireBaseColor: "#d4d8de",
+    portStroke: "#0a0d12",
+    portFill: "#1a1d22",
+    glowColor: "#ff7a18",
+    cableShadowFilter: "drop-shadow(0 1px 2px rgba(0,0,0,0.5))",
+    fontHeading: "'Oxanium','Rajdhani',sans-serif",
+    fontMono: "'JetBrains Mono','Consolas',monospace",
+    accent: "#ff7a18",
+    accentSoft: "rgba(255,122,24,0.12)",
+    textMuted: "rgba(180,200,220,0.55)",
+    textHi: "#5cc8ff",
+    scanlineOpacity: 0.15,
+    decorPattern: "linear-gradient(90deg, rgba(255,255,255,0.02) 0%, transparent 50%, rgba(255,255,255,0.02) 100%)",
+    borderStyle: "industrial",
+  },
+  3: {
+    id: 3, name: "AEROSPACE", rank: "", location: "",
+    shellBg: "#02060d",
+    shellBgImage: `radial-gradient(60% 50% at 50% 0%, rgba(0,180,255,0.18), transparent 70%), radial-gradient(40% 30% at 50% 100%, rgba(120,80,255,0.12), transparent 70%)`,
+    shellBorder: "border-cyan-400/40",
+    shellShadow: "inset 0 0 100px rgba(0,180,255,0.08), 0 30px 100px rgba(0,180,255,0.15), inset 0 0 0 1px rgba(0,180,255,0.2)",
+    wireBaseColor: "#e8f8ff",
+    portStroke: "#0a3a4a",
+    portFill: "#02060d",
+    glowColor: "#00e5ff",
+    cableShadowFilter: "drop-shadow(0 0 4px #00e5ff) drop-shadow(0 0 10px rgba(0,229,255,0.6))",
+    fontHeading: "'Orbitron','Exo 2',sans-serif",
+    fontMono: "'Share Tech Mono',monospace",
+    accent: "#00e5ff",
+    accentSoft: "rgba(0,229,255,0.1)",
+    textMuted: "rgba(180,220,255,0.55)",
+    textHi: "#7df9ff",
+    scanlineOpacity: 0.08,
+    decorPattern: "linear-gradient(0deg, rgba(0,229,255,0.03) 0 1px, transparent 1px 8px)",
+    borderStyle: "neon",
+  },
+};
+
+export const computeTier = (xp: number): TierLevel =>
+  xp >= TIER_THRESHOLDS[3] ? 3 : xp >= TIER_THRESHOLDS[2] ? 2 : 1;
+
+export const xpProgressToNext = (xp: number) => {
+  const t = computeTier(xp);
+  if (t === 3) return { current: xp, next: xp, pct: 100, remaining: 0 };
+  const nextThr = TIER_THRESHOLDS[(t + 1) as TierLevel];
+  const baseThr = TIER_THRESHOLDS[t];
+  const span = nextThr - baseThr;
+  const local = xp - baseThr;
+  return { current: local, next: span, pct: (local / span) * 100, remaining: nextThr - xp };
+};
+
+/* ════════════════════ 3. CONTEXT + HOOK ════════════════════ */
+
+const CareerCtx = createContext<CareerContextValue | null>(null);
+
+export const CareerProvider: React.FC<{ children: ReactNode; profession?: Profession; initialXP?: number }> = ({
+  children, profession = "electrician", initialXP = 0,
+}) => {
+  const [totalXP, setTotalXP] = useState<number>(initialXP);
+  const currentTier = useMemo(() => computeTier(totalXP), [totalXP]);
+  const theme = useMemo<ThemeConfig>(() => {
+    const r = RANKS[profession][currentTier];
+    return { ...THEMES[currentTier], rank: r.rank, location: r.location };
+  }, [currentTier, profession]);
+
+  const addXP = useCallback((amount: number) => {
+    if (amount <= 0) return;
+    setTotalXP((p) => p + amount);
+  }, []);
+  const resetCareer = useCallback(() => setTotalXP(0), []);
+
+  const value = useMemo<CareerContextValue>(() => ({
+    totalXP, currentTier, jobTitle: theme.rank, theme, profession, addXP, resetCareer,
+  }), [totalXP, currentTier, theme, profession, addXP, resetCareer]);
+
+  return <CareerCtx.Provider value={value}>{children}</CareerCtx.Provider>;
+};
+
+export const useCareer = (): CareerContextValue => {
+  const ctx = useContext(CareerCtx);
+  if (!ctx) throw new Error("useCareer must be used within <CareerProvider>");
+  return ctx;
+};
+
+/* ════════════════════ 4. THEMED DistributionBoxTask ════════════════════ */
+
+interface Wire { id: string; label: string; hex: string; glow: string; }
+const TIER_WIRES: Record<TierLevel, Wire[]> = {
+  1: [
+    { id: "L1", label: "L1", hex: "#a06030", glow: "#d4691e" },
+    { id: "L2", label: "L2", hex: "#2a2a2a", glow: "#666" },
+    { id: "L3", label: "L3", hex: "#7a7a7a", glow: "#bbb" },
+    { id: "N",  label: "N",  hex: "#3060a0", glow: "#5aa5ff" },
+    { id: "PE", label: "PE", hex: "#8aa040", glow: "#caf57a" },
+  ],
+  2: [
+    { id: "L1", label: "L1", hex: "#c45a18", glow: "#ff8a3a" },
+    { id: "L2", label: "L2", hex: "#1a1a1a", glow: "#888" },
+    { id: "L3", label: "L3", hex: "#a8acb0", glow: "#e0e4e8" },
+    { id: "N",  label: "N",  hex: "#1f6fd6", glow: "#5cc8ff" },
+    { id: "PE", label: "PE", hex: "#7cc450", glow: "#caf57a" },
+  ],
+  3: [
+    { id: "L1", label: "L1", hex: "#00e5ff", glow: "#7df9ff" },
+    { id: "L2", label: "L2", hex: "#7c5cff", glow: "#b5a3ff" },
+    { id: "L3", label: "L3", hex: "#ff3ec9", glow: "#ff8de4" },
+    { id: "N",  label: "N",  hex: "#ffffff", glow: "#e8f8ff" },
+    { id: "PE", label: "PE", hex: "#00ff95", glow: "#7dffd4" },
+  ],
+};
+
+interface TaskProps { onComplete: (xp: number) => void; onAbort: () => void; }
+
+const shuffle = <T,>(a: T[]): T[] => {
+  const r = [...a];
+  for (let i = r.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [r[i], r[j]] = [r[j], r[i]]; }
+  return r;
+};
+
+export const DistributionBoxTask: React.FC<TaskProps> = ({ onComplete, onAbort }) => {
+  const { theme, currentTier, addXP } = useCareer();
+  const wires = TIER_WIRES[currentTier];
+  const [leftOrder] = useState(() => shuffle(wires));
+  const [rightOrder] = useState(() => shuffle(wires));
+  const [conn, setConn] = useState<Record<string, true>>({});
+  const [active, setActive] = useState<string | null>(null);
+  const [mouse, setMouse] = useState({ x: 0, y: 0 });
+  const [done, setDone] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const lockRef = useRef(false);
+
+  const ROW = 70, TOP = 90, LX = 90, RX = 510;
+  const yOf = (i: number) => TOP + i * ROW;
+  const lY = (id: string) => yOf(leftOrder.findIndex((w) => w.id === id));
+  const rY = (id: string) => yOf(rightOrder.findIndex((w) => w.id === id));
+
+  const onMove = (e: React.MouseEvent) => {
+    if (!active || !ref.current) return;
+    const r = ref.current.getBoundingClientRect();
+    setMouse({ x: e.clientX - r.left, y: e.clientY - r.top });
+  };
+
+  const path = (x1: number, y1: number, x2: number, y2: number) => {
+    const dx = (x2 - x1) * 0.55;
+    return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
+  };
+
+  const handleR = (id: string) => {
+    if (!active || lockRef.current) return;
+    if (active === id) {
+      setConn((p) => {
+        const n = { ...p, [id]: true as const };
+        if (Object.keys(n).length === wires.length && !lockRef.current) {
+          lockRef.current = true;
+          setDone(true);
+          const xp = 150 * currentTier;
+          addXP(xp);
+          setTimeout(() => onComplete(xp), 1800);
+        }
+        return n;
+      });
+    }
+    setActive(null);
+  };
+
+  const radius = currentTier === 3 ? 12 : 11;
+  const strokeW = currentTier === 3 ? 7 : 6;
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-5 backdrop-blur-md"
+      style={{ background: "rgba(2,4,8,0.94)" }} onClick={() => setActive(null)}>
+      <div ref={ref} onClick={(e) => e.stopPropagation()} onMouseMove={onMove}
+        className={`relative w-[640px] max-w-full rounded-2xl border-2 ${theme.shellBorder} overflow-hidden`}
+        style={{
+          height: 500, background: theme.shellBg,
+          backgroundImage: `${theme.decorPattern}, ${theme.shellBgImage}`,
+          boxShadow: theme.shellShadow,
+          fontFamily: theme.fontHeading,
+          cursor: active ? "crosshair" : "default",
+        }}>
+        {/* scanlines */}
+        <div className="pointer-events-none absolute inset-0 mix-blend-overlay z-50"
+          style={{ backgroundImage: "repeating-linear-gradient(0deg, rgba(255,255,255,0.05) 0 1px, transparent 1px 3px)", opacity: theme.scanlineOpacity }} />
+
+        {/* HEADER */}
+        <div className="relative z-10 px-5 py-3 flex items-center justify-between border-b" style={{ borderColor: theme.accentSoft }}>
+          <div className="flex items-center gap-2.5">
+            <span className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ background: theme.accent, boxShadow: `0 0 10px ${theme.accent}` }} />
+            <span className="text-[11px] tracking-[0.2em] font-black" style={{ color: theme.textHi, fontFamily: theme.fontMono }}>
+              {currentTier === 1 ? "▲ NAPRAWA · POŁĄCZ FAZY" : currentTier === 2 ? "⚙ MAINTENANCE · WIRING TASK" : "◈ AEROSPACE · QUANTUM LINK"}
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-[10px] font-mono" style={{ color: theme.textMuted, fontFamily: theme.fontMono }}>
+              {theme.location}
+            </span>
+            <button onClick={onAbort} className="px-2.5 py-1 text-[10px] tracking-wider uppercase rounded border"
+              style={{ color: theme.textMuted, borderColor: theme.accentSoft }}>✕</button>
+          </div>
+        </div>
+
+        <svg width="100%" height="430" viewBox="0 0 600 430"
+          style={{ filter: currentTier === 3 ? theme.cableShadowFilter : "none" }}>
+          <text x="90" y="40" fontFamily={theme.fontMono} fontSize="13" fill={theme.textMuted} letterSpacing="2">ŹRÓDŁO</text>
+          <text x="510" y="40" fontFamily={theme.fontMono} fontSize="13" fill={theme.textMuted} letterSpacing="2" textAnchor="end">ZACISKI</text>
+
+          <rect x="20" y="60" width="140" height={wires.length * ROW + 20} rx={currentTier === 3 ? 12 : 4}
+            fill={theme.portFill} stroke={theme.portStroke} strokeWidth={currentTier === 1 ? 2 : 1.5}
+            strokeDasharray={currentTier === 1 ? "4 2" : "0"} />
+          <rect x="440" y="60" width="140" height={wires.length * ROW + 20} rx={currentTier === 3 ? 12 : 4}
+            fill={theme.portFill} stroke={theme.portStroke} strokeWidth={currentTier === 1 ? 2 : 1.5}
+            strokeDasharray={currentTier === 1 ? "4 2" : "0"} />
+
+          {/* połączone */}
+          {Object.keys(conn).map((id) => {
+            const w = wires.find((x) => x.id === id)!;
+            return (
+              <g key={id} style={{ filter: currentTier === 3 ? `drop-shadow(0 0 6px ${w.glow})` : "none" }}>
+                <path d={path(LX, lY(id), RX, rY(id))} stroke={w.hex} strokeWidth={strokeW} fill="none" strokeLinecap="round" />
+                <path d={path(LX, lY(id), RX, rY(id))} stroke={w.glow} strokeWidth="2" fill="none" strokeLinecap="round" opacity="0.7" />
+              </g>
+            );
+          })}
+
+          {/* aktywny */}
+          {active && (() => {
+            const w = wires.find((x) => x.id === active)!;
+            return <path d={path(LX, lY(active), mouse.x, mouse.y)} stroke={w.hex}
+              strokeWidth={strokeW} fill="none" strokeLinecap="round" opacity="0.85"
+              style={{ filter: currentTier === 3 ? `drop-shadow(0 0 8px ${w.glow})` : "none" }} />;
+          })()}
+
+          {/* porty */}
+          {[...leftOrder.map((w, i) => ({ w, i, side: "L" as const })),
+            ...rightOrder.map((w, i) => ({ w, i, side: "R" as const }))].map(({ w, i, side }) => {
+            const x = side === "L" ? LX : RX, y = yOf(i);
+            const isConn = conn[w.id], isAct = active === w.id;
+            return (
+              <g key={`${side}-${w.id}`} style={{ cursor: isConn ? "default" : "pointer" }}
+                onClick={(e) => { e.stopPropagation(); if (isConn) return;
+                  side === "L" ? setActive(w.id) : handleR(w.id); }}>
+                <rect x={x - 30} y={y - 22} width={60} height={44} fill="transparent" />
+                <rect x={side === "L" ? x - 60 : x + 10} y={y - 18} width={50} height={36}
+                  rx={currentTier === 3 ? 8 : 3} fill={theme.portFill} stroke={w.hex}
+                  strokeWidth={isAct ? 2.5 : 1.5} />
+                <text x={side === "L" ? x - 35 : x + 35} y={y + 5} fontFamily={theme.fontMono}
+                  fontSize="18" fill={w.hex} textAnchor="middle" fontWeight="bold">{w.label}</text>
+                <circle cx={x} cy={y} r={radius} fill={side === "L" || isConn ? w.hex : theme.portFill}
+                  stroke={isAct ? "#fff" : isConn ? w.glow : theme.portStroke} strokeWidth={isAct ? 2.5 : 1.5}
+                  style={{ filter: currentTier === 3 && (isConn || isAct) ? `drop-shadow(0 0 8px ${w.glow})` : "none" }} />
+                {!isConn && (
+                  <circle cx={x} cy={y} r={radius} fill="none" stroke={w.glow} strokeWidth="1.5">
+                    <animate attributeName="r" values={`${radius};${radius + 8};${radius}`} dur="1.5s" repeatCount="indefinite" />
+                    <animate attributeName="opacity" values="0.7;0;0.7" dur="1.5s" repeatCount="indefinite" />
+                  </circle>
+                )}
+              </g>
+            );
+          })}
+        </svg>
+
+        {done && (
+          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center"
+            style={{ background: `radial-gradient(circle, ${theme.accentSoft}, rgba(0,0,0,0.9))` }}>
+            <div className="text-3xl font-black tracking-[0.25em] text-center" style={{
+              color: theme.glowColor, fontFamily: theme.fontHeading,
+              textShadow: `0 0 20px ${theme.glowColor}, 0 0 40px ${theme.glowColor}`,
+            }}>
+              {currentTier === 1 ? "⚡ NAPRAWA OK" : currentTier === 2 ? "⚙ SYSTEM ONLINE" : "◈ LINK ESTABLISHED"}
+            </div>
+            <button onClick={() => onComplete(150 * currentTier)}
+              className="mt-6 px-6 py-3 font-black tracking-widest text-xs uppercase border-2 border-black rounded"
+              style={{ background: theme.glowColor, color: "#000", fontFamily: theme.fontHeading }}>
+              ▶ Powrót +{150 * currentTier} XP
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+/* ════════════════════ 5. CareerRoadmapView ════════════════════ */
+
+export const CareerRoadmapView: React.FC<{ onClose?: () => void }> = ({ onClose }) => {
+  const { totalXP, currentTier, theme, profession } = useCareer();
+  const [promoTier, setPromoTier] = useState<TierLevel | null>(null);
+  const prevTierRef = useRef(currentTier);
+
+  useEffect(() => {
+    if (currentTier > prevTierRef.current) setPromoTier(currentTier);
+    prevTierRef.current = currentTier;
+  }, [currentTier]);
+
+  const prog = xpProgressToNext(totalXP);
+
+  return (
+    <div className="min-h-screen p-8" style={{ background: theme.shellBg, backgroundImage: theme.shellBgImage, fontFamily: theme.fontHeading }}>
+      <div className="max-w-4xl mx-auto">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <div className="text-[10px] tracking-[0.3em] font-black uppercase" style={{ color: theme.textMuted, fontFamily: theme.fontMono }}>
+              Career · {profession}
+            </div>
+            <h1 className="text-4xl font-black mt-1" style={{ color: theme.textHi, textShadow: `0 0 20px ${theme.glowColor}` }}>
+              {theme.rank}
+            </h1>
+            <div className="text-sm mt-1" style={{ color: theme.textMuted, fontFamily: theme.fontMono }}>{theme.location}</div>
+          </div>
+          {onClose && <button onClick={onClose} className="px-4 py-2 text-xs uppercase tracking-widest border rounded"
+            style={{ color: theme.textMuted, borderColor: theme.accentSoft }}>✕ Zamknij</button>}
+        </div>
+
+        <div className="mb-10 p-4 rounded-lg border" style={{ background: theme.accentSoft, borderColor: theme.accent }}>
+          <div className="flex justify-between text-xs mb-2 font-mono" style={{ fontFamily: theme.fontMono }}>
+            <span style={{ color: theme.textMuted }}>XP: {totalXP.toLocaleString()}</span>
+            <span style={{ color: theme.textHi }}>
+              {currentTier < 3 ? `→ TIER ${currentTier + 1} za ${prog.remaining.toLocaleString()} XP` : "MAX TIER"}
+            </span>
+          </div>
+          <div className="h-3 rounded-full overflow-hidden" style={{ background: "rgba(0,0,0,0.5)" }}>
+            <div className="h-full transition-all" style={{
+              width: `${prog.pct}%`, background: theme.glowColor,
+              boxShadow: `0 0 12px ${theme.glowColor}`,
+            }} />
+          </div>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-5">
+          {([1, 2, 3] as TierLevel[]).map((tier) => {
+            const t = THEMES[tier];
+            const r = RANKS[profession][tier];
+            const locked = tier > currentTier;
+            const isCurrent = tier === currentTier;
+            return (
+              <div key={tier} className={`relative p-5 rounded-xl border-2 transition`}
+                style={{
+                  background: locked ? "rgba(0,0,0,0.5)" : t.shellBg,
+                  backgroundImage: locked ? "none" : t.shellBgImage,
+                  borderColor: isCurrent ? t.glowColor : locked ? "rgba(255,255,255,0.08)" : t.accentSoft,
+                  boxShadow: isCurrent ? `0 0 30px ${t.glowColor}40, inset 0 0 20px ${t.accentSoft}` : "none",
+                  opacity: locked ? 0.55 : 1,
+                  fontFamily: t.fontHeading,
+                }}>
+                <div className="text-[10px] tracking-[0.3em] font-black uppercase mb-2" style={{ color: t.textMuted, fontFamily: t.fontMono }}>
+                  Tier {tier} · {t.name}
+                </div>
+                <h3 className="text-lg font-black mb-1" style={{ color: t.textHi }}>{r.rank}</h3>
+                <p className="text-xs mb-3" style={{ color: t.textMuted, fontFamily: t.fontMono }}>{r.location}</p>
+                <div className="text-[11px] font-mono" style={{ color: t.textMuted, fontFamily: t.fontMono }}>
+                  Próg: {TIER_THRESHOLDS[tier].toLocaleString()} XP
+                </div>
+                {locked && (
+                  <div className="absolute inset-0 flex items-center justify-center rounded-xl" style={{ background: "rgba(0,0,0,0.7)" }}>
+                    <div className="text-center">
+                      <div className="text-4xl mb-2">🔒</div>
+                      <div className="text-[10px] tracking-widest uppercase" style={{ color: t.textMuted, fontFamily: t.fontMono }}>
+                        Zablokowane
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {isCurrent && (
+                  <div className="absolute -top-2 right-3 px-2 py-0.5 rounded text-[9px] font-black tracking-widest uppercase"
+                    style={{ background: t.glowColor, color: "#000" }}>● CURRENT</div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* PROMO MODAL */}
+      {promoTier && (() => {
+        const t = THEMES[promoTier], r = RANKS[profession][promoTier];
+        return (
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center backdrop-blur-xl"
+            style={{ background: "rgba(0,0,0,0.92)" }}>
+            <div className="relative max-w-lg w-full mx-4 p-10 rounded-2xl border-2 text-center"
+              style={{
+                background: t.shellBg, backgroundImage: t.shellBgImage,
+                borderColor: t.glowColor, fontFamily: t.fontHeading,
+                boxShadow: `0 0 60px ${t.glowColor}, inset 0 0 40px ${t.accentSoft}`,
+                animation: "promoIn 0.6s cubic-bezier(.2,.9,.3,1.4)",
+              }}>
+              <style>{`@keyframes promoIn { from{opacity:0;transform:scale(0.7) rotate(-3deg);} to{opacity:1;transform:scale(1);} }`}</style>
+              <div className="text-[11px] tracking-[0.4em] font-black uppercase mb-2" style={{ color: t.textMuted, fontFamily: t.fontMono }}>
+                ⬆ Promotion Unlocked
+              </div>
+              <div className="text-5xl font-black mb-3" style={{ color: t.glowColor, textShadow: `0 0 30px ${t.glowColor}` }}>
+                AWANS
+              </div>
+              <div className="text-2xl font-black mb-1" style={{ color: t.textHi }}>{r.rank}</div>
+              <div className="text-sm mb-6" style={{ color: t.textMuted, fontFamily: t.fontMono }}>
+                Nowe miejsce pracy: <span style={{ color: t.textHi }}>{r.location}</span>
+              </div>
+              <button onClick={() => setPromoTier(null)}
+                className="px-8 py-3 font-black tracking-[0.25em] text-xs uppercase border-2 rounded"
+                style={{ background: t.glowColor, color: "#000", borderColor: "#000" }}>
+                ▶ Rozpocznij nową rangę
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+  );
+};
