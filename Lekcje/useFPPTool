@@ -1,0 +1,263 @@
+
+
+export type FPPPhase =
+  | \"idle\"
+  | \"tool-selected\"
+  | \"engaging-screw\"
+  | \"cover-loose\"
+  | \"dragging-cover\"
+  | \"completed\";
+
+export type ToolId = \"screwdriver\";
+
+export interface ScrewState {
+  id: string;
+  // Position in % of the panel (0-100) so the SVG/scene can scale freely.
+  xPct: number;
+  yPct: number;
+  // 0 -> 1 of total rotation needed.
+  progress: number;
+  removed: boolean;
+}
+
+interface UseFPPToolTaskOptions {
+  rotationsRequired?: number; // full turns (default 2)
+  coverDragThreshold?: number; // px (default 220)
+  onCompleteInternal?: (durationMs: number) => void;
+}
+
+interface ScrewEngagement {
+  screwId: string;
+  // Screw center in viewport (px) — captured at engage time.
+  centerX: number;
+  centerY: number;
+  // Last pointer angle in radians around the center.
+  lastAngle: number;
+  // Accumulated rotation in radians (signed).
+  accumulated: number;
+}
+
+const TWO_PI = Math.PI * 2;
+
+const DEFAULT_SCREWS: ScrewState[] = [
+  { id: \"tl\", xPct: 12, yPct: 10, progress: 0, removed: false },
+  { id: \"tr\", xPct: 88, yPct: 10, progress: 0, removed: false },
+  { id: \"bl\", xPct: 12, yPct: 90, progress: 0, removed: false },
+  { id: \"br\", xPct: 88, yPct: 90, progress: 0, removed: false },
+];
+
+export function useFPPToolTask(opts: UseFPPToolTaskOptions = {}) {
+  const rotationsRequired = opts.rotationsRequired ?? 2;
+  const coverDragThreshold = opts.coverDragThreshold ?? 220;
+  const targetRadians = rotationsRequired * TWO_PI;
+
+  const [phase, setPhase] = useState<FPPPhase>(\"idle\");
+  const [tool, setTool] = useState<ToolId | null>(null);
+  const [screws, setScrews] = useState<ScrewState[]>(DEFAULT_SCREWS);
+  const [coverOffset, setCoverOffset] = useState(0); // px dragged
+  const [hudMessage, setHudMessage] = useState<string>(
+    \"Wybierz narzędzie z pasa narzędziowego.\"
+  );
+
+  const engagementRef = useRef<ScrewEngagement | null>(null);
+  const coverDragRef = useRef<{ startY: number } | null>(null);
+  const startedAtRef = useRef<number>(performance.now());
+
+  // ---------- Tool selection ----------
+  const selectTool = useCallback((id: ToolId) => {
+    setTool(id);
+    setPhase((prev) => (prev === \"idle\" ? \"tool-selected\" : prev));
+    setHudMessage(
+      \"Najedź na śrubę, kliknij i obracaj myszą w kółko, aby ją wykręcić.\"
+    );
+  }, []);
+
+  const dropTool = useCallback(() => {
+    if (engagementRef.current) return; // can't drop mid-rotation
+    setTool(null);
+    setPhase((prev) =>
+      prev === \"tool-selected\" || prev === \"cover-loose\" ? \"idle\" : prev
+    );
+  }, []);
+
+  // ---------- Screw engagement ----------
+  const beginScrew = useCallback(
+    (screwId: string, pointerX: number, pointerY: number, centerX: number, centerY: number) => {
+      if (tool !== \"screwdriver\") {
+        setHudMessage(\"Najpierw wybierz śrubokręt.\");
+        return;
+      }
+      const screw = screws.find((s) => s.id === screwId);
+      if (!screw || screw.removed) return;
+      engagementRef.current = {
+        screwId,
+        centerX,
+        centerY,
+        lastAngle: Math.atan2(pointerY - centerY, pointerX - centerX),
+        accumulated: screw.progress * targetRadians,
+      };
+      setPhase(\"engaging-screw\");
+      setHudMessage(\"Obracaj myszą w kółko — nie odrywaj ruchu!\");
+    },
+    [tool, screws, targetRadians]
+  );
+
+  const releaseScrew = useCallback(() => {
+    if (!engagementRef.current) return;
+    engagementRef.current = null;
+    setPhase((prev) => {
+      if (prev !== \"engaging-screw\") return prev;
+      // Re-evaluate based on screw states (sync via setScrews callback below)
+      return \"tool-selected\";
+    });
+    setHudMessage(
+      \"Trzymaj wciśnięty przycisk i kręć w kółko aż śruba wyjdzie.\"
+    );
+  }, []);
+
+  // Global pointermove + pointerup so the gesture survives leaving the screw.
+  useEffect(() => {
+    const handleMove = (ev: PointerEvent) => {
+      const eng = engagementRef.current;
+      if (!eng) return;
+      const angle = Math.atan2(ev.clientY - eng.centerY, ev.clientX - eng.centerX);
+      // signed shortest delta
+      let delta = angle - eng.lastAngle;
+      if (delta > Math.PI) delta -= TWO_PI;
+      if (delta < -Math.PI) delta += TWO_PI;
+      eng.lastAngle = angle;
+      // Reward only continuous motion. Tiny jitters add up too — that's ok.
+      eng.accumulated = Math.max(0, eng.accumulated + Math.abs(delta));
+
+      const progress = Math.min(1, eng.accumulated / targetRadians);
+      setScrews((prev) =>
+        prev.map((s) =>
+          s.id === eng.screwId ? { ...s, progress } : s
+        )
+      );
+      if (progress >= 1) {
+        // Pop the screw out.
+        setScrews((prev) =>
+          prev.map((s) =>
+            s.id === eng.screwId ? { ...s, removed: true, progress: 1 } : s
+          )
+        );
+        engagementRef.current = null;
+        setPhase(\"tool-selected\");
+        setHudMessage(\"Świetnie! Wykręć kolejną śrubę.\");
+      }
+    };
+    const handleUp = () => {
+      if (engagementRef.current) {
+        engagementRef.current = null;
+        setPhase((prev) => (prev === \"engaging-screw\" ? \"tool-selected\" : prev));
+      }
+      if (coverDragRef.current) {
+        coverDragRef.current = null;
+        // Snap back if not enough drag.
+        setCoverOffset((current) =>
+          current >= coverDragThreshold ? current : 0
+        );
+        setPhase((prev) =>
+          prev === \"dragging-cover\"
+            ? coverOffset >= coverDragThreshold
+              ? \"completed\"
+              : \"cover-loose\"
+            : prev
+        );
+      }
+    };
+    window.addEventListener(\"pointermove\", handleMove);
+    window.addEventListener(\"pointerup\", handleUp);
+    return () => {
+      window.removeEventListener(\"pointermove\", handleMove);
+      window.removeEventListener(\"pointerup\", handleUp);
+    };
+  }, [targetRadians, coverDragThreshold, coverOffset]);
+
+  // When all screws are out -> cover-loose
+  useEffect(() => {
+    if (phase === \"completed\") return;
+    const allOut = screws.every((s) => s.removed);
+    if (allOut && phase !== \"cover-loose\" && phase !== \"dragging-cover\") {
+      setPhase(\"cover-loose\");
+      setHudMessage(\"Pokrywa luźna! Złap ją i ściągnij w dół.\");
+    }
+  }, [screws, phase]);
+
+  // ---------- Cover drag ----------
+  const beginCoverDrag = useCallback(
+    (pointerY: number) => {
+      if (phase !== \"cover-loose\") return;
+      coverDragRef.current = { startY: pointerY };
+      setPhase(\"dragging-cover\");
+      setHudMessage(\"Ciągnij w dół!\");
+    },
+    [phase]
+  );
+
+  useEffect(() => {
+    const handleMove = (ev: PointerEvent) => {
+      const drag = coverDragRef.current;
+      if (!drag) return;
+      const dy = Math.max(0, ev.clientY - drag.startY);
+      setCoverOffset(dy);
+      if (dy >= coverDragThreshold) {
+        coverDragRef.current = null;
+        setCoverOffset(dy);
+        setPhase(\"completed\");
+        setHudMessage(\"Wnętrze rozdzielnicy odsłonięte. Brawo!\");
+      }
+    };
+    window.addEventListener(\"pointermove\", handleMove);
+    return () => window.removeEventListener(\"pointermove\", handleMove);
+  }, [coverDragThreshold]);
+
+  // ---------- Outcome ----------
+  const buildOutcome = useCallback(() => {
+    const durationMs = performance.now() - startedAtRef.current;
+    return {
+      durationMs,
+      metrics: {
+        screwsRemoved: screws.filter((s) => s.removed).length,
+        coverOffset,
+      },
+    };
+  }, [screws, coverOffset]);
+
+  // ---------- Reset ----------
+  const reset = useCallback(() => {
+    engagementRef.current = null;
+    coverDragRef.current = null;
+    setPhase(\"idle\");
+    setTool(null);
+    setScrews(DEFAULT_SCREWS.map((s) => ({ ...s })));
+    setCoverOffset(0);
+    setHudMessage(\"Wybierz narzędzie z pasa narzędziowego.\");
+    startedAtRef.current = performance.now();
+  }, []);
+
+  const screwsRemovedCount = useMemo(
+    () => screws.filter((s) => s.removed).length,
+    [screws]
+  );
+
+  return {
+    phase,
+    tool,
+    screws,
+    coverOffset,
+    coverDragThreshold,
+    hudMessage,
+    screwsRemovedCount,
+    selectTool,
+    dropTool,
+    beginScrew,
+    releaseScrew,
+    beginCoverDrag,
+    buildOutcome,
+    reset,
+  };
+}
+
+export type FPPToolTaskApi = ReturnType<typeof useFPPToolTask>;
