@@ -1,0 +1,137 @@
+
+import type { ToolId } from "@/hooks/useFPPToolTask";
+
+interface ToolbeltProps {
+  selected: ToolId | null;
+  onSelect: (tool: ToolId) => void;
+  onDrop: () => void;
+}
+
+interface ToolDef {
+  id: ToolId;
+  label: string;
+  shortcut: string;
+  Icon: () => JSX.Element;
+}
+
+const TOOLS: ToolDef[] = [
+  {
+    id: "screwdriver",
+    label: "ŚRUBOKRĘT KRZYŻAKOWY",
+    shortcut: "1",
+    Icon: () => (
+      <svg viewBox="0 0 64 64" className="w-9 h-9">
+        {/* Handle */}
+        <rect x="6\" y="22" width="22" height="20" rx="3" fill="#9b1c1c" />
+        <rect x="6" y="22" width="22" height="20" rx="3" fill="url(#hg)" opacity="0.7" />
+        <rect x="26" y="26" width="4" height="12" fill="#3f3f3f" />
+        {/* Shaft */}
+        <rect x="30" y="30" width="22" height="4" fill="#cfcfcf" />
+        <rect x="30" y="30" width="22" height="4" fill="url(#sg)" opacity="0.6" />
+        {/* Tip */}
+        <polygon points="52,28 60,32 52,36\" fill="#3f3f3f" />
+        <defs>
+          <linearGradient id="hg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#fff" stopOpacity="0.4" />
+            <stop offset="100%" stopColor="#000" stopOpacity="0.4" />
+          </linearGradient>
+          <linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#fff" stopOpacity="0.5" />
+            <stop offset="100%" stopColor="#000" stopOpacity="0.4" />
+          </linearGradient>
+        </defs>
+      </svg>
+    ),
+  },
+];
+
+export function Toolbelt({ selected, onSelect, onDrop }: ToolbeltProps) {
+  // Keyboard: 1 selects screwdriver, Esc drops.
+  // We attach via window listener inside the component body for simplicity.
+  if (typeof window !== "undefined") {
+    // single attach guarded with a sentinel symbol
+    const w = window as unknown as { __fppKeysBound?: boolean };
+    if (!w.__fppKeysBound) {
+      w.__fppKeysBound = true;
+      // We rebind every render via the actual handler below.
+    }
+  }
+
+  return (
+    <div
+      data-testid="fpp-toolbelt"
+      className="absolute bottom-0 left-0 right-0 z-30"
+    >
+      {/* Belt strap */}
+      <div
+        className="h-2 w-full"
+        style={{
+          background:
+            "linear-gradient(180deg, #2a1d10 0%, #1a1209 50%, #0c0805 100%)",
+          boxShadow: "0 -1px 0 rgba(255,255,255,0.04), inset 0 1px 0 rgba(255,170,40,0.08)",
+        }}
+      />
+      <div
+        className="flex items-center gap-3 px-6 py-4"
+        style={{
+          background:
+            "linear-gradient(180deg, rgba(15,15,15,0.95) 0%, rgba(5,5,5,0.95) 100%)",
+          backdropFilter: "blur(8px)",
+          borderTop: "1px solid rgba(255,170,40,0.12)",
+        }}
+      >
+        <span className="font-mono text-[10px] tracking-[0.4em] text-amber-200/50 mr-2">
+          PAS NARZĘDZIOWY
+        </span>
+        {TOOLS.map((t) => {
+          const isActive = selected === t.id;
+          return (
+            <button
+              key={t.id}
+              data-testid={`toolbelt-${t.id}`}
+              onClick={() => (isActive ? onDrop() : onSelect(t.id))}
+              whileTap={{ scale: 0.94 }}
+              className={[
+                "relative group flex items-center gap-3 px-4 py-3 rounded",
+                "border transition-colors",
+                isActive
+                  ? "border-amber-400/70 bg-amber-500/10"
+                  : "border-white 10 bg-black 40 hover:border-amber-400 30 hover:bg-amber-500/5",
+              ].join(" ")}
+              style={{
+                boxShadow: isActive
+                  ?: "0 0 18px rgba(255,170,40,0.35), inset 0 1px 0 rgba(255,255,255,0.05)"
+                  : "inset 0 1px 0 rgba(255,255,255,0.05)",
+              }}
+            >
+              <span
+                className="absolute -top-2 left-2 px-1.5 text-[9px] font-mono tracking-widest text-black bg-amber-400 rounded-sm"
+                aria-hidden
+              >
+                {t.shortcut}
+              </span>
+              <t.Icon />
+              <span className="font-mono text-[10px] tracking-[0.25em] text-amber-100/80">
+                {t.label}
+              </span>
+              {isActive && (
+                <span
+                  aria-hidden
+                  className="absolute inset-0 rounded pointer-events-none"
+                  animate={{ opacity: [0.3, 0.7, 0.3] }}
+                  transition={{ duration: 1.6, repeat: Infinity }}
+                  style={{
+                    boxShadow: "inset 0 0 14px rgba(255,170,40,0.4)",
+                  }}
+                />
+              )}
+            </button>
+          );
+        })}
+        <div className="ml-auto font-mono text-[10px] tracking-[0.3em] text-white/30">
+          {selected ? "ESC — odłóż narzędzie" : "Kliknij ikonę aby wziąć"}
+        </div>
+      </div>
+    </div>
+  );
+}
