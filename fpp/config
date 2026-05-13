@@ -1,0 +1,105 @@
+
+Action: file_editor view /app/frontend/craco.config.js
+Observation: [Showing lines 1-101 of 101 total] /app/frontend/craco.config.js:
+1|// craco.config.js
+2|const path = require("path");
+3|require("dotenv").config();
+4|
+5|// Check if we're in development/preview mode (not production build)
+6|// Craco sets NODE_ENV=development for start, NODE_ENV=production for build
+7|const isDevServer = process.env.NODE_ENV !== "production";
+8|
+9|// Environment variable overrides
+10|const config = {
+11|  enableHealthCheck: process.env.ENABLE_HEALTH_CHECK === "true",
+12|};
+13|
+14|// Conditionally load health check modules only if enabled
+15|let WebpackHealthPlugin;
+16|let setupHealthEndpoints;
+17|let healthPluginInstance;
+18|
+19|if (config.enableHealthCheck) {
+20|  WebpackHealthPlugin = require("./plugins/health-check/webpack-health-plugin");
+21|  setupHealthEndpoints = require("./plugins/health-check/health-endpoints");
+22|  healthPluginInstance = new WebpackHealthPlugin();
+23|}
+24|
+25|let webpackConfig = {
+26|  eslint: {
+27|    configure: {
+28|      extends: ["plugin:react-hooks/recommended"],
+29|      rules: {
+30|        "react-hooks/rules-of-hooks": "error",
+31|        "react-hooks/exhaustive-deps": "warn",
+32|      },
+33|    },
+34|  },
+35|  webpack: {
+36|    alias: {
+37|      '@': path.resolve(__dirname, 'src'),
+38|    },
+39|    configure: (webpackConfig) => {
+40|
+41|      // Add ignored patterns to reduce watched directories
+42|        webpackConfig.watchOptions = {
+43|          ...webpackConfig.watchOptions,
+44|          ignored: [
+45|            '**/node_modules/**',
+46|            '**/.git/**',
+47|            '**/build/**',
+48|            '**/dist/**',
+49|            '**/coverage/**',
+50|            '**/public/**',
+51|        ],
+52|      };
+53|
+54|      // Add health check plugin to webpack if enabled
+55|      if (config.enableHealthCheck && healthPluginInstance) {
+56|        webpackConfig.plugins.push(healthPluginInstance);
+57|      }
+58|      return webpackConfig;
+59|    },
+60|  },
+61|};
+62|
+63|webpackConfig.devServer = (devServerConfig) => {
+64|  // Add health check endpoints if enabled
+65|  if (config.enableHealthCheck && setupHealthEndpoints && healthPluginInstance) {
+66|    const originalSetupMiddlewares = devServerConfig.setupMiddlewares;
+67|
+68|    devServerConfig.setupMiddlewares = (middlewares, devServer) => {
+69|      // Call original setup if exists
+70|      if (originalSetupMiddlewares) {
+71|        middlewares = originalSetupMiddlewares(middlewares, devServer);
+72|      }
+73|
+74|      // Setup health endpoints
+75|      setupHealthEndpoints(devServer, healthPluginInstance);
+76|
+77|      return middlewares;
+78|    };
+79|  }
+80|
+81|  return devServerConfig;
+82|};
+83|
+84|// Wrap with visual edits (automatically adds babel plugin, dev server, and overlay in dev mode)
+85|if (isDevServer) {
+86|  try {
+87|    const { withVisualEdits } = require("@emergentbase/visual-edits/craco");
+88|    webpackConfig = withVisualEdits(webpackConfig);
+89|  } catch (err) {
+90|    if (err.code === 'MODULE_NOT_FOUND' && err.message.includes('@emergentbase/visual-edits/craco')) {
+91|      console.warn(
+92|        "[visual-edits] @emergentbase/visual-edits not installed — visual editing disabled."
+93|      );
+94|    } else {
+95|      throw err;
+96|    }
+97|  }
+98|}
+99|
+100|module.exports = webpackConfig;
+101|
+[End of file]
