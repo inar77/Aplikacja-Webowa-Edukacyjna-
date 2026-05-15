@@ -1,0 +1,111 @@
+Pakiet zainstalowany. Buduję komponenty równolegle.
+Action: file_editor create /app/frontend/src/navig/HandDrawnArrow.jsx --file-text "import React from \"react\";
+import { motion } from \"framer-motion\";
+
+/**
+ * HandDrawnArrow
+ * ------------------------------------------------------------
+ * Kredowa, lekko koślawa strzałka – overlay nad UI/FPP.
+ * Rysuje się \"w locie\" (pathLength) i delikatnie drga.
+ *
+ * Props:
+ *   x, y         – pozycja w px (lewy-górny róg kontenera)
+ *   rotation     – obrót w stopniach
+ *   label        – krótki, odręczny tekst (np. \"Odkręć to\")
+ *   length       – długość trzonu w px (default 120)
+ *   delay        – opóźnienie animacji
+ *   color        – kolor \"kredy\"
+ */
+export default function HandDrawnArrow({
+  x = 0,
+  y = 0,
+  rotation = 0,
+  label,
+  length = 120,
+  delay = 0,
+  color = \"#f4ecd8\",
+}) {
+  // Lekko nieregularna ścieżka (jakby ktoś rysował od ręki)
+  const shaft = `M 4 28 C ${length * 0.25} 22, ${length * 0.55} 34, ${length - 18} 26`;
+  const head1 = `M ${length - 18} 26 L ${length - 34} 14`;
+  const head2 = `M ${length - 18} 26 L ${length - 30} 40`;
+
+  return (
+    <motion.div
+      data-testid=\"hand-drawn-arrow\"
+      className=\"pointer-events-none absolute\"
+      style={{
+        left: x,
+        top: y,
+        transform: `rotate(${rotation}deg)`,
+        transformOrigin: \"0% 50%\",
+      }}
+      initial={{ opacity: 0 }}
+      animate={{
+        opacity: 1,
+        x: [0, 0.6, -0.4, 0.3, 0],
+        y: [0, -0.3, 0.5, -0.2, 0],
+      }}
+      transition={{
+        opacity: { duration: 0.3, delay },
+        x: { duration: 2.4, repeat: Infinity, ease: \"easeInOut\" },
+        y: { duration: 2.8, repeat: Infinity, ease: \"easeInOut\" },
+      }}
+    >
+      <svg
+        width={length}
+        height=\"56\"
+        viewBox={`0 0 ${length} 56`}
+        style={{ filter: \"drop-shadow(0 0 2px rgba(244,236,216,0.35))\" }}
+      >
+        <defs>
+          <filter id={`chalk-${length}`}>
+            <feTurbulence baseFrequency=\"0.9\" numOctaves=\"2\" seed=\"3\" />
+            <feDisplacementMap in=\"SourceGraphic\" scale=\"1.6\" />
+          </filter>
+        </defs>
+        {[shaft, head1, head2].map((d, i) => (
+          <motion.path
+            key={i}
+            d={d}
+            stroke={color}
+            strokeWidth={2.4}
+            strokeLinecap=\"round\"
+            strokeLinejoin=\"round\"
+            fill=\"none\"
+            filter={`url(#chalk-${length})`}
+            initial={{ pathLength: 0, opacity: 0 }}
+            animate={{ pathLength: 1, opacity: 0.92 }}
+            transition={{
+              duration: 0.55,
+              delay: delay + i * 0.08,
+              ease: \"easeOut\",
+            }}
+          />
+        ))}
+      </svg>
+      {label && (
+        <motion.span
+          data-testid=\"hand-drawn-arrow-label\"
+          className=\"absolute whitespace-nowrap text-[1.05rem]\"
+          style={{
+            left: length * 0.15,
+            top: -6,
+            color,
+            fontFamily: \"'Caveat', 'Architects Daughter', cursive\",
+            transform: `rotate(${-rotation}deg)`,
+            transformOrigin: \"0% 50%\",
+            textShadow: \"0 0 6px rgba(0,0,0,0.55)\",
+          }}
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 0.95, y: 0 }}
+          transition={{ duration: 0.4, delay: delay + 0.35 }}
+        >
+          {label}
+        </motion.span>
+      )}
+    </motion.div>
+  );
+}
+"
+Observation: Create successful: /app/frontend/src/navig/HandDrawnArrow.jsx
