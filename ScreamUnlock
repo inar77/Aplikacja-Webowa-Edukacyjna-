@@ -1,0 +1,567 @@
+Now creating the canonical `.tsx` deliverable plus a runnable `.jsx` mirror and dark demo page in parallel:
+Action: file_editor create /app/frontend/src/components/EngagementScreamUnlock.tsx --file-text "/**
+ * EngagementScreamUnlock.tsx
+ * ---------------------------------------------------------------------------
+ * Gamification component for the Navig education app.
+ *
+ * The user has to physically SHOUT into the microphone to unlock a power-up
+ * (e.g. faster pliers in an FPP repair task). We progressively measure the RMS
+ * of the live mic stream, classify it into 4 tiers (Whisper / Talk / Shout /
+ * Scream) and only fire `onUnlockTool` when the user stays in the SCREAM tier
+ * for `holdMs` consecutive milliseconds. This prevents a single clap or a
+ * desk-thump from cheesing the reward.
+ *
+ * Requires: react, framer-motion, tailwindcss, lucide-react.
+ * ---------------------------------------------------------------------------
+ */
+
+import React, { useCallback, useEffect, useRef, useState } from \"react\";
+import { motion, AnimatePresence } from \"framer-motion\";
+import { Mic, MicOff, Zap, AlertTriangle, Lock, Unlock } from \"lucide-react\";
+
+/* ----------------------------- Types & constants -------------------------- */
+
+export type ScreamTier = \"idle\" | \"whisper\" | \"talk\" | \"shout\" | \"scream\";
+
+export interface UnlockPayload {
+  toolId: string;
+  speedBoost: number;
+}
+
+export interface EngagementScreamUnlockProps {
+  /** Fired when the user holds the SCREAM tier for `holdMs` ms. */
+  onUnlockTool: (payload: UnlockPayload) => void;
+  /** Identifier of the tool that gets unlocked. Default: \"pro_pliers\". */
+  toolId?: string;
+  /** Multiplier passed to the callback. Default: 1.5. */
+  speedBoost?: number;
+  /** Time in ms the user must hold the SCREAM tier. Default: 1000. */
+  holdMs?: number;
+  /**
+   * RMS thresholds (0-1). Values above each threshold enter that tier.
+   * Defaults are calibrated for an \"easy/medium\" target on a typical laptop
+   * mic – tweak per device profile.
+   */
+  thresholds?: {
+    talk: number;
+    shout: number;
+    scream: number;
+  };
+  /** Optional className appended to the root. */
+  className?: string;
+}
+
+interface TierMeta {
+  id: ScreamTier;
+  labelPl: string;
+  min: number;
+  accent: string; // tailwind colour token for highlight
+}
+
+/* ------------------------------ Component --------------------------------- */
+
+const DEFAULT_THRESHOLDS = { talk: 0.08, shout: 0.22, scream: 0.42 };
+
+export const EngagementScreamUnlock: React.FC<EngagementScreamUnlockProps> = ({
+  onUnlockTool,
+  toolId = \"pro_pliers\",
+  speedBoost = 1.5,
+  holdMs = 1000,
+  thresholds = DEFAULT_THRESHOLDS,
+  className = \"\",
+}) => {
+  /* ---------- React state (what triggers re-render) -------------------- */
+  const [isListening, setIsListening] = useState(false);
+  const [tier, setTier] = useState<ScreamTier>(\"idle\");
+  const [volume, setVolume] = useState(0); // 0..1 smoothed RMS
+  const [holdProgress, setHoldProgress] = useState(0); // 0..1
+  const [unlocked, setUnlocked] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  /* ---------- Refs (mutable, not part of render cycle) ------------------ */
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const dataRef = useRef<Uint8Array | null>(null);
+  const smoothedVolRef = useRef(0);
+  const screamStartRef = useRef<number | null>(null);
+
+  const tiers: TierMeta[] = [
+    { id: \"whisper\", labelPl: \"SZEPT\",  min: 0,                 accent: \"bg-zinc-700\"  },
+    { id: \"talk\",    labelPl: \"MOWA\",   min: thresholds.talk,   accent: \"bg-amber-500\" },
+    { id: \"shout\",   labelPl: \"KRZYK\",  min: thresholds.shout,  accent: \"bg-orange-500\" },
+    { id: \"scream\",  labelPl: \"WRZASK\", min: thresholds.scream, accent: \"bg-red-600\"   },
+  ];
+
+  /* ---------- Tier classification --------------------------------------- */
+  const classify = useCallback(
+    (rms: number): ScreamTier => {
+      if (rms >= thresholds.scream) return \"scream\";
+      if (rms >= thresholds.shout) return \"shout\";
+      if (rms >= thresholds.talk) return \"talk\";
+      return \"whisper\";
+    },
+    [thresholds.scream, thresholds.shout, thresholds.talk]
+  );
+
+  /* ---------- Resource cleanup ------------------------------------------ */
+  const releaseAudio = useCallback(() => {
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+    if (sourceRef.current) {
+      try { sourceRef.current.disconnect(); } catch { /* noop */ }
+      sourceRef.current = null;
+    }
+    if (analyserRef.current) {
+      try { analyserRef.current.disconnect(); } catch { /* noop */ }
+      analyserRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    if (audioContextRef.current && audioContextRef.current.state !== \"closed\") {
+      audioContextRef.current.close().catch(() => undefined);
+    }
+    audioContextRef.current = null;
+    dataRef.current = null;
+    smoothedVolRef.current = 0;
+    screamStartRef.current = null;
+  }, []);
+
+  /* ---------- Animation loop: read mic & update state ------------------- */
+  const tick = useCallback(() => {
+    const analyser = analyserRef.current;
+    const data = dataRef.current;
+    if (!analyser || !data) return;
+
+    analyser.getByteTimeDomainData(data);
+
+    // RMS over the time-domain buffer (centered at 128 = silence).
+    let sumSquares = 0;
+    for (let i = 0; i < data.length; i++) {
+      const v = (data[i] - 128) / 128;
+      sumSquares += v * v;
+    }
+    const rms = Math.sqrt(sumSquares / data.length);
+
+    // Exponential smoothing so the meter doesn't jitter.
+    const prev = smoothedVolRef.current;
+    const smoothed = prev * 0.75 + rms * 0.25;
+    smoothedVolRef.current = smoothed;
+
+    const nextTier = classify(smoothed);
+    setVolume(smoothed);
+    setTier(nextTier);
+
+    // Hold logic – must stay in scream tier for `holdMs` ms.
+    const now = performance.now();
+    if (nextTier === "scream") {
+      if (screamStartRef.current === null) screamStartRef.current = now;
+      const held = now - screamStartRef.current;
+      const progress = Math.min(1, held / holdMs);
+      setHoldProgress(progress);
+
+      if (progress >= 1) {
+        // SUCCESS
+        setUnlocked(true);
+        setIsListening(false);
+        releaseAudio();
+        onUnlockTool({ toolId, speedBoost });
+        return; // stop the loop
+      }
+    } else {
+      if (screamStartRef.current !== null) {
+        screamStartRef.current = null;
+        setHoldProgress(0);
+      }
+    }
+
+    rafRef.current = requestAnimationFrame(tick);
+  }, [classify, holdMs, onUnlockTool, releaseAudio, speedBoost, toolId]);
+
+  /* ---------- Start microphone ------------------------------------------ */
+  const start = useCallback(async () => {
+    setError(null);
+    setUnlocked(false);
+    setHoldProgress(0);
+    setVolume(0);
+    setTier("whisper");
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setError("Twoja przeglądarka nie obsługuje mikrofonu.");
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+        },
+      });
+      streamRef.current = stream;
+
+      // Safari still uses the prefixed constructor.
+      const Ctx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext })
+          .webkitAudioContext;
+      const ctx = new Ctx();
+      audioContextRef.current = ctx;
+
+      const source = ctx.createMediaStreamSource(stream);
+      sourceRef.current = source;
+
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 1024;
+      analyser.smoothingTimeConstant = 0.2;
+      analyserRef.current = analyser;
+
+      dataRef.current = new Uint8Array(analyser.fftSize);
+      source.connect(analyser);
+
+      setIsListening(true);
+      rafRef.current = requestAnimationFrame(tick);
+    } catch (e: unknown) {
+      const err = e as { name?: string; message?: string };
+      if (err?.name === "NotAllowedError" || err?.name === "SecurityError") {
+        setError("Brak zgody na mikrofon. Włącz uprawnienia w przeglądarce.");
+      } else if (err?.name === "NotFoundError") {
+        setError("Nie znaleziono żadnego mikrofonu.");
+      } else {
+        setError(err?.message || "Nie udało się uruchomić mikrofonu.");
+      }
+      releaseAudio();
+      setIsListening(false);
+    }
+  }, [releaseAudio, tick]);
+
+  /* ---------- Stop / reset ---------------------------------------------- */
+  const stop = useCallback(() => {
+    releaseAudio();
+    setIsListening(false);
+    setTier("idle");
+    setVolume(0);
+    setHoldProgress(0);
+  }, [releaseAudio]);
+
+  const reset = useCallback(() => {
+    stop();
+    setUnlocked(false);
+    setError(null);
+  }, [stop]);
+
+  // Always free resources on unmount.
+  useEffect(() => {
+    return () => {
+      releaseAudio();
+    };
+  }, [releaseAudio]);
+
+  /* ---------- Derived values for rendering ------------------------------ */
+  // The visible meter is the maximum of (real volume) and (hold progress) so
+  // the ring keeps \"locked\" at full while holding the scream.
+  const meter = Math.max(volume, holdProgress * 0.9);
+  const ringPct = Math.min(1, meter * 1.6); // visual amplification
+
+  const RING_R = 120;
+  const RING_C = 2 * Math.PI * RING_R;
+  const ringDashOffset = RING_C * (1 - ringPct);
+
+  const tierAccent =
+    tier === \"scream\"
+      ? \"text-red-500\"
+      : tier === \"shout\"
+      ? \"text-orange-400\"
+      : tier === \"talk\"
+      ? \"text-amber-300\"
+      : \"text-zinc-400\";
+
+  const ringStroke =
+    tier === \"scream\"
+      ? \"#ef4444\"
+      : tier === \"shout\"
+      ? \"#f97316\"
+      : tier === \"talk\"
+      ? \"#f59e0b\"
+      : \"#52525b\";
+
+  return (
+    <div
+      data-testid=\"engagement-scream-unlock\"
+      className={`relative w-full max-w-xl mx-auto rounded-2xl border border-zinc-800 bg-[#0a0a0b] text-zinc-100 p-8 overflow-hidden ${className}`}
+      style={{
+        backgroundImage:
+          \"radial-gradient(circle at 50% 0%, rgba(239,68,68,0.08), transparent 60%), repeating-linear-gradient(0deg, rgba(255,255,255,0.015) 0 1px, transparent 1px 3px)\",
+      }}
+    >
+      {/* Header */}
+      <div className=\"flex items-start justify-between mb-6\">
+        <div>
+          <p className=\"text-[10px] tracking-[0.3em] text-zinc-500 font-mono\">
+            NAVIG // POWER-UP
+          </p>
+          <h2 className=\"mt-2 text-2xl font-black tracking-tight uppercase\">
+            Odblokuj narzędzie
+          </h2>
+          <p className=\"mt-1 text-xs text-zinc-400 font-mono\">
+            tool:{\" \"}
+            <span className=\"text-zinc-200\">{toolId}</span>{\" \"}
+            · speed ×{speedBoost}
+          </p>
+        </div>
+        <div
+          className={`flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest px-2 py-1 border ${
+            isListening
+              ? \"border-red-600/60 text-red-400\"
+              : \"border-zinc-700 text-zinc-500\"
+          }`}
+        >
+          <span
+            className={`h-1.5 w-1.5 rounded-full ${
+              isListening ? \"bg-red-500 animate-pulse\" : \"bg-zinc-600\"
+            }`}
+          />
+          {isListening ? \"REC\" : \"STDBY\"}
+        </div>
+      </div>
+
+      {/* Ring meter */}
+      <div className=\"relative flex items-center justify-center my-2\">
+        <svg
+          viewBox=\"0 0 280 280\"
+          width={280}
+          height={280}
+          className=\"-rotate-90\"
+        >
+          <circle
+            cx=\"140\"
+            cy=\"140\"
+            r={RING_R}
+            stroke=\"#18181b\"
+            strokeWidth={14}
+            fill=\"none\"
+          />
+          <circle
+            cx=\"140\"
+            cy=\"140\"
+            r={RING_R}
+            stroke={ringStroke}
+            strokeWidth={14}
+            strokeLinecap=\"round\"
+            fill=\"none\"
+            strokeDasharray={RING_C}
+            strokeDashoffset={ringDashOffset}
+            style={{
+              transition: \"stroke 120ms linear\",
+              filter:
+                tier === \"scream\"
+                  ? \"drop-shadow(0 0 14px rgba(239,68,68,0.7))\"
+                  : \"none\",
+            }}
+          />
+        </svg>
+
+        {/* Center label */}
+        <div className=\"absolute inset-0 flex flex-col items-center justify-center pointer-events-none\">
+          <motion.div
+            animate={{ scale: tier === \"scream\" ? 1.08 : 1 }}
+            transition={{ type: \"spring\", stiffness: 250, damping: 18 }}
+            className={`text-6xl font-black tabular-nums ${tierAccent}`}
+            data-testid=\"volume-readout\"
+          >
+            {Math.round(meter * 100)}
+          </motion.div>
+          <div className=\"text-[10px] tracking-[0.3em] font-mono text-zinc-500 mt-1\">
+            POZIOM
+          </div>
+          <div
+            className={`mt-3 text-xs font-mono uppercase tracking-[0.25em] ${tierAccent}`}
+            data-testid=\"current-tier\"
+          >
+            {tier === \"idle\" ? \"—\" : tiers.find((t) => t.id === tier)?.labelPl}
+          </div>
+        </div>
+      </div>
+
+      {/* Tier strip */}
+      <div className="grid grid-cols-4 gap-2 mt-4">
+        {tiers.map((t) => {
+          const active = tier === t.id && isListening;
+          return (
+            <div
+              key={t.id}
+              data-testid={`tier-${t.id}`}
+              className={`relative border px-2 py-2 font-mono text-[10px] uppercase tracking-widest transition-colors ${
+                active
+                  ? "border-zinc-100/30 bg-zinc-900"
+                  : "border-zinc-800 bg-zinc-950/50 text-zinc-500"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className={active ? \"text-zinc-100" : ""}>
+                  {t.labelPl}
+                </span>
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    active ? t.accent : "bg-zinc-700"
+                  }`}
+                />
+              </div>
+              <div className="mt-1 text-zinc-500">
+                ≥ {Math.round(t.min * 100)}%
+              </div>
+            <div>
+          );
+        })}
+      </div>
+
+      {/* Hold meter */}
+      <div className="mt-5">
+        <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-2\">
+          <span>Utrzymaj WRZASK</span>
+          <span data-testid="hold-progress">
+            {Math.round(holdProgress * 1000)} / {holdMs} ms
+          </span>
+        </div>
+        <div className="relative h-2 w-full bg-zinc-900 overflow-hidden rounded-sm">
+          <motion.div
+            className="absolute inset-y-0 left-0 bg-red-600"
+            animate={{ width: `${holdProgress * 100}%` }}
+            transition={{ ease: \"linear\", duration: 0.05 }}
+            style={{
+              boxShadow:
+                holdProgress > 0 ? \"0 0 12px rgba(239,68,68,0.6)\" : \"none\",
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Error banner */}
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            data-testid="error-banner\"
+            className="mt-4 flex items-start gap-2 border border-red-900/60 bg-red-950/40 px-3 py-2 text-xs text-red-300 font-mono"
+          >
+            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+            <span>{error}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* CTA */}
+      <div className="mt-6">
+        {!unlocked && !isListening && (
+          <button
+            type="button"
+            onClick={start}
+            data-testid="start-scream-button"
+            className="group relative w-full overflow-hidden border border-red-600 bg-red-600 text-white font-black uppercase tracking-[0.2em] py-4 hover:bg-red-500 active:translate-y-px transition-colors\"
+            style={{ boxShadow: \"0 0 0 4px rgba(239,68,68,0.15)" }}
+          >
+            <span className="flex items-center justify-center gap-3">
+              <Mic className="h-5 w-5" />
+              Odblokuj narzędzie — WYKRZYCZ TO!
+            </span>
+            <span className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity\"
+              style={{
+                background:
+                  \"repeating-linear-gradient(45deg, rgba(0,0,0,0.15) 0 6px, transparent 6px 12px)",
+              }}
+            />
+          </button>
+        )}
+
+        {isListening && (
+          <button
+            type="button"
+            onClick={stop}
+            data-testid="stop-scream-button"
+            className="w-full border border-zinc-700 bg-zinc-900 text-zinc-300 font-mono uppercase tracking-[0.2em] py-3 hover:bg-zinc-800 transition-colors\"
+          >
+            <span className="flex items-center justify-center gap-2">
+              <MicOff className="h-4 w-4" />
+              Przerwij
+            </span>
+          </button>
+        )}
+
+        {unlocked && (
+          <button
+            type="button"
+            onClick={reset}
+            data-testid="reset-button"
+            className="w-full border border-zinc-700 bg-zinc-900 text-zinc-300 font-mono uppercase tracking-[0.2em] py-3 hover:bg-zinc-800 transition-colors"
+          >
+            <span className="flex items-center justify-center gap-2">
+              <Lock className="h-4 w-4\" >
+              Resetuj (debug)
+            </span>
+          </button>
+        )}
+      </div>
+
+      <p className="mt-4 text-center text-[11px] font-mono text-zinc-500\">
+        Im głośniej krzyczysz, tym szybciej odblokujesz lepsze narzędzie.
+      </p>
+
+      {/* Success overlay */}
+      <AnimatePresence>
+        {unlocked && (
+          <motion.div
+            data-testid="success-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 flex flex-col items-center justify-center bg-[#0a0a0b]/95 backdrop-blur-sm\"
+          >
+            <motion.div
+              initial={{ scale: 0.4, rotate: -8, opacity: 0 }}
+              animate={{ scale: 1, rotate: 0, opacity: 1 }}
+              transition={{ type: "spring", stiffness: 260, damping: 16 }}
+              className="relative"
+            >
+              <div className="absolute inset-0 -m-6 rounded-full bg-red-600/20 blur-2xl" />
+              <div className="relative border-2 border-red-600 bg-red-600/10 px-8 py-6 text-center">
+                <Unlock className="h-10 w-10 mx-auto text-red-500" />
+                <div className="mt-3 text-[10px] tracking-[0.4em] font-mono text-red-400">
+                  POWER-UP UNLOCKED
+                </div>
+                <div className="mt-1 text-3xl font-black uppercase tracking-tight">
+                  {toolId}
+                </div>
+                <div className="mt-1 text-xs font-mono text-zinc-300">
+                  <Zap className="inline h-3 w-3 -mt-0.5 mr-1 text-amber-400" />
+                  speed boost ×{speedBoost}
+                </div>
+              </div>
+            </motion.div>
+
+            <motion.button
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+              onClick={reset}
+              data-testid="success-close-button"
+              className="mt-8 border border-zinc-700 bg-zinc-900 text-zinc-200 font-mono uppercase tracking-[0.2em] px-6 py-2 text-xs hover:bg-zinc-800"
+            >
+              Kontynuuj
+            </motion.button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+export default EngagementScreamUnlock;
