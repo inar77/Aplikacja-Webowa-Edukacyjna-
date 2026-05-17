@@ -1,0 +1,303 @@
+Robię 3 nowe scenki FPP — każda z własnym klimatem, sceną SVG i 4-krokowym flow z kredowymi affordances. Najpierw refaktor: wynoszę dane misji do osobnego pliku, żeby `NavigFPPScene` był generyczny.
+Action: file_editor create /app/frontend/src/navig/scenes/ApartmentScene.jsx --file-text "import React from \"react\";
+
+/**
+ * ApartmentScene
+ * ------------------------------------------------------------
+ * Mieszkanie – instalacja gniazdka 230V w puszce w ścianie.
+ * Klimat: ciepłe światło dzienne z okna, jasna ściana, listwa
+ * przypodłogowa, drewniana podłoga, narzędzie (śrubokręt).
+ *
+ * Klikalne elementy (data-testid=\"fpp-{id}\"):
+ *  - wire-l (brąz, faza)
+ *  - wire-n (niebieski, zero)
+ *  - wire-pe (żółto-zielony, ochrona)
+ *  - socket (białe gniazdko do wkręcenia)
+ */
+export default function ApartmentScene({ onHit, completedSteps = new Set(), activeId }) {
+  const interact = (id) => () => onHit?.(id);
+  const isDone = (id) => completedSteps.has(id);
+  const isActive = (id) => activeId === id;
+
+  return (
+    <svg
+      data-testid=\"apartment-scene\"
+      viewBox=\"0 0 1000 620\"
+      className=\"h-full w-full\"
+      preserveAspectRatio=\"xMidYMid meet\"
+    >
+      <defs>
+        <linearGradient id=\"wall-paint\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\">
+          <stop offset=\"0%\" stopColor=\"#f3ead4\" />
+          <stop offset=\"100%\" stopColor=\"#d8c9a4\" />
+        </linearGradient>
+        <linearGradient id=\"floor-wood\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\">
+          <stop offset=\"0%\" stopColor=\"#9c6c3c\" />
+          <stop offset=\"100%\" stopColor=\"#5e3d1f\" />
+        </linearGradient>
+        <linearGradient id=\"baseboard\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\">
+          <stop offset=\"0%\" stopColor=\"#faf3df\" />
+          <stop offset=\"100%\" stopColor=\"#cdbe93\" />
+        </linearGradient>
+        <radialGradient id=\"sun-glow\" cx=\"50%\" cy=\"50%\" r=\"50%\">
+          <stop offset=\"0%\" stopColor=\"rgba(255,210,140,0.55)\" />
+          <stop offset=\"100%\" stopColor=\"rgba(255,210,140,0)\" />
+        </radialGradient>
+        <radialGradient id=\"box-shadow\" cx=\"50%\" cy=\"50%\" r=\"50%\">
+          <stop offset=\"0%\" stopColor=\"#3a2a18\" />
+          <stop offset=\"100%\" stopColor=\"#1a120a\" />
+        </radialGradient>
+        <linearGradient id=\"socket\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\">
+          <stop offset=\"0%\" stopColor=\"#fdfbf3\" />
+          <stop offset=\"100%\" stopColor=\"#d8d2bf\" />
+        </linearGradient>
+        <linearGradient id=\"driver-handle\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\">
+          <stop offset=\"0%\" stopColor=\"#d04f3a\" />
+          <stop offset=\"100%\" stopColor=\"#8a2a17\" />
+        </linearGradient>
+        <filter id=\"apt-vignette\" x=\"-20%\" y=\"-20%\" width=\"140%\" height=\"140%\">
+          <feGaussianBlur stdDeviation=\"2\" />
+        </filter>
+      </defs>
+
+      {/* ŚCIANA */}
+      <rect x=\"0\" y=\"0\" width=\"1000\" height=\"480\" fill=\"url(#wall-paint)\" />
+      {/* subtelna tekstura tynku */}
+      <g opacity=\"0.08\">
+        {Array.from({ length: 60 }).map((_, i) => (
+          <circle
+            key={i}
+            cx={(i * 137) % 1000}
+            cy={((i * 71) % 480)}
+            r={(i % 5) + 1}
+            fill=\"#7a5a30\"
+          />
+        ))}
+      </g>
+      {/* światło z okna (prawy górny) */}
+      <ellipse cx=\"850\" cy=\"80\" rx=\"320\" ry=\"220\" fill=\"url(#sun-glow)\" />
+      <ellipse cx=\"900\" cy=\"40\" rx=\"180\" ry=\"120\" fill=\"url(#sun-glow)\" />
+
+      {/* RAMA OKNA (po prawej, sugestywnie) */}
+      <g opacity=\"0.4\">
+        <rect x=\"820\" y=\"40\" width=\"160\" height=\"180\" rx=\"3\" fill=\"rgba(255,240,210,0.7)\" />
+        <line x1=\"900\" y1=\"40\" x2=\"900\" y2=\"220\" stroke=\"#a08560\" strokeWidth=\"2\" />
+        <line x1=\"820\" y1=\"130\" x2=\"980\" y2=\"130\" stroke=\"#a08560\" strokeWidth=\"2\" />
+        <rect x=\"820\" y=\"40\" width=\"160\" height=\"180\" rx=\"3\" fill=\"none\" stroke=\"#7a5a30\" strokeWidth=\"3\" />
+      </g>
+
+      {/* OBRAZ ozdobny na ścianie (lewy) */}
+      <g opacity=\"0.85\">
+        <rect x=\"50\" y=\"80\" width=\"170\" height=\"120\" fill=\"#3a2a18\" stroke=\"#6b4a26\" strokeWidth=\"3\" />
+        <rect x=\"58\" y=\"88\" width=\"154\" height=\"104\" fill=\"#7a8a6a\" />
+        <path d=\"M 58 192 L 110 130 L 150 160 L 212 88 L 212 192 Z\" fill=\"#5a6a4a\" />
+        <circle cx=\"90\" cy=\"110\" r=\"10\" fill=\"#f7d04a\" opacity=\"0.7\" />
+      </g>
+
+      {/* PODŁOGA */}
+      <rect x=\"0\" y=\"480\" width=\"1000\" height=\"140\" fill=\"url(#floor-wood)\" />
+      {/* deski podłogowe */}
+      {[0, 1, 2, 3, 4].map((i) => (
+        <line
+          key={i}
+          x1=\"0\"
+          y1={490 + i * 28}
+          x2=\"1000\"
+          y2={490 + i * 28}
+          stroke=\"rgba(0,0,0,0.18)\"
+          strokeWidth=\"1.2\"
+        />
+      ))}
+      {Array.from({ length: 12 }).map((_, i) => (
+        <line
+          key={`v${i}`}
+          x1={i * 85 + (i % 2 === 0 ? 0 : 42)}
+          y1={i % 2 === 0 ? 490 : 518}
+          x2={i * 85 + (i % 2 === 0 ? 0 : 42)}
+          y2={i % 2 === 0 ? 518 : 546}
+          stroke=\"rgba(0,0,0,0.22)\"
+          strokeWidth=\"1\"
+        />
+      ))}
+
+      {/* LISTWA PRZYPODŁOGOWA */}
+      <rect x=\"0\" y=\"460\" width=\"1000\" height=\"22\" fill=\"url(#baseboard)\" stroke=\"#5a3a18\" strokeWidth=\"1\" />
+      <line x1=\"0\" y1=\"466\" x2=\"1000\" y2=\"466\" stroke=\"#a08560\" strokeWidth=\"0.8\" opacity=\"0.7\" />
+
+      {/* PUSZKA INSTALACYJNA W ŚCIANIE — środek */}
+      <g>
+        {/* otoczenie puszki – delikatny kontur */}
+        <circle cx=\"500\" cy=\"320\" r=\"58\" fill=\"url(#box-shadow)\" />
+        <circle cx=\"500\" cy=\"320\" r=\"52\" fill=\"#1a120a\" />
+        <circle cx=\"500\" cy=\"320\" r=\"48\" fill=\"#252013\" stroke=\"#0d0a05\" strokeWidth=\"1\" />
+        {/* śrubki montażowe puszki */}
+        <circle cx=\"468\" cy=\"320\" r=\"3\" fill=\"#9aa2b0\" />
+        <circle cx=\"532\" cy=\"320\" r=\"3\" fill=\"#9aa2b0\" />
+        <text x=\"500\" y=\"395\" textAnchor=\"middle\" fill=\"#7a5a30\" fontFamily=\"JetBrains Mono, monospace\" fontSize=\"10\" letterSpacing=\"2\" opacity=\"0.6\">
+          PUSZKA Ø60
+        </text>
+      </g>
+
+      {/* PRZEWODY wystające z puszki */}
+      {/* L – brąz */}
+      <g
+        data-testid=\"fpp-wire-l\"
+        style={{ cursor: \"pointer\" }}
+        onClick={interact(\"wire-l\")}
+      >
+        <path
+          d=\"M 482 305 C 470 280, 455 260, 460 230\"
+          stroke=\"#8a4a20\"
+          strokeWidth={isDone(\"wire-l\") ? \"9\" : \"7\"}
+          strokeLinecap=\"round\"
+          fill=\"none\"
+        />
+        {/* odsłonięta miedź jeśli zaliczone */}
+        {isDone(\"wire-l\") ? (
+          <line x1=\"458\" y1=\"228\" x2=\"462\" y2=\"216\" stroke=\"#d97a1f\" strokeWidth=\"4\" strokeLinecap=\"round\" />
+        ) : (
+          <line x1=\"458\" y1=\"228\" x2=\"462\" y2=\"216\" stroke=\"#8a4a20\" strokeWidth=\"6\" strokeLinecap=\"round\" />
+        )}
+        <text x=\"450\" y=\"208\" textAnchor=\"end\" fill=\"#5a3a18\" fontFamily=\"JetBrains Mono, monospace\" fontSize=\"9\" letterSpacing=\"2\" opacity=\"0.7\">L · faza</text>
+        {isActive(\"wire-l\") && (
+          <circle cx=\"460\" cy=\"220\" r=\"14\" fill=\"none\" stroke=\"#f4a13d\" strokeWidth=\"2\">
+            <animate attributeName=\"r\" values=\"10;20;10\" dur=\"1.6s\" repeatCount=\"indefinite\" />
+            <animate attributeName=\"opacity\" values=\"0.9;0;0.9\" dur=\"1.6s\" repeatCount=\"indefinite\" />
+          </circle>
+        )}
+        {isDone(\"wire-l\") && (
+          <circle cx=\"460\" cy=\"220\" r=\"12\" fill=\"none\" stroke=\"#58d896\" strokeWidth=\"1.6\" />
+        )}
+      </g>
+
+      {/* N – niebieski */}
+      <g
+        data-testid=\"fpp-wire-n\"
+        style={{ cursor: \"pointer\" }}
+        onClick={interact(\"wire-n\")}
+      >
+        <path
+          d=\"M 500 295 C 502 270, 500 245, 504 220\"
+          stroke=\"#1f5fb3\"
+          strokeWidth={isDone(\"wire-n\") ? \"9\" : \"7\"}
+          strokeLinecap=\"round\"
+          fill=\"none\"
+        />
+        {isDone(\"wire-n\") ? (
+          <line x1=\"504\" y1=\"218\" x2=\"505\" y2=\"205\" stroke=\"#d97a1f\" strokeWidth=\"4\" strokeLinecap=\"round\" />
+        ) : (
+          <line x1=\"504\" y1=\"218\" x2=\"505\" y2=\"205\" stroke=\"#1f5fb3\" strokeWidth=\"6\" strokeLinecap=\"round\" />
+        )}
+        <text x=\"514\" y=\"198\" textAnchor=\"start\" fill=\"#1f5fb3\" fontFamily=\"JetBrains Mono, monospace\" fontSize=\"9\" letterSpacing=\"2\" opacity=\"0.7\">N · zero</text>
+        {isActive(\"wire-n\") && (
+          <circle cx=\"505\" cy=\"210\" r=\"14\" fill=\"none\" stroke=\"#f4a13d\" strokeWidth=\"2\">
+            <animate attributeName=\"r\" values=\"10;20;10\" dur=\"1.6s\" repeatCount=\"indefinite\" />
+            <animate attributeName=\"opacity\" values=\"0.9;0;0.9\" dur=\"1.6s\" repeatCount=\"indefinite\" />
+          </circle>
+        )}
+        {isDone(\"wire-n\") && (
+          <circle cx=\"505\" cy=\"210\" r=\"12\" fill=\"none\" stroke=\"#58d896\" strokeWidth=\"1.6\" />
+        )}
+      </g>
+
+      {/* PE – żółto-zielony */}
+      <g
+        data-testid=\"fpp-wire-pe\"
+        style={{ cursor: \"pointer\" }}
+        onClick={interact(\"wire-pe\")}
+      >
+        <path
+          d=\"M 518 305 C 535 280, 545 255, 548 225\"
+          stroke=\"#58d896\"
+          strokeWidth={isDone(\"wire-pe\") ? \"9\" : \"7\"}
+          strokeLinecap=\"round\"
+          fill=\"none\"
+        />
+        {/* żółte spiralki dla PE */}
+        {[0, 1, 2, 3].map((i) => (
+          <line
+            key={i}
+            x1={524 + i * 7}
+            y1={295 - i * 18}
+            x2={530 + i * 7}
+            y2={285 - i * 18}
+            stroke=\"#f7d04a\"
+            strokeWidth=\"3\"
+            strokeLinecap=\"round\"
+          />
+        ))}
+        {isDone(\"wire-pe\") ? (
+          <line x1=\"548\" y1=\"223\" x2=\"552\" y2=\"212\" stroke=\"#d97a1f\" strokeWidth=\"4\" strokeLinecap=\"round\" />
+        ) : (
+          <line x1=\"548\" y1=\"223\" x2=\"552\" y2=\"212\" stroke=\"#58d896\" strokeWidth=\"6\" strokeLinecap=\"round\" />
+        )}
+        <text x=\"560\" y=\"206\" textAnchor=\"start\" fill=\"#2a8a4a\" fontFamily=\"JetBrains Mono, monospace\" fontSize=\"9\" letterSpacing=\"2\" opacity=\"0.7\">PE · ochrona</text>
+        {isActive(\"wire-pe\") && (
+          <circle cx=\"550\" cy=\"218\" r=\"14\" fill=\"none\" stroke=\"#f4a13d\" strokeWidth=\"2\">
+            <animate attributeName=\"r\" values=\"10;20;10\" dur=\"1.6s\" repeatCount=\"indefinite\" />
+            <animate attributeName=\"opacity\" values=\"0.9;0;0.9\" dur=\"1.6s\" repeatCount=\"indefinite\" />
+          </circle>
+        )}
+        {isDone(\"wire-pe\") && (
+          <circle cx=\"550\" cy=\"218\" r=\"12\" fill=\"none\" stroke=\"#58d896\" strokeWidth=\"1.6\" />
+        )}
+      </g>
+
+      {/* GNIAZDKO – do wkręcenia. Przed zakończeniem leży na podłodze, po zakończeniu wkręcone w puszkę */}
+      <g
+        data-testid=\"fpp-socket\"
+        style={{ cursor: \"pointer\" }}
+        onClick={interact(\"socket\")}
+      >
+        {isDone(\"socket\") ? (
+          // wkręcone w puszkę
+          <g>
+            <circle cx=\"500\" cy=\"320\" r=\"50\" fill=\"url(#socket)\" stroke=\"#3a3a3a\" strokeWidth=\"1.5\" />
+            <circle cx=\"500\" cy=\"320\" r=\"38\" fill=\"#e8e2d2\" stroke=\"#aaa395\" strokeWidth=\"0.8\" />
+            <rect x=\"478\" y=\"304\" width=\"10\" height=\"32\" rx=\"2\" fill=\"#1f1f1f\" />
+            <rect x=\"512\" y=\"304\" width=\"10\" height=\"32\" rx=\"2\" fill=\"#1f1f1f\" />
+            <circle cx=\"500\" cy=\"332\" r=\"4\" fill=\"#3a3a3a\" />
+            <circle cx=\"468\" cy=\"320\" r=\"2\" fill=\"#5a5a5a\" />
+            <circle cx=\"532\" cy=\"320\" r=\"2\" fill=\"#5a5a5a\" />
+          </g>
+        ) : (
+          // leży na podłodze obok
+          <g transform=\"translate(720, 510) rotate(-12)\">
+            <circle cx=\"0\" cy=\"0\" r=\"40\" fill=\"url(#socket)\" stroke=\"#3a3a3a\" strokeWidth=\"1.5\" />
+            <circle cx=\"0\" cy=\"0\" r=\"30\" fill=\"#e8e2d2\" stroke=\"#aaa395\" strokeWidth=\"0.8\" />
+            <rect x=\"-17\" y=\"-12\" width=\"8\" height=\"24\" rx=\"1.5\" fill=\"#1f1f1f\" />
+            <rect x=\"9\" y=\"-12\" width=\"8\" height=\"24\" rx=\"1.5\" fill=\"#1f1f1f\" />
+            <circle cx=\"0\" cy=\"10\" r=\"3.5\" fill=\"#3a3a3a\" />
+            <text x=\"0\" y=\"58\" textAnchor=\"middle\" fill=\"#fff8e0\" fontFamily=\"JetBrains Mono, monospace\" fontSize=\"9\" letterSpacing=\"2\" opacity=\"0.95\" style={{ textShadow: \"0 0 4px rgba(0,0,0,0.6)\" }}>
+              GNIAZDKO 230V
+            </text>
+            {isActive(\"socket\") && (
+              <circle cx=\"0\" cy=\"0\" r=\"48\" fill=\"none\" stroke=\"#f4a13d\" strokeWidth=\"2.5\">
+                <animate attributeName=\"r\" values=\"44;56;44\" dur=\"1.4s\" repeatCount=\"indefinite\" />
+                <animate attributeName=\"opacity\" values=\"0.95;0;0.95\" dur=\"1.4s\" repeatCount=\"indefinite\" />
+              </circle>
+            )}
+          </g>
+        )}
+      </g>
+
+      {/* ŚRUBOKRĘT na podłodze */}
+      <g transform=\"translate(220, 545) rotate(-25)\" pointerEvents=\"none\">
+        <rect x=\"-50\" y=\"-7\" width=\"80\" height=\"14\" rx=\"3\" fill=\"url(#driver-handle)\" stroke=\"#3a0e08\" strokeWidth=\"1\" />
+        <rect x=\"30\" y=\"-3\" width=\"50\" height=\"6\" fill=\"#c8d2e6\" stroke=\"#3a3a3a\" strokeWidth=\"0.8\" />
+        <rect x=\"78\" y=\"-4\" width=\"6\" height=\"8\" fill=\"#3a3a3a\" />
+        <text x=\"-10\" y=\"22\" fill=\"#fff8e0\" fontFamily=\"JetBrains Mono, monospace\" fontSize=\"8\" letterSpacing=\"2\" opacity=\"0.6\" textAnchor=\"middle\">PH2</text>
+      </g>
+
+      {/* vignette */}
+      <rect x=\"0\" y=\"0\" width=\"1000\" height=\"620\" fill=\"url(#apt-vignette)\" pointerEvents=\"none\" />
+      <radialGradient id=\"apt-vig\" cx=\"50%\" cy=\"50%\" r=\"70%\">
+        <stop offset=\"65%\" stopColor=\"rgba(0,0,0,0)\" />
+        <stop offset=\"100%\" stopColor=\"rgba(20,10,5,0.7)\" />
+      </radialGradient>
+      <rect x=\"0\" y=\"0\" width=\"1000\" height=\"620\" fill=\"url(#apt-vig)\" pointerEvents=\"none\" />
+    </svg>
+  );
+}
+"
+Observation: Create successful: /app/frontend/src/navig/scenes/ApartmentScene.jsx
