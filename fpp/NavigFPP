@@ -1,0 +1,421 @@
+Teraz buduję główny komponent `NavigFPPScene` z systemem podpowiedzi step-by-step + parallax kamery.
+Action: file_editor create /app/frontend/src/navig/NavigFPPScene.jsx --file-text "import React, { useEffect, useMemo, useRef, useState } from \"react\";
+import { motion, AnimatePresence } from \"framer-motion\";
+import { ArrowLeft, Lightbulb, Check, X } from \"lucide-react\";
+import { useNavigate } from \"react-router-dom\";
+import HandDrawnArrow from \"./HandDrawnArrow\";
+import SwitchgearScene from \"./SwitchgearScene\";
+import OrganicProgressBar from \"./OrganicProgressBar\";
+
+/**
+ * NavigFPPScene
+ * ------------------------------------------------------------
+ * Tryb FPP \"rozdzielnia 230V\" z system kredowych podpowiedzi.
+ * Każdy krok ma:
+ *  - targetId: element w scenie który trzeba kliknąć
+ *  - hints: lista HandDrawnArrow (pozycje są w \"world coords\" sceny – 1000x620 viewport)
+ *  - title: krótka instrukcja
+ *  - successMessage: co user widzi po zaliczeniu
+ *
+ * Podpowiedzi pojawiają się automatycznie po 4s bezczynności
+ * lub natychmiast po kliknięciu \"Pokaż podpowiedź\".
+ *
+ * Parallax: scena lekko reaguje na ruch myszki (efekt FPP).
+ */
+
+const STEPS = [
+  {
+    id: \"s1\",
+    targetId: \"main-breaker\",
+    title: \"Odłącz napięcie\",
+    instruction: \"Najpierw wyłącz główny wyłącznik. Bez tego nie ruszaj nic dalej.\",
+    hints: [
+      { x: 170, y: 230, rotation: 25, length: 110, label: \"Wyłącz to\" },
+    ],
+  },
+  {
+    id: \"s2\",
+    targetId: \"multimeter\",
+    title: \"Sprawdź multimetrem\",
+    instruction: \"Mierzy napięcie? Jeśli pokazuje > 0V — wracaj do kroku 1.\",
+    hints: [
+      { x: 200, y: 470, rotation: -10, length: 130, label: \"Włącz V~\" },
+      { x: 170, y: 350, rotation: -85, length: 100, label: \"tu zmierz\" },
+    ],
+  },
+  {
+    id: \"s3\",
+    targetId: \"pe-terminal\",
+    title: \"Zlokalizuj zacisk PE\",
+    instruction: \"Po prawej – listwa PE / N. Tam podpinasz przewód ochronny.\",
+    hints: [
+      { x: 580, y: 230, rotation: 0, length: 130, label: \"Listwa PE\" },
+    ],
+  },
+  {
+    id: \"s4\",
+    targetId: \"breaker-3\",
+    title: \"Wyłącz obwód C3\",
+    instruction: \"Obwód kuchni. Wyłącz, zanim ruszysz zacisk.\",
+    hints: [
+      { x: 380, y: 200, rotation: 50, length: 120, label: \"Ten – C3\" },
+    ],
+  },
+];
+
+// \"World\" rozmiar sceny (musi być spójny z viewBox SwitchgearScene)
+const SCENE_W = 1000;
+const SCENE_H = 620;
+
+export default function NavigFPPScene() {
+  const navigate = useNavigate();
+  const sceneRef = useRef(null);
+  const [stepIdx, setStepIdx] = useState(0);
+  const [completed, setCompleted] = useState(new Set());
+  const [showHints, setShowHints] = useState(false);
+  const [missMsg, setMissMsg] = useState(null);
+  const [allDone, setAllDone] = useState(false);
+  const idleTimer = useRef(null);
+
+  const step = STEPS[stepIdx];
+
+  // odlicz 4s bezczynności → pokaż podpowiedzi automatycznie
+  useEffect(() => {
+    setShowHints(false);
+    if (idleTimer.current) clearTimeout(idleTimer.current);
+    idleTimer.current = setTimeout(() => setShowHints(true), 4200);
+    return () => clearTimeout(idleTimer.current);
+  }, [stepIdx]);
+
+  // parallax kamery (lekkie kołysanie wraz z myszką)
+  const [parallax, setParallax] = useState({ x: 0, y: 0 });
+  useEffect(() => {
+    const onMove = (e) => {
+      const r = sceneRef.current?.getBoundingClientRect();
+      if (!r) return;
+      const nx = (e.clientX - r.left - r.width / 2) / r.width;
+      const ny = (e.clientY - r.top - r.height / 2) / r.height;
+      setParallax({ x: nx * 12, y: ny * 8 });
+    };
+    window.addEventListener(\"mousemove\", onMove);
+    return () => window.removeEventListener(\"mousemove\", onMove);
+  }, []);
+
+  // skala scene-pixel → DOM-pixel (do pozycjonowania overlay'a)
+  const [scale, setScale] = useState({ sx: 1, sy: 1, dx: 0, dy: 0 });
+  useEffect(() => {
+    const recalc = () => {
+      const r = sceneRef.current?.getBoundingClientRect();
+      if (!r) return;
+      // SVG ma preserveAspectRatio=\"xMidYMid meet\" – więc skala = min(w/SCENE_W, h/SCENE_H)
+      const s = Math.min(r.width / SCENE_W, r.height / SCENE_H);
+      const dx = (r.width - SCENE_W * s) / 2;
+      const dy = (r.height - SCENE_H * s) / 2;
+      setScale({ sx: s, sy: s, dx, dy });
+    };
+    recalc();
+    window.addEventListener(\"resize\", recalc);
+    return () => window.removeEventListener(\"resize\", recalc);
+  }, []);
+
+  const worldToScreen = (x, y) => ({
+    x: scale.dx + x * scale.sx,
+    y: scale.dy + y * scale.sy,
+  });
+
+  const handleHit = (id) => {
+    if (allDone) return;
+    if (id === step.targetId) {
+      const next = new Set(completed);
+      next.add(id);
+      setCompleted(next);
+      if (stepIdx + 1 < STEPS.length) {
+        setStepIdx(stepIdx + 1);
+      } else {
+        setAllDone(true);
+      }
+    } else {
+      setMissMsg(\"Spokojnie. To nie ten element — popatrz na podpowiedź.\");
+      setShowHints(true);
+      setTimeout(() => setMissMsg(null), 2200);
+    }
+  };
+
+  const progress = useMemo(() => {
+    return Math.round(((completed.size) / STEPS.length) * 100);
+  }, [completed]);
+
+  return (
+    <div
+      data-testid=\"navig-fpp-scene\"
+      className=\"relative min-h-screen w-full overflow-hidden text-[#e8eef9]\"
+      style={{ background: \"#05070d\" }}
+    >
+      {/* TOP BAR */}
+      <header className=\"relative z-30 flex items-center justify-between px-6 py-4\">
+        <button
+          data-testid=\"fpp-back\"
+          onClick={() => navigate(\"/\")}
+          className=\"flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[0.78rem] uppercase tracking-[0.22em] text-[#c8d2e6] transition hover:bg-white/10\"
+          style={{ fontFamily: \"'JetBrains Mono', monospace\" }}
+        >
+          <ArrowLeft size={14} /> Mapa
+        </button>
+
+        <div
+          className=\"text-[0.7rem] uppercase tracking-[0.32em] text-[#f4a13d]\"
+          style={{ fontFamily: \"'JetBrains Mono', monospace\" }}
+        >
+          ● FPP · MISJA 04 · ROZDZIELNIA 230V
+        </div>
+
+        <div className=\"flex items-center gap-3\">
+          <span
+            className=\"text-[0.72rem] uppercase tracking-[0.22em] text-[#c8d2e6]/65\"
+            style={{ fontFamily: \"'JetBrains Mono', monospace\" }}
+          >
+            Krok {Math.min(stepIdx + 1, STEPS.length)} / {STEPS.length}
+          </span>
+        </div>
+      </header>
+
+      {/* SCENA */}
+      <div className=\"relative z-10 mx-auto w-full max-w-[1280px] px-4\">
+        <motion.div
+          ref={sceneRef}
+          className=\"relative aspect-[1000/620] w-full overflow-hidden rounded-[12px] border border-white/10\"
+          style={{
+            background: \"#000\",
+            boxShadow:
+              \"0 30px 80px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,255,255,0.04)\",
+          }}
+          animate={{ x: -parallax.x, y: -parallax.y }}
+          transition={{ type: \"spring\", stiffness: 60, damping: 14 }}
+        >
+          <SwitchgearScene
+            onHit={handleHit}
+            completedSteps={completed}
+            activeId={!allDone ? step.targetId : null}
+          />
+
+          {/* CROSSHAIR FPP */}
+          <Crosshair />
+
+          {/* SCANLINES + VIGNETTE */}
+          <div
+            aria-hidden
+            className=\"pointer-events-none absolute inset-0 opacity-[0.18] mix-blend-overlay\"
+            style={{
+              background:
+                \"repeating-linear-gradient(0deg, rgba(255,255,255,0.06) 0 1px, transparent 1px 3px)\",
+            }}
+          />
+          <div
+            aria-hidden
+            className=\"pointer-events-none absolute inset-0\"
+            style={{
+              boxShadow: \"inset 0 0 140px rgba(0,0,0,0.85)\",
+            }}
+          />
+
+          {/* OVERLAY HAND-DRAWN ARROWS */}
+          {showHints && !allDone && (
+            <AnimatePresence>
+              {step.hints.map((h, i) => {
+                const p = worldToScreen(h.x, h.y);
+                return (
+                  <HandDrawnArrow
+                    key={`${step.id}-${i}`}
+                    x={p.x}
+                    y={p.y}
+                    rotation={h.rotation}
+                    length={h.length * scale.sx}
+                    label={h.label}
+                    delay={i * 0.25}
+                  />
+                );
+              })}
+            </AnimatePresence>
+          )}
+
+          {/* MISS MSG */}
+          <AnimatePresence>
+            {missMsg && (
+              <motion.div
+                data-testid=\"fpp-miss-message\"
+                className=\"absolute left-1/2 top-6 -translate-x-1/2 rounded-full px-4 py-2 text-[0.95rem]\"
+                style={{
+                  background: \"rgba(207,64,64,0.18)\",
+                  border: \"1px solid rgba(207,64,64,0.45)\",
+                  color: \"#ffd9d9\",
+                  fontFamily: \"'Caveat', cursive\",
+                  fontSize: \"1.2rem\",
+                  backdropFilter: \"blur(6px)\",
+                }}
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+              >
+                {missMsg}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* SUCCESS OVERLAY */}
+          <AnimatePresence>
+            {allDone && (
+              <motion.div
+                data-testid=\"fpp-success\"
+                className=\"absolute inset-0 flex flex-col items-center justify-center\"
+                style={{
+                  background: \"radial-gradient(circle, rgba(0,40,20,0.5), rgba(0,0,0,0.85))\",
+                  backdropFilter: \"blur(2px)\",
+                }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <motion.div
+                  initial={{ scale: 0.7, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ type: \"spring\", stiffness: 200, damping: 18 }}
+                  className=\"flex flex-col items-center\"
+                >
+                  <div
+                    className=\"text-[1rem] uppercase tracking-[0.32em] text-[#58d896]\"
+                    style={{ fontFamily: \"'JetBrains Mono', monospace\" }}
+                  >
+                    ✓ misja zaliczona
+                  </div>
+                  <div
+                    className=\"mt-3 text-[3.6rem] leading-[1]\"
+                    style={{ fontFamily: \"'Caveat', cursive\", color: \"#f4ecd8\" }}
+                  >
+                    Robota wykonana, mistrzu.
+                  </div>
+                  <div className=\"mt-1 text-[1rem] text-[#c8d2e6]/80\">
+                    +240 XP · awans w sektorze 03
+                  </div>
+                  <button
+                    data-testid=\"fpp-back-to-map\"
+                    onClick={() => navigate(\"/\")}
+                    className=\"mt-7 rounded-[8px] px-6 py-3 text-[0.85rem] uppercase tracking-[0.22em] text-[#0a0e1a]\"
+                    style={{
+                      background: \"linear-gradient(180deg, #58d896, #2db166)\",
+                      fontFamily: \"'JetBrains Mono', monospace\",
+                      boxShadow: \"0 8px 28px rgba(88,216,150,0.35)\",
+                    }}
+                  >
+                    ► Wracaj na mapę
+                  </button>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
+      </div>
+
+      {/* DOLNY HUD – instrukcja kroku */}
+      <div className=\"relative z-20 mx-auto mt-5 w-full max-w-[1100px] px-4 pb-10\">
+        <div
+          className=\"rounded-[12px] border border-white/10 p-5\"
+          style={{
+            background: \"rgba(20,28,48,0.65)\",
+            backdropFilter: \"blur(10px)\",
+          }}
+        >
+          <div className=\"flex items-start justify-between gap-6\">
+            <div className=\"flex-1\">
+              <div
+                className=\"text-[0.7rem] uppercase tracking-[0.32em] text-[#5fb3ff]\"
+                style={{ fontFamily: \"'JetBrains Mono', monospace\" }}
+              >
+                {allDone ? \"Misja zakończona\" : `Krok ${stepIdx + 1} · ${step.title}`}
+              </div>
+              <div
+                className=\"mt-1 text-[1.65rem] leading-[1.1] text-[#f4ecd8]\"
+                style={{ fontFamily: \"'Caveat', cursive\" }}
+              >
+                {allDone ? \"Wszystko jak należy. ✓\" : step.instruction}
+              </div>
+            </div>
+
+            {!allDone && (
+              <button
+                data-testid=\"fpp-show-hint\"
+                onClick={() => setShowHints(true)}
+                className=\"flex items-center gap-2 rounded-[8px] border border-[#f4a13d]/40 bg-[#f4a13d]/10 px-4 py-2 text-[0.78rem] uppercase tracking-[0.22em] text-[#f4a13d] transition hover:bg-[#f4a13d]/20\"
+                style={{ fontFamily: \"'JetBrains Mono', monospace\" }}
+              >
+                <Lightbulb size={14} /> Pokaż podpowiedź
+              </button>
+            )}
+          </div>
+
+          {/* mini-progress steps */}
+          <div className=\"mt-4 flex items-center gap-3\">
+            {STEPS.map((s, i) => {
+              const done = completed.has(s.targetId);
+              const active = i === stepIdx && !allDone;
+              return (
+                <div
+                  key={s.id}
+                  className=\"flex items-center gap-2\"
+                  style={{ fontFamily: \"'JetBrains Mono', monospace\" }}
+                >
+                  <span
+                    className=\"flex h-6 w-6 items-center justify-center rounded-full text-[0.7rem]\"
+                    style={{
+                      background: done
+                        ? \"rgba(88,216,150,0.18)\"
+                        : active
+                        ? \"rgba(244,161,61,0.18)\"
+                        : \"rgba(255,255,255,0.05)\",
+                      color: done ? \"#58d896\" : active ? \"#f4a13d\" : \"#c8d2e6\",
+                      border: `1px solid ${done ? \"#58d896\" : active ? \"#f4a13d\" : \"rgba(255,255,255,0.12)\"}`,
+                    }}
+                  >
+                    {done ? <Check size={12} /> : i + 1}
+                  </span>
+                  <span
+                    className=\"text-[0.72rem] uppercase tracking-[0.18em]\"
+                    style={{
+                      color: done ? \"#58d896\" : active ? \"#f4a13d\" : \"#c8d2e6\",
+                      opacity: done || active ? 1 : 0.45,
+                    }}
+                  >
+                    {s.title}
+                  </span>
+                  {i < STEPS.length - 1 && (
+                    <span className=\"mx-1 text-[#c8d2e6]/25\">›</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className=\"mt-4\">
+            <OrganicProgressBar value={progress} label=\"Postęp misji\" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Crosshair() {
+  return (
+    <div className=\"pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2\">
+      <svg width=\"36\" height=\"36\" viewBox=\"0 0 36 36\">
+        <circle cx=\"18\" cy=\"18\" r=\"9\" fill=\"none\" stroke=\"rgba(244,236,216,0.65)\" strokeWidth=\"1.2\" />
+        <circle cx=\"18\" cy=\"18\" r=\"1.6\" fill=\"#f4a13d\" />
+        <line x1=\"2\" y1=\"18\" x2=\"9\" y2=\"18\" stroke=\"rgba(244,236,216,0.5)\" strokeWidth=\"1.2\" />
+        <line x1=\"27\" y1=\"18\" x2=\"34\" y2=\"18\" stroke=\"rgba(244,236,216,0.5)\" strokeWidth=\"1.2\" />
+        <line x1=\"18\" y1=\"2\" x2=\"18\" y2=\"9\" stroke=\"rgba(244,236,216,0.5)\" strokeWidth=\"1.2\" />
+        <line x1=\"18\" y1=\"27\" x2=\"18\" y2=\"34\" stroke=\"rgba(244,236,216,0.5)\" strokeWidth=\"1.2\" />
+      </svg>
+    </div>
+  );
+}
+"
+Observation: Create successful: /app/frontend/src/navig/NavigFPPScene.jsx
