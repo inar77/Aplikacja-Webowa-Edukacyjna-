@@ -1,0 +1,100 @@
+
+Action: file_editor create /app/frontend/src/navig/social/GhostHint.jsx --file-text "import React from \"react\";
+import { motion } from \"framer-motion\";
+
+/**
+ * GhostHint
+ * ------------------------------------------------------------
+ * Odręczna notatka \"ślad poprzedników\" — social proof prosto
+ * przy elemencie afordancyjnym. Pojawia się gdy user się waha
+ * lub zrobi 1 błąd. NavigFPPScene pokazuje ją razem z chalk arrows.
+ *
+ * Props:
+ *   x, y    – pozycja px w DOM (lewy-górny)
+ *   text    – treść notatki
+ *   icon    – \"skull\" | \"bolt\" | \"eye\"
+ *   rotation– lekkie pochylenie kartki
+ *   delay   – opóźnienie animacji wejścia
+ *   color   – kolor \"kredy\" (default żółtawy)
+ */
+export default function GhostHint({
+  x = 0,
+  y = 0,
+  text = \"\",
+  icon = \"skull\",
+  rotation = -2,
+  delay = 0,
+  color = \"#f4d76a\",
+}) {
+  return (
+    <motion.div
+      data-testid=\"ghost-hint\"
+      className=\"pointer-events-none absolute z-10 flex max-w-[220px] items-start gap-2\"
+      style={{
+        left: x,
+        top: y,
+        transform: `rotate(${rotation}deg)`,
+        transformOrigin: \"0 50%\",
+        fontFamily: \"'Caveat', 'Architects Daughter', cursive\",
+        color,
+        textShadow: \"0 0 8px rgba(0,0,0,0.75)\",
+      }}
+      initial={{ opacity: 0, filter: \"blur(6px)\", y: 6 }}
+      animate={{ opacity: 1, filter: \"blur(0px)\", y: 0 }}
+      exit={{ opacity: 0, filter: \"blur(3px)\" }}
+      transition={{ duration: 0.7, delay, ease: \"easeOut\" }}
+    >
+      <GhostIcon kind={icon} color={color} />
+      <span
+        className=\"leading-[1.1]\"
+        style={{ fontSize: \"1.05rem\", letterSpacing: \"0.01em\" }}
+      >
+        {text}
+      </span>
+    </motion.div>
+  );
+}
+
+function GhostIcon({ kind, color }) {
+  const common = {
+    stroke: color,
+    strokeWidth: 1.8,
+    strokeLinecap: \"round\",
+    strokeLinejoin: \"round\",
+    fill: \"none\",
+    style: { filter: `drop-shadow(0 0 4px ${color}66)` },
+  };
+
+  return (
+    <svg width=\"22\" height=\"22\" viewBox=\"0 0 22 22\" className=\"mt-0.5 flex-shrink-0\">
+      <defs>
+        <filter id={`gh-rough-${kind}`}>
+          <feTurbulence baseFrequency=\"0.9\" numOctaves=\"2\" seed=\"3\" />
+          <feDisplacementMap in=\"SourceGraphic\" scale=\"1.2\" />
+        </filter>
+      </defs>
+      <g filter={`url(#gh-rough-${kind})`}>
+        {kind === \"skull\" && (
+          <>
+            <path d=\"M 5 9 C 5 4, 17 4, 17 9 L 17 13 C 17 15, 14 15, 14 17 L 8 17 C 8 15, 5 15, 5 13 Z\" {...common} />
+            <circle cx=\"8.5\" cy=\"11\" r=\"1.3\" {...common} fill={color} />
+            <circle cx=\"13.5\" cy=\"11\" r=\"1.3\" {...common} fill={color} />
+            <path d=\"M 10 17 L 10 19 M 11 17 L 11 19 M 12 17 L 12 19\" {...common} />
+          </>
+        )}
+        {kind === \"bolt\" && (
+          <path d=\"M 12 3 L 7 12 L 11 12 L 9 19 L 16 9 L 12 9 Z\" {...common} />
+        )}
+        {kind === \"eye\" && (
+          <>
+            <path d=\"M 2 11 C 6 5, 16 5, 20 11 C 16 17, 6 17, 2 11 Z\" {...common} />
+            <circle cx=\"11\" cy=\"11\" r=\"3\" {...common} />
+            <circle cx=\"11\" cy=\"11\" r=\"1.2\" {...common} fill={color} />
+          </>
+        )}
+      </g>
+    </svg>
+  );
+}
+"
+Observation: Create successful: /app/frontend/src/navig/social/GhostHint.jsx
