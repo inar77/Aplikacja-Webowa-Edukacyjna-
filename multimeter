@@ -1,0 +1,524 @@
+Teraz **MultimeterTrainingScene** — interaktywny pokrętło multimetru z 6 trybami i 4 zadaniami pomiarowymi:
+Action: file_editor create /app/frontend/src/navig/scenes/MultimeterTrainingScene.jsx --file-text "import React, { useEffect, useState } from \"react\";
+import { motion, AnimatePresence } from \"framer-motion\";
+import { ArrowLeft, Check, Lightbulb } from \"lucide-react\";
+import { useNavigate } from \"react-router-dom\";
+import OrganicProgressBar from \"../OrganicProgressBar\";
+import LiveCrewFeed from \"../social/LiveCrewFeed\";
+import HandDrawnArrow from \"../HandDrawnArrow\";
+import GhostHint from \"../social/GhostHint\";
+
+/**
+ * MultimeterTrainingScene
+ * ------------------------------------------------------------
+ * Misja 04 — trening obsługi multimetru Fluke 117.
+ * Pokrętło ma 7 pozycji (OFF, V~, V=, Ω, A=, A~, ciągłość).
+ *
+ * Każdy krok:
+ *  1. ustaw pokrętło na poprawny tryb
+ *  2. (auto) odczyt zmienia się dynamicznie + komentarz mistrza
+ *
+ * Pedagogika:
+ *  - corrective feedback przy złym trybie (\"Tu mierzysz prąd zmienny — gniazdko 230V to V~\")
+ *  - safety context pod instrukcją
+ *  - mini-quiz na koniec
+ */
+
+const MODES = [
+  { id: \"off\",  angle: -135, label: \"OFF\" },
+  { id: \"vac\",  angle: -90,  label: \"V~\" },
+  { id: \"vdc\",  angle: -45,  label: \"V=\" },
+  { id: \"ohm\",  angle: 0,    label: \"Ω\" },
+  { id: \"cont\", angle: 45,   label: \"·)))\" },
+  { id: \"aac\",  angle: 90,   label: \"A~\" },
+  { id: \"adc\",  angle: 135,  label: \"A=\" },
+];
+
+const STEPS = [
+  {
+    id: \"m1\",
+    targetMode: \"vac\",
+    title: \"Pomiar napięcia AC\",
+    instruction: \"Ustaw pokrętło na V~ aby zmierzyć gniazdko 230V w domu.\",
+    safety: \"Zasada BHP: zaczynaj od najwyższego zakresu V — chroni miernik przed przepaleniem.\",
+    reading: \"229.8 V\",
+    note: \"Idealny pomiar. Sieć w PL — 230 V nominalne, tolerancja ±10%.\",
+    wrongFeedback: {
+      vdc: \"Pomyłka — V= mierzy prąd stały (baterie). Gniazdko 230V to AC, czyli V~ (z falą).\",
+      ohm: \"Ω mierzy opór, a nie napięcie. Pokrętło w lewo na V~.\",
+      cont: \"Ciągłość to test przewodów, nie napięcia. Wybierz V~.\",
+      aac: \"A~ mierzy PRĄD (amper), nie napięcie. Tu V~.\",
+      adc: \"A= też mierzy prąd. Napięcie zmienne = V~.\",
+      off: \"Miernik jest wyłączony. Obróć pokrętło na V~.\",
+    },
+  },
+  {
+    id: \"m2\",
+    targetMode: \"vdc\",
+    title: \"Pomiar napięcia DC\",
+    instruction: \"Sprawdź baterię w panelu PV — to napięcie stałe. Tryb V=.\",
+    safety: \"Zasada BHP: panel PV daje napięcie nawet bez słońca. Sondy ostrożnie.\",
+    reading: \"12.42 V\",
+    note: \"Bateria akumulatorowa 12V — typowa rezerwa dla małej instalacji.\",
+    wrongFeedback: {
+      vac: \"Bliskie, ale to napięcie STAŁE (z baterii/paneli). V= z prostą kreską.\",
+      ohm: \"Opór, nie napięcie. Wybierz V=.\",
+      cont: \"Ciągłość. Tu jest napięcie stałe — V=.\",
+      aac: \"A~ mierzy prąd. Tu napięcie — V=.\",
+      adc: \"A= to prąd stały. Tu napięcie — V=.\",
+      off: \"Wyłączony. Obróć na V=.\",
+    },
+  },
+  {
+    id: \"m3\",
+    targetMode: \"ohm\",
+    title: \"Pomiar oporu\",
+    instruction: \"Zmierz opór grzałki bojlera. Tryb Ω (omy).\",
+    safety: \"Zasada BHP: zawsze WYŁĄCZ napięcie przed pomiarem oporu — inaczej spalisz miernik.\",
+    reading: \"18.7 Ω\",
+    note: \"Typowy opór grzałki ~20Ω. Jeśli pokazuje OL (nieskończoność) — grzałka spalona.\",
+    wrongFeedback: {
+      vac: \"V~ to napięcie. Tu mierzymy opór — Ω.\",
+      vdc: \"V= to napięcie stałe. Opór to Ω.\",
+      cont: \"Bliskie — ciągłość to opór bardzo niski. Ale do pomiaru wartości użyj Ω.\",
+      aac: \"Prąd zmienny, nie opór. Tryb Ω.\",
+      adc: \"Prąd stały. Tu opór — Ω.\",
+      off: \"Wyłączony. Obróć na Ω.\",
+    },
+  },
+  {
+    id: \"m4\",
+    targetMode: \"cont\",
+    title: \"Test ciągłości\",
+    instruction: \"Sprawdź czy bezpiecznik nie jest przepalony — tryb ciągłości (piszczek).\",
+    safety: \"Zasada BHP: ciągłość mierzymy tylko na obwodach BEZ napięcia.\",
+    reading: \"0.4 Ω · piszczy\",
+    note: \"Sprawny bezpiecznik = krótki opór (<1Ω) i piszczek. Przepalony = OL.\",
+    wrongFeedback: {
+      vac: \"Tu nie ma napięcia. Sprawdzasz CIĄGŁOŚĆ — symbol z falami dźwiękowymi ·))).\",
+      vdc: \"Bez napięcia stałego. Tryb ciągłości ·))).\",
+      ohm: \"Bliskie — Ω to opór. Do testu „dzwoni-nie dzwoni\\" lepszy jest ·))).\",
+      aac: \"Prąd zmienny. Tryb ciągłości ·))).\",
+      adc: \"Prąd stały. Tryb ciągłości ·))).\",
+      off: \"Wyłączony. Obróć na ·))).\",
+    },
+  },
+];
+
+const FACTS = [
+  \"Fluke 117 ma w środku detektor napięcia — wystarczy zbliżyć obudowę do żyły aby usłyszeć piszczek.\",
+  \"Pomiar V~ na zakresie V= pokaże blisko 0V — ale miernik to przeżyje. Odwrotnie spali wzmacniacz.\",
+  \"Symbol ·))) (ciągłość) to ten sam tryb co Ω, ale dodaje brzęczyk gdy R < 30Ω.\",
+];
+
+export default function MultimeterTrainingScene() {
+  const navigate = useNavigate();
+  const [stepIdx, setStepIdx] = useState(0);
+  const [mode, setMode] = useState(\"off\");
+  const [completed, setCompleted] = useState(new Set());
+  const [done, setDone] = useState(false);
+  const [missMsg, setMissMsg] = useState(null);
+  const [showHints, setShowHints] = useState(false);
+
+  const step = STEPS[stepIdx];
+  const currentModeData = MODES.find((m) => m.id === mode);
+
+  // pokaż chalk-hint po 4s bezczynności
+  useEffect(() => {
+    setShowHints(false);
+    const t = setTimeout(() => setShowHints(true), 4200);
+    return () => clearTimeout(t);
+  }, [stepIdx]);
+
+  const handlePick = (id) => {
+    if (done) return;
+    setMode(id);
+    if (id === step.targetMode) {
+      const next = new Set(completed);
+      next.add(step.id);
+      setCompleted(next);
+      // po krótkiej chwili na przeczytanie odczytu
+      setTimeout(() => {
+        if (stepIdx + 1 < STEPS.length) setStepIdx(stepIdx + 1);
+        else setDone(true);
+      }, 2400);
+    } else if (id !== \"off\") {
+      const msg = step.wrongFeedback?.[id] || \"To nie ten tryb. Sprawdź instrukcję.\";
+      setMissMsg(msg);
+      setShowHints(true);
+      setTimeout(() => setMissMsg(null), 3200);
+    }
+  };
+
+  const progress = Math.round((completed.size / STEPS.length) * 100);
+  const showReading = mode === step?.targetMode && !done;
+
+  return (
+    <div
+      data-testid=\"multimeter-training-scene\"
+      className=\"relative min-h-screen w-full overflow-hidden text-[#e8eef9]\"
+      style={{ background: \"radial-gradient(ellipse 80% 60% at 50% 30%, #142036 0%, #0c1322 55%, #050811 100%)\" }}
+    >
+      {/* GRID */}
+      <div
+        aria-hidden
+        className=\"pointer-events-none absolute inset-0 opacity-[0.10]\"
+        style={{
+          backgroundImage:
+            \"repeating-linear-gradient(0deg, rgba(120,170,230,0.45) 0 1px, transparent 1px 28px), repeating-linear-gradient(90deg, rgba(120,170,230,0.45) 0 1px, transparent 1px 28px)\",
+        }}
+      />
+
+      <header className=\"relative z-30 flex items-center justify-between px-6 py-4\">
+        <button
+          data-testid=\"mm-back\"
+          onClick={() => navigate(\"/\")}
+          className=\"flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[0.78rem] uppercase tracking-[0.22em] text-[#c8d2e6] transition hover:bg-white/10\"
+          style={{ fontFamily: \"'JetBrains Mono', monospace\" }}
+        >
+          <ArrowLeft size={14} /> Mapa
+        </button>
+        <div className=\"text-[0.7rem] uppercase tracking-[0.32em] text-[#f4a13d]\" style={{ fontFamily: \"'JetBrains Mono', monospace\" }}>
+          ● TRENING · MISJA 04 · MULTIMETR
+        </div>
+        <div className=\"text-[0.72rem] uppercase tracking-[0.22em] text-[#c8d2e6]/65\" style={{ fontFamily: \"'JetBrains Mono', monospace\" }}>
+          {done ? \"Ukończone\" : `Krok ${stepIdx + 1} / ${STEPS.length}`}
+        </div>
+      </header>
+
+      <div className=\"absolute right-6 top-[100px] z-20\">
+        <LiveCrewFeed running={!done} />
+      </div>
+
+      {/* MULTIMETER */}
+      <div className=\"relative z-10 mx-auto mt-2 max-w-[520px] px-6\">
+        <div
+          className=\"relative mx-auto\"
+          style={{
+            width: 360,
+            background: \"linear-gradient(180deg, #d97a1f 0%, #a85a10 100%)\",
+            border: \"2px solid #5a3608\",
+            borderRadius: 18,
+            padding: \"22px 26px 30px\",
+            boxShadow: \"0 24px 60px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.18)\",
+          }}
+        >
+          {/* logo */}
+          <div className=\"flex items-center justify-between\">
+            <span
+              className=\"text-[0.85rem] tracking-[0.3em] text-[#fff8e0]\"
+              style={{ fontFamily: \"'JetBrains Mono', monospace\", fontWeight: 700 }}
+            >
+              FLUKE
+            </span>
+            <span
+              className=\"text-[0.65rem] tracking-[0.3em] text-[#fff8e0]/70\"
+              style={{ fontFamily: \"'JetBrains Mono', monospace\" }}
+            >
+              117 · TRMS
+            </span>
+          </div>
+
+          {/* WYŚWIETLACZ */}
+          <div
+            className=\"mt-3 rounded-[8px] p-4\"
+            style={{
+              background: \"#0f1218\",
+              border: \"2px solid #1a1c20\",
+              boxShadow: \"inset 0 0 18px rgba(0,0,0,0.7)\",
+            }}
+          >
+            <div className=\"flex items-center justify-between\">
+              <span
+                className=\"text-[0.65rem] tracking-[0.2em] text-[#58d896]/55\"
+                style={{ fontFamily: \"'JetBrains Mono', monospace\" }}
+              >
+                {currentModeData?.label || \"\"}
+              </span>
+              <span
+                className=\"text-[0.65rem] tracking-[0.2em] text-[#5fb3ff]/70\"
+                style={{ fontFamily: \"'JetBrains Mono', monospace\" }}
+              >
+                AUTO
+              </span>
+            </div>
+            <div
+              className=\"mt-2 text-center text-[2.6rem] leading-[1] text-[#58d896]\"
+              style={{ fontFamily: \"'JetBrains Mono', monospace\", fontWeight: 700, letterSpacing: \"0.04em\", textShadow: \"0 0 12px rgba(88,216,150,0.5)\" }}
+            >
+              {mode === \"off\" ? \"----\" : showReading ? step.reading : \"OL\"}
+            </div>
+            <div className=\"mt-1 flex items-center justify-end gap-2\">
+              {showReading && (
+                <span
+                  className=\"rounded-full border border-[#58d896]/40 px-2 py-0.5 text-[0.55rem] uppercase tracking-[0.2em] text-[#58d896]\"
+                  style={{ fontFamily: \"'JetBrains Mono', monospace\" }}
+                >
+                  ● live
+                </span>
+              )}
+              <span
+                className=\"text-[0.6rem] uppercase tracking-[0.22em] text-[#5fb3ff]/55\"
+                style={{ fontFamily: \"'JetBrains Mono', monospace\" }}
+              >
+                bat 92%
+              </span>
+            </div>
+          </div>
+
+          {/* POKRĘTŁO */}
+          <div className=\"relative mx-auto mt-6\" style={{ width: 260, height: 260 }}>
+            {/* tarcza */}
+            <div
+              className=\"absolute inset-0 rounded-full\"
+              style={{
+                background: \"radial-gradient(circle, #2a2a2a 0%, #1a1a1a 100%)\",
+                border: \"3px solid #0a0a0a\",
+                boxShadow: \"inset 0 2px 6px rgba(0,0,0,0.7), 0 4px 12px rgba(0,0,0,0.4)\",
+              }}
+            />
+
+            {/* etykiety wokół tarczy (klikalne tryby) */}
+            {MODES.map((m) => {
+              const isPicked = mode === m.id;
+              const isTarget = step && m.id === step.targetMode && !done;
+              const rad = (m.angle * Math.PI) / 180;
+              const lx = 130 + Math.cos(rad) * 110;
+              const ly = 130 + Math.sin(rad) * 110;
+              return (
+                <motion.button
+                  key={m.id}
+                  data-testid={`mm-mode-${m.id}`}
+                  onClick={() => handlePick(m.id)}
+                  className=\"absolute flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-[0.78rem] outline-none\"
+                  style={{
+                    left: lx,
+                    top: ly,
+                    background: isPicked ? \"#f4a13d\" : \"rgba(244,236,216,0.06)\",
+                    color: isPicked ? \"#0a0e1a\" : \"#f4ecd8\",
+                    border: `1.5px solid ${isPicked ? \"#f4a13d\" : \"rgba(244,236,216,0.2)\"}`,
+                    fontFamily: \"'JetBrains Mono', monospace\",
+                    fontWeight: 600,
+                    boxShadow: isTarget
+                      ? \"0 0 20px rgba(244,161,61,0.55)\"
+                      : isPicked
+                      ? \"0 0 12px rgba(244,161,61,0.55)\"
+                      : \"0 1px 4px rgba(0,0,0,0.4)\",
+                    cursor: done ? \"default\" : \"pointer\",
+                  }}
+                  whileHover={!done ? { scale: 1.08 } : {}}
+                  whileTap={!done ? { scale: 0.94 } : {}}
+                >
+                  {m.label}
+                </motion.button>
+              );
+            })}
+
+            {/* środkowa wskazówka — obraca się do wybranego trybu */}
+            <motion.div
+              className=\"absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2\"
+              animate={{ rotate: currentModeData?.angle ?? -135 }}
+              transition={{ type: \"spring\", stiffness: 110, damping: 14 }}
+              style={{ width: 90, height: 90 }}
+            >
+              <div
+                className=\"absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full\"
+                style={{
+                  width: 70,
+                  height: 70,
+                  background: \"radial-gradient(circle, #3a3a3a 0%, #0a0a0a 100%)\",
+                  border: \"2px solid #f4ecd8\",
+                  boxShadow: \"0 4px 12px rgba(0,0,0,0.6)\",
+                }}
+              />
+              {/* trójkątna wskazówka */}
+              <div
+                className=\"absolute left-1/2 top-[-4px] -translate-x-1/2\"
+                style={{
+                  width: 0,
+                  height: 0,
+                  borderLeft: \"8px solid transparent\",
+                  borderRight: \"8px solid transparent\",
+                  borderBottom: \"20px solid #f4a13d\",
+                  filter: \"drop-shadow(0 0 8px rgba(244,161,61,0.7))\",
+                }}
+              />
+            </motion.div>
+          </div>
+
+          {/* gniazda sond */}
+          <div className=\"mt-4 flex justify-center gap-6\">
+            <div className=\"flex flex-col items-center\">
+              <div className=\"h-3 w-3 rounded-full bg-[#cf4040] shadow-[0_0_8px_rgba(207,64,64,0.7)]\" />
+              <span className=\"mt-1 text-[0.55rem] uppercase tracking-[0.2em] text-[#fff8e0]/70\" style={{ fontFamily: \"'JetBrains Mono', monospace\" }}>V/Ω</span>
+            </div>
+            <div className=\"flex flex-col items-center\">
+              <div className=\"h-3 w-3 rounded-full bg-[#1a1a1a] border border-[#fff8e0]/30\" />
+              <span className=\"mt-1 text-[0.55rem] uppercase tracking-[0.2em] text-[#fff8e0]/70\" style={{ fontFamily: \"'JetBrains Mono', monospace\" }}>COM</span>
+            </div>
+            <div className=\"flex flex-col items-center\">
+              <div className=\"h-3 w-3 rounded-full bg-[#fff8e0]/40 border border-[#fff8e0]/30\" />
+              <span className=\"mt-1 text-[0.55rem] uppercase tracking-[0.2em] text-[#fff8e0]/70\" style={{ fontFamily: \"'JetBrains Mono', monospace\" }}>10A</span>
+            </div>
+          </div>
+        </div>
+
+        {/* MISS MSG nad multimetrem */}
+        <AnimatePresence>
+          {missMsg && (
+            <motion.div
+              data-testid=\"mm-miss\"
+              className=\"mx-auto mt-3 max-w-[440px] rounded-[10px] border p-3\"
+              style={{
+                background: \"rgba(244,161,61,0.10)\",
+                borderColor: \"rgba(244,161,61,0.4)\",
+                color: \"#f4ecd8\",
+                fontFamily: \"'Caveat', cursive\",
+                fontSize: \"1.2rem\",
+                textAlign: \"center\",
+              }}
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+            >
+              {missMsg}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* HUD */}
+      <div className=\"relative z-20 mx-auto mt-6 w-full max-w-[1000px] px-6 pb-10\">
+        {!done ? (
+          <div
+            className=\"rounded-[12px] border border-white/10 p-5\"
+            style={{ background: \"rgba(20,28,48,0.65)\", backdropFilter: \"blur(10px)\" }}
+          >
+            <div className=\"flex items-start justify-between gap-6\">
+              <div className=\"flex-1\">
+                <div className=\"text-[0.7rem] uppercase tracking-[0.32em] text-[#5fb3ff]\" style={{ fontFamily: \"'JetBrains Mono', monospace\" }}>
+                  Krok {stepIdx + 1} · {step.title}
+                </div>
+                <div className=\"mt-1 text-[1.5rem] leading-[1.1] text-[#f4ecd8]\" style={{ fontFamily: \"'Caveat', cursive\" }}>
+                  {step.instruction}
+                </div>
+                <div
+                  className=\"mt-2 border-l-2 border-[#f4a13d]/45 pl-3 text-[0.95rem] text-[#f4ecd8]/75\"
+                  style={{ fontFamily: \"'Caveat', cursive\" }}
+                >
+                  {step.safety}
+                </div>
+                {showReading && (
+                  <div
+                    className=\"mt-3 text-[0.95rem] text-[#9af2b9]\"
+                    style={{ fontFamily: \"'Caveat', cursive\" }}
+                  >
+                    Mistrz: {step.note}
+                  </div>
+                )}
+              </div>
+              <button
+                data-testid=\"mm-show-hint\"
+                onClick={() => setShowHints(true)}
+                className=\"flex items-center gap-2 rounded-[8px] border border-[#f4a13d]/40 bg-[#f4a13d]/10 px-4 py-2 text-[0.78rem] uppercase tracking-[0.22em] text-[#f4a13d] transition hover:bg-[#f4a13d]/20\"
+                style={{ fontFamily: \"'JetBrains Mono', monospace\" }}
+              >
+                <Lightbulb size={14} /> Pokaż podpowiedź
+              </button>
+            </div>
+
+            <div className=\"mt-4 flex flex-wrap items-center gap-3\">
+              {STEPS.map((s, i) => {
+                const isDone = completed.has(s.id);
+                const isActive = i === stepIdx;
+                return (
+                  <div key={s.id} className=\"flex items-center gap-2\" style={{ fontFamily: \"'JetBrains Mono', monospace\" }}>
+                    <span
+                      className=\"flex h-6 w-6 items-center justify-center rounded-full text-[0.7rem]\"
+                      style={{
+                        background: isDone ? \"rgba(88,216,150,0.18)\" : isActive ? \"rgba(244,161,61,0.18)\" : \"rgba(255,255,255,0.05)\",
+                        color: isDone ? \"#58d896\" : isActive ? \"#f4a13d\" : \"#c8d2e6\",
+                        border: `1px solid ${isDone ? \"#58d896\" : isActive ? \"#f4a13d\" : \"rgba(255,255,255,0.12)\"}`,
+                      }}
+                    >
+                      {isDone ? <Check size={12} /> : i + 1}
+                    </span>
+                    <span
+                      className=\"text-[0.7rem] uppercase tracking-[0.18em]\"
+                      style={{ color: isDone ? \"#58d896\" : isActive ? \"#f4a13d\" : \"#c8d2e6\", opacity: isDone || isActive ? 1 : 0.45 }}
+                    >
+                      {s.title}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className=\"mt-4\">
+              <OrganicProgressBar value={progress} label=\"Postęp treningu\" />
+            </div>
+          </div>
+        ) : (
+          <motion.div
+            data-testid=\"mm-done\"
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            className=\"rounded-[14px] border border-white/10 p-7\"
+            style={{ background: \"rgba(20,28,48,0.65)\", backdropFilter: \"blur(10px)\" }}
+          >
+            <div className=\"text-[0.8rem] uppercase tracking-[0.32em] text-[#58d896]\" style={{ fontFamily: \"'JetBrains Mono', monospace\" }}>
+              ✓ trening zakończony
+            </div>
+            <h2 className=\"mt-2 text-[3rem] leading-[1] text-[#f4ecd8]\" style={{ fontFamily: \"'Caveat', cursive\" }}>
+              Multimetr trzymasz w ręku jak swoje narzędzie.
+            </h2>
+            <div className=\"mt-1 text-[0.95rem] text-[#c8d2e6]/80\" style={{ fontFamily: \"'JetBrains Mono', monospace\" }}>
+              +240 XP · {Math.floor(Math.random() * 20) + 12} osób ukończyło to dziś
+            </div>
+
+            <div className=\"mt-6\">
+              <div className=\"text-[0.7rem] uppercase tracking-[0.28em] text-[#5fb3ff]\" style={{ fontFamily: \"'JetBrains Mono', monospace\" }}>
+                Wiedziałeś, że...
+              </div>
+              <ul className=\"mt-2 space-y-2\">
+                {FACTS.map((f, i) => (
+                  <li key={i} className=\"flex items-start gap-2 text-[1.05rem] leading-snug text-[#f4ecd8]/90\" style={{ fontFamily: \"'Caveat', cursive\" }}>
+                    <span className=\"text-[#f4a13d] flex-shrink-0\">◆</span>
+                    <span>{f}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <button
+              data-testid=\"mm-back-to-map\"
+              onClick={() => navigate(\"/\")}
+              className=\"mt-6 rounded-[8px] px-6 py-3 text-[0.85rem] uppercase tracking-[0.22em] text-[#0a0e1a]\"
+              style={{
+                background: \"linear-gradient(180deg, #58d896, #2db166)\",
+                fontFamily: \"'JetBrains Mono', monospace\",
+                boxShadow: \"0 8px 28px rgba(88,216,150,0.35)\",
+              }}
+            >
+              ► Wracaj na mapę
+            </button>
+          </motion.div>
+        )}
+      </div>
+
+      {/* CHALK HINT */}
+      {showHints && !done && step && (
+        <HandDrawnArrow
+          x={300}
+          y={420 + (MODES.find((m) => m.id === step.targetMode)?.angle || 0) * 0.4}
+          rotation={0}
+          length={120}
+          label={`Tu — ${MODES.find((m) => m.id === step.targetMode)?.label}`}
+          delay={0.2}
+        />
+      )}
+    </div>
+  );
+}
+"
+Observation: Create successful: /app/frontend/src/navig/scenes/MultimeterTrainingScene.jsx
