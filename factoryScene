@@ -1,0 +1,257 @@
+Robotę. Wznawiam — kończę resztę scen + dodaję wszystkie 3 elementy social proof (`LiveCrewFeed`, `GhostHint`, `NodeMultiplayerPresence`). Wszystko spinam w jeden żyjący flow.
+
+Najpierw refaktor: wynoszę misje do osobnego pliku config (żeby `NavigFPPScene` był generyczny i dynamicznie ładował scenę po missionId).
+Action: file_editor create /app/frontend/src/navig/scenes/FactoryScene.jsx --file-text "import React from \"react\";
+
+/**
+ * FactoryScene
+ * ------------------------------------------------------------
+ * Hala produkcyjna – silnik 3-fazowy + skrzynka zaciskowa.
+ * Klimat: szare betonowe podłogi, metalowa rama, industrial.
+ *
+ * Klikalne elementy:
+ *  - main-disconnect (czerwony wyłącznik 3-fazowy na ścianie)
+ *  - phase-l1 / phase-l2 / phase-l3 (kabel po kabelu)
+ *  - motor-terminal (skrzynka zaciskowa silnika)
+ *  - test-button (zielony przycisk START)
+ */
+export default function FactoryScene({ onHit, completedSteps = new Set(), activeId }) {
+  const interact = (id) => () => onHit?.(id);
+  const isDone = (id) => completedSteps.has(id);
+  const isActive = (id) => activeId === id;
+
+  return (
+    <svg
+      data-testid=\"factory-scene\"
+      viewBox=\"0 0 1000 620\"
+      className=\"h-full w-full\"
+      preserveAspectRatio=\"xMidYMid meet\"
+    >
+      <defs>
+        <linearGradient id=\"wall-concrete\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\">
+          <stop offset=\"0%\" stopColor=\"#5a5e66\" />
+          <stop offset=\"100%\" stopColor=\"#34373d\" />
+        </linearGradient>
+        <linearGradient id=\"floor-concrete\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\">
+          <stop offset=\"0%\" stopColor=\"#2d2f33\" />
+          <stop offset=\"100%\" stopColor=\"#16181c\" />
+        </linearGradient>
+        <linearGradient id=\"motor-body\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\">
+          <stop offset=\"0%\" stopColor=\"#a6a098\" />
+          <stop offset=\"50%\" stopColor=\"#787068\" />
+          <stop offset=\"100%\" stopColor=\"#4a443c\" />
+        </linearGradient>
+        <linearGradient id=\"disconnect-body\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\">
+          <stop offset=\"0%\" stopColor=\"#e63d20\" />
+          <stop offset=\"100%\" stopColor=\"#8a1e0e\" />
+        </linearGradient>
+        <radialGradient id=\"hall-light\" cx=\"50%\" cy=\"10%\" r=\"80%\">
+          <stop offset=\"0%\" stopColor=\"rgba(255,210,160,0.18)\" />
+          <stop offset=\"100%\" stopColor=\"rgba(0,0,0,0)\" />
+        </radialGradient>
+      </defs>
+
+      {/* TŁO: ściana z betonu prefabrykowanego */}
+      <rect x=\"0\" y=\"0\" width=\"1000\" height=\"470\" fill=\"url(#wall-concrete)\" />
+      {/* płyty betonowe */}
+      {[0, 1, 2, 3].map((i) => (
+        <line key={`h${i}`} x1=\"0\" y1={120 + i * 90} x2=\"1000\" y2={120 + i * 90} stroke=\"#1a1c20\" strokeWidth=\"1.2\" opacity=\"0.7\" />
+      ))}
+      {[0, 1, 2, 3].map((i) => (
+        <line key={`v${i}`} x1={250 + i * 250} y1=\"0\" x2={250 + i * 250} y2=\"470\" stroke=\"#1a1c20\" strokeWidth=\"1.2\" opacity=\"0.7\" />
+      ))}
+      <rect x=\"0\" y=\"0\" width=\"1000\" height=\"470\" fill=\"url(#hall-light)\" pointerEvents=\"none\" />
+
+      {/* PODŁOGA */}
+      <rect x=\"0\" y=\"470\" width=\"1000\" height=\"150\" fill=\"url(#floor-concrete)\" />
+      {/* żółta taśma ostrzegawcza */}
+      <rect x=\"0\" y=\"476\" width=\"1000\" height=\"6\" fill=\"#f4c20d\" />
+      <g opacity=\"0.85\">
+        {Array.from({ length: 30 }).map((_, i) => (
+          <rect key={i} x={i * 34} y=\"476\" width=\"17\" height=\"6\" fill=\"#1a1c20\" />
+        ))}
+      </g>
+
+      {/* RURY WENTYLACYJNE u góry */}
+      <g opacity=\"0.85\">
+        <rect x=\"0\" y=\"20\" width=\"1000\" height=\"22\" fill=\"#3a3d44\" stroke=\"#1a1c20\" strokeWidth=\"1\" />
+        <rect x=\"0\" y=\"38\" width=\"1000\" height=\"4\" fill=\"#1a1c20\" opacity=\"0.6\" />
+        {[100, 300, 500, 700, 900].map((x) => (
+          <circle key={x} cx={x} cy=\"31\" r=\"4\" fill=\"#1a1c20\" />
+        ))}
+      </g>
+
+      {/* TABLICA OSTRZEGAWCZA na ścianie */}
+      <g opacity=\"0.9\">
+        <rect x=\"60\" y=\"80\" width=\"120\" height=\"80\" fill=\"#f4c20d\" stroke=\"#1a1c20\" strokeWidth=\"2\" />
+        <polygon points=\"120,95 155,150 85,150\" fill=\"none\" stroke=\"#1a1c20\" strokeWidth=\"3\" />
+        <text x=\"120\" y=\"138\" textAnchor=\"middle\" fill=\"#1a1c20\" fontFamily=\"JetBrains Mono, monospace\" fontWeight=\"700\" fontSize=\"18\">!</text>
+        <text x=\"120\" y=\"172\" textAnchor=\"middle\" fill=\"#1a1c20\" fontFamily=\"JetBrains Mono, monospace\" fontSize=\"8\" letterSpacing=\"2\">3~400V</text>
+      </g>
+
+      {/* MAIN DISCONNECT — czerwony obrotowy wyłącznik na ścianie */}
+      <g
+        data-testid=\"fpp-main-disconnect\"
+        style={{ cursor: \"pointer\" }}
+        onClick={interact(\"main-disconnect\")}
+      >
+        <rect x=\"220\" y=\"100\" width=\"120\" height=\"160\" rx=\"5\" fill=\"url(#disconnect-body)\" stroke=\"#3a0a04\" strokeWidth=\"2\" />
+        {/* korpus aluminium */}
+        <rect x=\"232\" y=\"116\" width=\"96\" height=\"100\" rx=\"3\" fill=\"#2a2c30\" stroke=\"#0d0e10\" strokeWidth=\"1.5\" />
+        {/* obrotowa rączka */}
+        <circle cx=\"280\" cy=\"166\" r=\"32\" fill=\"#1a1a1a\" stroke=\"#0d0e10\" strokeWidth=\"1.5\" />
+        <circle cx=\"280\" cy=\"166\" r=\"26\" fill=\"#3a3a3a\" />
+        <rect
+          x=\"276\"
+          y={isDone(\"main-disconnect\") ? \"142\" : \"168\"}
+          width=\"8\"
+          height={isDone(\"main-disconnect\") ? \"20\" : \"20\"}
+          fill=\"#f4ecd8\"
+          transform={isDone(\"main-disconnect\") ? \"rotate(90 280 152)\" : \"rotate(0 280 178)\"}
+        />
+        {/* etykiety ON / OFF */}
+        <text x=\"280\" y=\"138\" textAnchor=\"middle\" fill={isDone(\"main-disconnect\") ? \"#58d896\" : \"#f4ecd8\"} fontFamily=\"JetBrains Mono, monospace\" fontWeight=\"600\" fontSize=\"10\">OFF</text>
+        <text x=\"280\" y=\"206\" textAnchor=\"middle\" fill={isDone(\"main-disconnect\") ? \"#f4ecd8\" : \"#cf4040\"} fontFamily=\"JetBrains Mono, monospace\" fontWeight=\"600\" fontSize=\"10\">ON</text>
+        <text x=\"280\" y=\"248\" textAnchor=\"middle\" fill=\"#fff8e0\" fontFamily=\"JetBrains Mono, monospace\" fontSize=\"9\" letterSpacing=\"3\">MAIN · 63 A</text>
+
+        {isActive(\"main-disconnect\") && (
+          <rect x=\"216\" y=\"96\" width=\"128\" height=\"168\" rx=\"6\" fill=\"none\" stroke=\"#f4a13d\" strokeWidth=\"2.5\" pointerEvents=\"none\">
+            <animate attributeName=\"opacity\" values=\"0.95;0.2;0.95\" dur=\"1.4s\" repeatCount=\"indefinite\" />
+          </rect>
+        )}
+      </g>
+
+      {/* SILNIK 3-fazowy */}
+      <g>
+        {/* postument */}
+        <rect x=\"540\" y=\"380\" width=\"280\" height=\"80\" fill=\"#2a2c30\" stroke=\"#0d0e10\" strokeWidth=\"1.5\" />
+        {/* korpus silnika - cylinder */}
+        <ellipse cx=\"680\" cy=\"320\" rx=\"160\" ry=\"40\" fill=\"url(#motor-body)\" />
+        <rect x=\"520\" y=\"280\" width=\"320\" height=\"80\" fill=\"url(#motor-body)\" />
+        <ellipse cx=\"680\" cy=\"360\" rx=\"160\" ry=\"40\" fill=\"#2a2624\" opacity=\"0.8\" />
+        {/* żebra chłodzące */}
+        {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
+          <line
+            key={i}
+            x1={540 + i * 40}
+            y1=\"288\"
+            x2={540 + i * 40}
+            y2=\"352\"
+            stroke=\"#3a3530\"
+            strokeWidth=\"2\"
+            opacity=\"0.7\"
+          />
+        ))}
+        {/* oś wału */}
+        <rect x=\"840\" y=\"316\" width=\"50\" height=\"14\" fill=\"#aaa395\" stroke=\"#0d0e10\" strokeWidth=\"1\" />
+        <circle cx=\"893\" cy=\"323\" r=\"9\" fill=\"#787068\" stroke=\"#0d0e10\" strokeWidth=\"1\" />
+        {/* tabliczka znamionowa */}
+        <rect x=\"600\" y=\"305\" width=\"80\" height=\"40\" fill=\"#1a1c20\" stroke=\"#0d0e10\" strokeWidth=\"1\" />
+        <text x=\"640\" y=\"320\" textAnchor=\"middle\" fill=\"#aaa395\" fontFamily=\"JetBrains Mono, monospace\" fontSize=\"7\" letterSpacing=\"1.5\">3~ 400V 5.5kW</text>
+        <text x=\"640\" y=\"334\" textAnchor=\"middle\" fill=\"#aaa395\" fontFamily=\"JetBrains Mono, monospace\" fontSize=\"7\" letterSpacing=\"1.5\">1450 RPM · IE3</text>
+      </g>
+
+      {/* MOTOR TERMINAL BOX – skrzynka zaciskowa na silniku */}
+      <g
+        data-testid=\"fpp-motor-terminal\"
+        style={{ cursor: \"pointer\" }}
+        onClick={interact(\"motor-terminal\")}
+      >
+        <rect x=\"610\" y=\"250\" width=\"140\" height=\"46\" rx=\"3\" fill=\"#3a3530\" stroke=\"#0d0e10\" strokeWidth=\"1.5\" />
+        {/* 6 zacisków (U1 V1 W1 / U2 V2 W2 dla trójkąt/gwiazda) */}
+        {[0, 1, 2, 3, 4, 5].map((i) => {
+          const x = 620 + (i % 3) * 40 + (i >= 3 ? -120 : 0);
+          const y = 264 + (i >= 3 ? 18 : 0);
+          return (
+            <g key={i}>
+              <circle cx={x} cy={y} r=\"5.5\" fill=\"#787068\" stroke=\"#0d0e10\" strokeWidth=\"0.8\" />
+              <circle cx={x} cy={y} r=\"2.5\" fill=\"#3a3530\" />
+            </g>
+          );
+        })}
+        <text x=\"680\" y=\"262\" textAnchor=\"middle\" fill=\"#aaa395\" fontFamily=\"JetBrains Mono, monospace\" fontSize=\"7\" letterSpacing=\"1.5\">U1 V1 W1</text>
+
+        {/* zworki gwiazda → trójkąt */}
+        {isDone(\"motor-terminal\") && (
+          <g pointerEvents=\"none\">
+            <line x1=\"620\" y1=\"264\" x2=\"740\" y2=\"282\" stroke=\"#f4a13d\" strokeWidth=\"2\" />
+            <line x1=\"660\" y1=\"264\" x2=\"620\" y2=\"282\" stroke=\"#f4a13d\" strokeWidth=\"2\" />
+            <line x1=\"700\" y1=\"264\" x2=\"660\" y2=\"282\" stroke=\"#f4a13d\" strokeWidth=\"2\" />
+          </g>
+        )}
+
+        {isActive(\"motor-terminal\") && (
+          <rect x=\"606\" y=\"246\" width=\"148\" height=\"54\" rx=\"4\" fill=\"none\" stroke=\"#f4a13d\" strokeWidth=\"2.5\" pointerEvents=\"none\">
+            <animate attributeName=\"opacity\" values=\"0.95;0.2;0.95\" dur=\"1.4s\" repeatCount=\"indefinite\" />
+          </rect>
+        )}
+      </g>
+
+      {/* 3 kable fazowe wychodzące z disconnect → silnik */}
+      <g pointerEvents=\"none\">
+        <path d=\"M 340 145 C 420 145, 480 200, 610 256\" stroke=\"#a87018\" strokeWidth=\"4.5\" fill=\"none\" />
+        <path d=\"M 340 175 C 420 175, 480 215, 610 272\" stroke=\"#1a1c20\" strokeWidth=\"4.5\" fill=\"none\" />
+        <path d=\"M 340 205 C 420 205, 480 230, 610 288\" stroke=\"#5a5e66\" strokeWidth=\"4.5\" fill=\"none\" />
+      </g>
+
+      {/* 3 fazy klikalne (L1/L2/L3) — niewielkie nakładki na kable */}
+      {[
+        { id: \"phase-l1\", x: 430, y: 145, color: \"#a87018\", label: \"L1\" },
+        { id: \"phase-l2\", x: 460, y: 195, color: \"#1a1c20\", label: \"L2\" },
+        { id: \"phase-l3\", x: 490, y: 220, color: \"#5a5e66\", label: \"L3\" },
+      ].map((p) => (
+        <g
+          key={p.id}
+          data-testid={`fpp-${p.id}`}
+          style={{ cursor: \"pointer\" }}
+          onClick={interact(p.id)}
+        >
+          <circle cx={p.x} cy={p.y} r=\"14\" fill={isDone(p.id) ? \"#58d896\" : \"rgba(0,0,0,0.4)\"} stroke={p.color} strokeWidth=\"2\" />
+          <text x={p.x} y={p.y + 3.5} textAnchor=\"middle\" fill={isDone(p.id) ? \"#0a0e1a\" : \"#f4ecd8\"} fontFamily=\"JetBrains Mono, monospace\" fontSize=\"9\" fontWeight=\"700\">{p.label}</text>
+          {isActive(p.id) && (
+            <circle cx={p.x} cy={p.y} r=\"20\" fill=\"none\" stroke=\"#f4a13d\" strokeWidth=\"2\" pointerEvents=\"none\">
+              <animate attributeName=\"r\" values=\"16;26;16\" dur=\"1.4s\" repeatCount=\"indefinite\" />
+              <animate attributeName=\"opacity\" values=\"0.9;0;0.9\" dur=\"1.4s\" repeatCount=\"indefinite\" />
+            </circle>
+          )}
+        </g>
+      ))}
+
+      {/* PRZYCISK START / TEST — zielony, po prawej */}
+      <g
+        data-testid=\"fpp-test-button\"
+        style={{ cursor: \"pointer\" }}
+        onClick={interact(\"test-button\")}
+      >
+        <rect x=\"860\" y=\"380\" width=\"100\" height=\"80\" rx=\"6\" fill=\"#1a1c20\" stroke=\"#0d0e10\" strokeWidth=\"2\" />
+        <circle cx=\"910\" cy=\"420\" r=\"26\" fill={isDone(\"test-button\") ? \"#58d896\" : \"#3a8a4a\"} stroke=\"#0d0e10\" strokeWidth=\"2\" />
+        <circle cx=\"910\" cy=\"420\" r=\"18\" fill={isDone(\"test-button\") ? \"#9af2b9\" : \"#58d896\"} />
+        <text x=\"910\" y=\"468\" textAnchor=\"middle\" fill=\"#f4ecd8\" fontFamily=\"JetBrains Mono, monospace\" fontSize=\"8\" letterSpacing=\"2\">START</text>
+        {isActive(\"test-button\") && (
+          <circle cx=\"910\" cy=\"420\" r=\"34\" fill=\"none\" stroke=\"#f4a13d\" strokeWidth=\"2.5\" pointerEvents=\"none\">
+            <animate attributeName=\"r\" values=\"30;42;30\" dur=\"1.4s\" repeatCount=\"indefinite\" />
+            <animate attributeName=\"opacity\" values=\"0.95;0;0.95\" dur=\"1.4s\" repeatCount=\"indefinite\" />
+          </circle>
+        )}
+        {/* iskra przy uruchomieniu */}
+        {isDone(\"test-button\") && (
+          <g pointerEvents=\"none\">
+            <circle cx=\"893\" cy=\"323\" r=\"14\" fill=\"none\" stroke=\"#f4c20d\" strokeWidth=\"1.5\" opacity=\"0.7\">
+              <animate attributeName=\"r\" values=\"12;22;12\" dur=\"1.2s\" repeatCount=\"indefinite\" />
+              <animate attributeName=\"opacity\" values=\"0.8;0;0.8\" dur=\"1.2s\" repeatCount=\"indefinite\" />
+            </circle>
+          </g>
+        )}
+      </g>
+
+      {/* vignette */}
+      <radialGradient id=\"factory-vig\" cx=\"50%\" cy=\"50%\" r=\"70%\">
+        <stop offset=\"60%\" stopColor=\"rgba(0,0,0,0)\" />
+        <stop offset=\"100%\" stopColor=\"rgba(0,0,0,0.85)\" />
+      </radialGradient>
+      <rect x=\"0\" y=\"0\" width=\"1000\" height=\"620\" fill=\"url(#factory-vig)\" pointerEvents=\"none\" />
+    </svg>
+  );
+}
+"
+Observation: Create successful: /app/frontend/src/navig/scenes/FactoryScene.jsx
