@@ -1,0 +1,114 @@
+Teraz 3 komponenty social proof.
+Action: file_editor create /app/frontend/src/navig/social/LiveCrewFeed.jsx --file-text "import React, { useEffect, useState } from \"react\";
+import { motion, AnimatePresence } from \"framer-motion\";
+
+/**
+ * LiveCrewFeed
+ * ------------------------------------------------------------
+ * Krótkofalówka brygady – subtelny techniczny feed w rogu ekranu.
+ * Pokazuje co robią inni fachowcy w tym samym czasie.
+ *
+ * Props:
+ *   events – opcjonalna tablica { id, text, type } z zewnątrz (np. WebSocket).
+ *            Jeśli pusta – komponent sam generuje \"ghost feed\" (mock dla demo).
+ *   missionTitle – używane do kontekstowych komunikatów (\"ten silnik...\")
+ *
+ * Wizualnie: text-amber-500/55 monospace, każdy wpis wjeżdża od dołu,
+ * trzymamy max 4 ostatnie, kazdy znika po 6s.
+ */
+
+const DEMO_BANK = [
+  { who: \"Piotrek_W\", text: \"podpiął fazę w gnieździe\", type: \"ok\" },
+  { who: \"Janek33\", text: \"zaliczył krok: Odetnij Napięcie\", type: \"ok\" },
+  { who: \"Magda_K\", text: \"uruchomiła silnik 3F\", type: \"ok\" },
+  { who: \"Tomek_PV\", text: \"wyłączył inwerter prawidłowo\", type: \"ok\" },
+  { who: \"Brygada\", text: \"43 osoby robią teraz misje\", type: \"system\" },
+  { who: \"MisterX\", text: \"spalił bezpiecznik (znowu)\", type: \"warn\" },
+  { who: \"AdamSEP\", text: \"zdał egzamin za pierwszym razem\", type: \"win\" },
+  { who: \"Brygada\", text: \"+12 nowych fachowców online\", type: \"system\" },
+  { who: \"Kasia_L\", text: \"podpięła PE w mieszkaniu\", type: \"ok\" },
+  { who: \"Wojtek_3F\", text: \"ostrzeżenie: pomylił L2 z PE\", type: \"warn\" },
+  { who: \"Mistrz\", text: \"obserwuje twoją robotę.\", type: \"system\" },
+];
+
+const TYPE_STYLES = {
+  ok:     { dot: \"#9af2b9\", text: \"rgba(244,236,216,0.65)\" },
+  warn:   { dot: \"#f4a13d\", text: \"rgba(244,161,61,0.85)\" },
+  win:    { dot: \"#5fb3ff\", text: \"rgba(95,179,255,0.85)\" },
+  system: { dot: \"#787068\", text: \"rgba(200,210,230,0.4)\" },
+};
+
+function timeStr() {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, \"0\")}:${String(d.getMinutes()).padStart(2, \"0\")}`;
+}
+
+export default function LiveCrewFeed({ events, className = \"\", running = true }) {
+  const [items, setItems] = useState([]);
+
+  useEffect(() => {
+    if (!running) return;
+    let counter = 0;
+    const push = () => {
+      const e = events && events.length
+        ? events[Math.floor(Math.random() * events.length)]
+        : DEMO_BANK[Math.floor(Math.random() * DEMO_BANK.length)];
+      const id = `${Date.now()}-${counter++}`;
+      const entry = { id, time: timeStr(), ...e };
+      setItems((prev) => [...prev.slice(-3), entry]);
+      // auto-remove po 6.5s
+      setTimeout(() => {
+        setItems((prev) => prev.filter((x) => x.id !== id));
+      }, 6500);
+    };
+    push();
+    const t = setInterval(push, 2400 + Math.random() * 1400);
+    return () => clearInterval(t);
+  }, [events, running]);
+
+  return (
+    <div
+      data-testid=\"live-crew-feed\"
+      className={`pointer-events-none flex w-[280px] flex-col gap-1.5 ${className}`}
+      style={{ fontFamily: \"'JetBrains Mono', monospace\" }}
+    >
+      <div
+        className=\"text-[0.6rem] uppercase tracking-[0.32em] text-amber-500/40\"
+      >
+        ◆ krótkofalówka brygady
+      </div>
+      <div className=\"flex flex-col-reverse gap-1\">
+        <AnimatePresence initial={false}>
+          {items.map((e) => {
+            const s = TYPE_STYLES[e.type] || TYPE_STYLES.ok;
+            return (
+              <motion.div
+                key={e.id}
+                data-testid={`crew-feed-item-${e.id}`}
+                initial={{ opacity: 0, y: 10, filter: \"blur(2px)\" }}
+                animate={{ opacity: 1, y: 0, filter: \"blur(0px)\" }}
+                exit={{ opacity: 0, y: -4, filter: \"blur(1px)\" }}
+                transition={{ duration: 0.4, ease: \"easeOut\" }}
+                className=\"flex items-start gap-2 text-[0.65rem] leading-[1.2]\"
+                style={{ color: s.text }}
+              >
+                <span
+                  className=\"mt-1 inline-block h-1.5 w-1.5 flex-shrink-0 rounded-full\"
+                  style={{
+                    background: s.dot,
+                    boxShadow: `0 0 6px ${s.dot}`,
+                  }}
+                />
+                <span className=\"opacity-50\">[{e.time}]</span>
+                <span className=\"opacity-80\">{e.who}</span>
+                <span className=\"flex-1\">{e.text}</span>
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+}
+"
+Observation: Create successful: /app/frontend/src/navig/social/LiveCrewFeed.jsx
