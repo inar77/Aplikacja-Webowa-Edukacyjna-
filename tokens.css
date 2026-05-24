@@ -1,0 +1,59 @@
+
+Action: file_editor view /app/frontend/src/navig/tokens.css
+Observation: [Showing lines 1-55 of 55 total] /app/frontend/src/navig/tokens.css:
+1|/* ============================================
+2|   NAVIG · Design Tokens
+3|   --------------------------------------------
+4|   Jedno źródło prawdy dla kolorów, fontów,
+5|   promieni, cieni. Używaj var(--xxx) wszędzie.
+6|   ============================================ */
+7|
+8|:root {
+9|  /* Tła */
+10|  --bg:               #07111f;
+11|  --panel:            rgba(17, 27, 45, 0.72);
+12|  --panel-strong:     rgba(17, 27, 45, 0.88);
+13|  --panel-border:     rgba(255, 255, 255, 0.09);
+14|
+15|  /* Tekst */
+16|  --text:             #e8eef9;
+17|  --text-muted:       rgba(232, 238, 249, 0.60);
+18|  --text-faint:       rgba(232, 238, 249, 0.30);
+19|
+20|  /* Akcenty (jeden naraz!) */
+21|  --accent:           #f4a13d;            /* pomarańcz — CTA, current */
+22|  --accent-dim:       rgba(244, 161, 61, 0.15);
+23|  --accent-glow:      rgba(244, 161, 61, 0.45);
+24|
+25|  --success:          #58d896;            /* zielony — zaliczone */
+26|  --success-dim:      rgba(88, 216, 150, 0.12);
+27|
+28|  --info:             #5fb3ff;            /* niebieski — info, etap */
+29|  --info-dim:         rgba(95, 179, 255, 0.10);
+30|
+31|  --danger:           #ff6b6b;            /* czerwony — błąd */
+32|  --danger-dim:       rgba(255, 107, 107, 0.12);
+33|
+34|  --warn:             #f4c20d;            /* żółty — BHP */
+35|  --warn-dim:         rgba(244, 194, 13, 0.10);
+36|
+37|  /* Efekty */
+38|  --radius:           12px;
+39|  --radius-sm:        8px;
+40|  --radius-lg:        16px;
+41|  --shadow:           0 20px 60px rgba(0, 0, 0, 0.45);
+42|  --blur:             blur(12px);
+43|
+44|  /* Typografia */
+45|  --font-display:     'Caveat', cursive;
+46|  --font-mono:        'JetBrains Mono', ui-monospace, monospace;
+47|  --font-body:        'Satoshi', 'Inter', system-ui, sans-serif;
+48|}
+49|
+50|/* default body font dla wszystkiego */
+51|.navig-body {
+52|  font-family: var(--font-body);
+53|  color: var(--text);
+54|}
+55|
+[End of file]
