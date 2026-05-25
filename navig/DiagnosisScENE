@@ -1,0 +1,717 @@
+Teraz **FaultDiagnosisScene** — diagnostyka zwarcia do PE:
+Action: file_editor create /app/frontend/src/navig/scenes/FaultDiagnosisScene.jsx --file-text "import React, { useState, useRef, useEffect } from \"react\";
+import { motion, AnimatePresence, useMotionValue, useSpring, useMotionTemplate } from \"framer-motion\";
+import { ArrowLeft, RotateCcw, Lightbulb, Volume2 } from \"lucide-react\";
+import { useNavigate } from \"react-router-dom\";
+import { Panel } from \"../shared/ui/Panel\";
+import BHPAlert from \"../shared/ui/BHPAlert\";
+import PrimaryButton from \"../shared/ui/PrimaryButton\";
+import Stepper from \"../shared/ui/Stepper\";
+import FloatingXP from \"../shared/ui/FloatingXP\";
+import WorkOrderBanner, { ORDERS } from \"../shared/ui/WorkOrderBanner\";
+import OrganicProgressBar from \"../OrganicProgressBar\";
+import LiveCrewFeed from \"../social/LiveCrewFeed\";
+
+/**
+ * FaultDiagnosisScene · Misja 09
+ * ============================================================
+ * Inquiry-Based Learning:
+ * \"Silnik 3-fazowy wybija różnicówkę po włączeniu. Znajdź przyczynę.
+ *  Multimetr w trybie ciągłości (·))) między każdą fazą a PE.
+ *  ZWARCIE pokaże 0.4 Ω + brzęczyk. SPRAWNA faza pokaże OL.\"
+ *
+ * Sekret scenariusza: L2 ma przebicie do obudowy (uszkodzona izolacja).
+ *
+ * UX:
+ *  - Brak prowadzenia za rękę — uczeń sam wybiera mierzone punkty.
+ *  - BHP locker: nie można dotykać sond zanim hebel główny \"OFF\".
+ *  - \"Aha! moment\" przy L2–PE: multimetr pulsuje, fale dźwiękowe.
+ *
+ * Interakcja:
+ *  1. Klik na sondę (czerwona/czarna) → \"aktywna\"
+ *  2. Klik na zacisk → sonda przyczepiona (sprężyna animuje kabel)
+ *  3. Gdy obie podpięte → multimetr czyta
+ */
+
+// Konfiguracja terminali w block zacisków (układ 3F: L1 L2 L3 N PE)
+const TERMINALS = [
+  { id: \"L1\", label: \"L1\",  x: 200, y: 280, color: \"#b8801a\", desc: \"Faza 1 · brąz\" },
+  { id: \"L2\", label: \"L2\",  x: 290, y: 280, color: \"#1a1a1a\", desc: \"Faza 2 · czarny\" },
+  { id: \"L3\", label: \"L3\",  x: 380, y: 280, color: \"#3a3a3a\", desc: \"Faza 3 · szary\" },
+  { id: \"N\",  label: \"N\",   x: 470, y: 280, color: \"#1f5fb3\", desc: \"Zero · niebieski\" },
+  { id: \"PE\", label: \"PE\",  x: 560, y: 280, color: \"#58d896\", desc: \"Ochrona · żółto-zielony\", stripe: true },
+];
+
+// Wewnątrz silnika — który jest uszkodzony (secret)
+const FAULT_PHASE = \"L2\";
+
+const PROBE_REST = {
+  red:   { x: 100, y: 480 },
+  black: { x: 660, y: 480 },
+};
+
+const STEPS = [
+  { id: \"loto\",       title: \"Zabezpiecz · OFF + LOTO\" },
+  { id: \"first_meas\", title: \"1. pomiar ciągłości\" },
+  { id: \"fault\",      title: \"Znajdź zwarcie\" },
+];
+
+export default function FaultDiagnosisScene() {
+  const navigate = useNavigate();
+  const [mainOff, setMainOff] = useState(false);
+  const [activeProbe, setActiveProbe] = useState(null); // \"red\" | \"black\" | null
+  const [redOn, setRedOn] = useState(null);             // id terminala lub null
+  const [blackOn, setBlackOn] = useState(null);
+  const [measurements, setMeasurements] = useState(new Set()); // pary \"L1-PE\" itp.
+  const [foundFault, setFoundFault] = useState(false);
+  const [done, setDone] = useState(false);
+  const [floatingXP, setFloatingXP] = useState([]);
+  const [completed, setCompleted] = useState(new Set());
+  const [shakeWarning, setShakeWarning] = useState(false);
+  const containerRef = useRef(null);
+
+  const xpBurst = (label, x, y) => {
+    const id = Date.now() + Math.random();
+    const r = containerRef.current?.getBoundingClientRect();
+    setFloatingXP((f) => [...f, { id, label, x: x ?? (r?.width || 800) / 2, y: y ?? 200 }]);
+    setTimeout(() => setFloatingXP((f) => f.filter((it) => it.id !== id)), 1300);
+  };
+
+  // detekcja par
+  const pairKey = (a, b) => [a, b].sort().join(\"-\");
+  const hasFault = (redId, blackId) => {
+    if (!redId || !blackId) return false;
+    const pair = pairKey(redId, blackId);
+    // Tylko gdy mamy fazę × PE
+    return (pair === pairKey(FAULT_PHASE, \"PE\"));
+  };
+
+  const isPhaseToPe = (a, b) => {
+    if (!a || !b) return false;
+    const isPhaseA = [\"L1\", \"L2\", \"L3\"].includes(a);
+    const isPhaseB = [\"L1\", \"L2\", \"L3\"].includes(b);
+    return (isPhaseA && b === \"PE\") || (isPhaseB && a === \"PE\");
+  };
+
+  // przy każdym podpięciu obu sond — sprawdź pomiar
+  useEffect(() => {
+    if (!mainOff) return;
+    if (redOn && blackOn && redOn !== blackOn) {
+      const key = pairKey(redOn, blackOn);
+      if (!measurements.has(key)) {
+        const ms = new Set(measurements);
+        ms.add(key);
+        setMeasurements(ms);
+
+        if (!completed.has(\"first_meas\")) {
+          setCompleted((c) => new Set([...c, \"first_meas\"]));
+          xpBurst(\"+30 XP · pomiar 1\", null, 260);
+        }
+
+        if (hasFault(redOn, blackOn) && !foundFault) {
+          setFoundFault(true);
+          setCompleted((c) => new Set([...c, \"fault\"]));
+          xpBurst(\"+120 XP · ZNALEZIONE!\", null, 200);
+          setTimeout(() => setDone(true), 2200);
+        }
+      }
+    }
+  }, [redOn, blackOn, mainOff]);
+
+  const handleMainOff = () => {
+    setMainOff(true);
+    setCompleted((c) => new Set([...c, \"loto\"]));
+    xpBurst(\"+50 XP · LOTO\", null, 250);
+  };
+
+  const handleProbeClick = (color) => {
+    if (!mainOff) {
+      setShakeWarning(true);
+      setTimeout(() => setShakeWarning(false), 600);
+      return;
+    }
+    setActiveProbe(activeProbe === color ? null : color);
+  };
+
+  const handleTerminalClick = (id) => {
+    if (!mainOff || !activeProbe) return;
+    // nie można podpiąć obu sond na ten sam zacisk
+    if (activeProbe === \"red\" && blackOn === id) return;
+    if (activeProbe === \"black\" && redOn === id) return;
+    if (activeProbe === \"red\") setRedOn(id);
+    else setBlackOn(id);
+    setActiveProbe(null);
+  };
+
+  const detach = (color) => {
+    if (color === \"red\") setRedOn(null);
+    else setBlackOn(null);
+  };
+
+  const reset = () => {
+    setMainOff(false);
+    setActiveProbe(null);
+    setRedOn(null);
+    setBlackOn(null);
+    setMeasurements(new Set());
+    setFoundFault(false);
+    setDone(false);
+    setCompleted(new Set());
+  };
+
+  const reading = (() => {
+    if (!mainOff || !redOn || !blackOn) return { value: \"----\", mode: \"·)))\", bg: \"#0a160e\", color: \"#00ff66\", buzz: false };
+    if (hasFault(redOn, blackOn)) return { value: \"0.4 Ω\", mode: \"·)))\", bg: \"#0a160e\", color: \"#00ff66\", buzz: true };
+    if (isPhaseToPe(redOn, blackOn)) return { value: \"OL\", mode: \"·)))\", bg: \"#0a160e\", color: \"#00ff66\", buzz: false };
+    // Mierzenie faz między sobą — pokaż ok wartość
+    return { value: \"OL\", mode: \"·)))\", bg: \"#0a160e\", color: \"#00ff66\", buzz: false };
+  })();
+
+  const currentIdx = !completed.has(\"loto\") ? 0 : !completed.has(\"first_meas\") ? 1 : 2;
+
+  const instruction = (() => {
+    if (done) return \"Misja wykonana. Wymień uszkodzony silnik lub przewiń izolację.\";
+    if (!mainOff) return \"Silnik wybija różnicówkę po starcie. Zabezpiecz instalację — odłącz główny zasilanie. Nie tykaj sond pod napięciem.\";
+    if (!redOn && !blackOn) return \"Użyj testu CIĄGŁOŚCI (·))) między każdą fazą a PE. Znajdź gdzie izolacja przebija do masy.\";
+    return \"Kontynuuj pomiar. Brzęczyk = znalazłeś zwarcie. OL = obwód sprawny.\";
+  })();
+
+  return (
+    <div
+      data-testid=\"fault-diagnosis-scene\"
+      className=\"navig-body relative min-h-screen w-full overflow-hidden\"
+      style={{ background: \"var(--bg)\", color: \"var(--text)\" }}
+    >
+      <FloatingXP items={floatingXP} />
+
+      {/* HEADER */}
+      <header className=\"relative z-30 mx-auto flex max-w-[1600px] flex-col gap-2 px-6 py-4\">
+        <div className=\"flex items-center justify-between gap-4\">
+          <button
+            data-testid=\"fd-back\"
+            onClick={() => navigate(\"/\")}
+            className=\"flex items-center gap-2 rounded-full border px-3 py-1.5 text-[0.78rem] uppercase tracking-[0.22em] transition hover:bg-white/10\"
+            style={{ borderColor: \"var(--panel-border)\", background: \"rgba(255,255,255,0.04)\", color: \"var(--text-muted)\", fontFamily: \"var(--font-mono)\" }}
+          >
+            <ArrowLeft size={14} /> Mapa
+          </button>
+          <div className=\"text-[0.7rem] uppercase tracking-[0.32em]\" style={{ color: \"var(--accent)\", fontFamily: \"var(--font-mono)\" }}>
+            ● MISJA 09 · DIAGNOSTYKA · ZWARCIE DO MASY
+          </div>
+          <div className=\"text-[0.72rem] uppercase tracking-[0.22em]\" style={{ color: \"var(--text-muted)\", fontFamily: \"var(--font-mono)\" }}>
+            {done ? \"Ukończone\" : `Krok ${currentIdx + 1} / 3`}
+          </div>
+        </div>
+        {/* Work order */}
+        <div
+          className=\"flex flex-wrap items-center gap-x-5 gap-y-1.5 rounded-[var(--radius-sm)] border px-4 py-2.5\"
+          style={{ background: \"rgba(20,28,48,0.55)\", borderColor: \"var(--panel-border)\", borderLeft: \"3px solid var(--danger)\", backdropFilter: \"var(--blur)\", fontFamily: \"var(--font-mono)\" }}
+        >
+          <span className=\"text-[0.62rem] uppercase tracking-[0.28em]\" style={{ color: \"var(--danger)\" }}>● PILNE</span>
+          <span className=\"text-[0.7rem]\" style={{ color: \"var(--text)\" }}>Zlecenie <strong style={{ color: \"var(--accent)\" }}>ZS-417/26</strong></span>
+          <span className=\"text-[0.7rem]\" style={{ color: \"var(--text-muted)\" }}>klient: Pralnia „Mydlana Bania\"</span>
+          <span className=\"text-[0.68rem]\" style={{ color: \"var(--text-muted)\" }}>ul. Wolska 88 · Warszawa</span>
+          <span className=\"hidden xl:inline text-[0.68rem] italic\" style={{ color: \"var(--text-faint)\", fontFamily: \"var(--font-body)\" }}>
+            „Silnik bębna wybija różnicówkę. Klient: „od rana 5 razy.\"
+          </span>
+        </div>
+      </header>
+
+      {/* LAYOUT 70/30 */}
+      <div className=\"relative z-10 mx-auto grid w-full max-w-[1600px] grid-cols-1 gap-5 px-4 pb-10 lg:grid-cols-[minmax(0,1fr)_380px]\">
+        {/* WORKSPACE */}
+        <div
+          ref={containerRef}
+          className=\"relative overflow-hidden rounded-[var(--radius)] border\"
+          style={{
+            background: \"radial-gradient(ellipse 80% 60% at 50% 40%, #142036 0%, #0c1322 60%, #050811 100%)\",
+            borderColor: \"var(--panel-border)\",
+            minHeight: 680,
+            boxShadow: \"var(--shadow)\",
+          }}
+        >
+          {/* Grid bg */}
+          <div aria-hidden className=\"pointer-events-none absolute inset-0 opacity-[0.08]\"
+            style={{ backgroundImage: \"repeating-linear-gradient(0deg, rgba(120,170,230,0.45) 0 1px, transparent 1px 28px), repeating-linear-gradient(90deg, rgba(120,170,230,0.45) 0 1px, transparent 1px 28px)\" }} />
+
+          <svg viewBox=\"0 0 800 680\" className=\"absolute inset-0 h-full w-full\" preserveAspectRatio=\"xMidYMid meet\">
+            <defs>
+              <linearGradient id=\"motor-body\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\">
+                <stop offset=\"0%\" stopColor=\"#5a6b80\" />
+                <stop offset=\"100%\" stopColor=\"#2a3445\" />
+              </linearGradient>
+              <linearGradient id=\"terminal-block\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\">
+                <stop offset=\"0%\" stopColor=\"#e8d8b2\" />
+                <stop offset=\"100%\" stopColor=\"#a89875\" />
+              </linearGradient>
+            </defs>
+
+            {/* SILNIK — z boku, korpus */}
+            <g>
+              {/* obudowa cylindryczna */}
+              <ellipse cx=\"400\" cy=\"500\" rx=\"280\" ry=\"50\" fill=\"rgba(0,0,0,0.5)\" />
+              <rect x=\"120\" y=\"380\" width=\"560\" height=\"140\" fill=\"url(#motor-body)\" stroke=\"#1a1f2a\" strokeWidth=\"2\" rx=\"6\" />
+              {/* żebra chłodzące */}
+              {Array.from({ length: 18 }).map((_, i) => (
+                <line key={i} x1={140 + i * 30} y1=\"385\" x2={140 + i * 30} y2=\"515\" stroke=\"rgba(0,0,0,0.4)\" strokeWidth=\"1.2\" />
+              ))}
+              {/* wał */}
+              <rect x=\"680\" y=\"430\" width=\"100\" height=\"40\" fill=\"#3a4252\" stroke=\"#1a1f2a\" strokeWidth=\"2\" />
+              <circle cx=\"780\" cy=\"450\" r=\"22\" fill=\"#1a1f2a\" stroke=\"#3a4252\" strokeWidth=\"2\" />
+              <circle cx=\"780\" cy=\"450\" r=\"6\" fill=\"#3a4252\" />
+              {/* Tabliczka znamionowa */}
+              <rect x=\"160\" y=\"410\" width=\"120\" height=\"50\" fill=\"#3a3a40\" stroke=\"#1a1a20\" strokeWidth=\"1\" />
+              <text x=\"220\" y=\"425\" textAnchor=\"middle\" fill=\"#f4ecd8\" fontFamily=\"var(--font-mono)\" fontSize=\"6\" letterSpacing=\"1.5\">3~ ASYNCHRONOUS</text>
+              <text x=\"220\" y=\"436\" textAnchor=\"middle\" fill=\"#f4a13d\" fontFamily=\"var(--font-mono)\" fontSize=\"9\" fontWeight=\"700\">3.0 kW · 400V</text>
+              <text x=\"220\" y=\"447\" textAnchor=\"middle\" fill=\"#f4ecd8\" fontFamily=\"var(--font-mono)\" fontSize=\"6\" letterSpacing=\"1.2\">cos φ 0.85 · 6.3 A</text>
+              <text x=\"220\" y=\"456\" textAnchor=\"middle\" fill=\"#f4ecd8\" fontFamily=\"var(--font-mono)\" fontSize=\"5.5\" letterSpacing=\"1\">IP54 · IE2 · 1450 obr/min</text>
+            </g>
+
+            {/* SKRZYNKA ZACISKOWA — wystaje z góry silnika */}
+            <g>
+              <rect x=\"180\" y=\"240\" width=\"440\" height=\"120\" fill=\"#1a1f2a\" stroke=\"#3a4252\" strokeWidth=\"2\" rx=\"4\" />
+              <rect x=\"190\" y=\"250\" width=\"420\" height=\"100\" fill=\"url(#terminal-block)\" stroke=\"#5a4830\" strokeWidth=\"1\" />
+              {/* 4 śrubki narożne */}
+              {[[200,260],[605,260],[200,345],[605,345]].map(([cx, cy], i) => (
+                <g key={i}><circle cx={cx} cy={cy} r=\"4\" fill=\"#3a3a40\" /><line x1={cx-3} y1={cy} x2={cx+3} y2={cy} stroke=\"#1a1a20\" strokeWidth=\"1\" /></g>
+              ))}
+              {/* nadruk \"TERMINAL BLOCK\" */}
+              <text x=\"400\" y=\"266\" textAnchor=\"middle\" fill=\"#5a4830\" fontFamily=\"var(--font-mono)\" fontSize=\"7\" letterSpacing=\"2\">TERMINAL BLOCK · 5×6mm²</text>
+            </g>
+
+            {/* TERMINALE — klikalne */}
+            {TERMINALS.map((t) => {
+              const isHover = activeProbe !== null;
+              const redHere = redOn === t.id;
+              const blackHere = blackOn === t.id;
+              return (
+                <g key={t.id}>
+                  {/* sruba */}
+                  <circle cx={t.x} cy={t.y} r=\"22\" fill=\"#5a5a60\" stroke=\"#1a1a20\" strokeWidth=\"1.5\" />
+                  <circle cx={t.x} cy={t.y} r=\"16\" fill={t.color} stroke=\"#1a1a20\" strokeWidth=\"1\" />
+                  {t.stripe && (
+                    <>
+                      <path d={`M ${t.x-10} ${t.y-6} L ${t.x+10} ${t.y-6}`} stroke=\"#f7d04a\" strokeWidth=\"3\" />
+                      <path d={`M ${t.x-10} ${t.y+6} L ${t.x+10} ${t.y+6}`} stroke=\"#f7d04a\" strokeWidth=\"3\" />
+                    </>
+                  )}
+                  {/* nakrętka 6 pkt */}
+                  <polygon
+                    points={`${t.x},${t.y-13} ${t.x+11},${t.y-7} ${t.x+11},${t.y+7} ${t.x},${t.y+13} ${t.x-11},${t.y+7} ${t.x-11},${t.y-7}`}
+                    fill=\"none\"
+                    stroke=\"rgba(0,0,0,0.3)\"
+                    strokeWidth=\"0.5\"
+                  />
+                  {/* label */}
+                  <text x={t.x} y={t.y + 50} textAnchor=\"middle\" fill=\"#f4ecd8\" fontFamily=\"var(--font-mono)\" fontSize=\"14\" fontWeight=\"700\" letterSpacing=\"2\">{t.label}</text>
+                  {/* aktywny puls gdy sonda jest aktywna */}
+                  {isHover && (
+                    <motion.circle
+                      cx={t.x} cy={t.y} r={28}
+                      fill=\"none\"
+                      stroke=\"var(--accent)\"
+                      strokeWidth=\"2\"
+                      animate={{ opacity: [0.3, 0.9, 0.3], r: [26, 32, 26] }}
+                      transition={{ duration: 1.4, repeat: Infinity }}
+                    />
+                  )}
+                  {/* indicator że jest podpięta sonda */}
+                  {redHere && <circle cx={t.x} cy={t.y - 28} r=\"4\" fill=\"#cf4040\" />}
+                  {blackHere && <circle cx={t.x} cy={t.y - 28} r=\"4\" fill=\"#1a1a1a\" stroke=\"#fff\" strokeWidth=\"0.5\" />}
+                  {/* hitbox */}
+                  <rect
+                    x={t.x - 24} y={t.y - 24} width=\"48\" height=\"48\"
+                    fill=\"transparent\"
+                    pointerEvents={mainOff && activeProbe ? \"all\" : \"none\"}
+                    style={{ cursor: mainOff && activeProbe ? \"pointer\" : \"default\" }}
+                    onClick={() => handleTerminalClick(t.id)}
+                    data-testid={`fd-terminal-${t.id}`}
+                  />
+                </g>
+              );
+            })}
+
+            {/* WEWNĘTRZNE UZWOJENIE — sygnalizacja gdzie jest pęknięcie izolacji (widoczne tylko po znalezieniu) */}
+            <AnimatePresence>
+              {foundFault && (
+                <motion.g initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                  {/* X-ray view of L2 winding shorting to housing */}
+                  <line x1=\"290\" y1=\"280\" x2=\"290\" y2=\"380\" stroke=\"#1a1a1a\" strokeWidth=\"3\" opacity=\"0.7\" strokeDasharray=\"2 2\" />
+                  <motion.path
+                    d=\"M 290 380 Q 320 430 350 480 Q 380 510 400 510\"
+                    stroke=\"#ff3838\" strokeWidth=\"3\" fill=\"none\" strokeDasharray=\"6 4\"
+                    initial={{ pathLength: 0 }}
+                    animate={{ pathLength: 1 }}
+                    transition={{ duration: 1.4 }}
+                  />
+                  <motion.circle
+                    cx=\"350\" cy=\"480\" r=\"14\"
+                    fill=\"rgba(255,56,56,0.3)\" stroke=\"#ff3838\" strokeWidth=\"2\"
+                    animate={{ scale: [1, 1.3, 1], opacity: [0.6, 1, 0.6] }}
+                    transition={{ duration: 1.4, repeat: Infinity }}
+                  />
+                  <text x=\"350\" y=\"500\" textAnchor=\"middle\" fill=\"#ff3838\" fontFamily=\"var(--font-mono)\" fontSize=\"8\" fontWeight=\"700\" letterSpacing=\"1.5\">PĘKNIĘTA IZOLACJA</text>
+                </motion.g>
+              )}
+            </AnimatePresence>
+
+            {/* MAIN BREAKER — w lewym górnym rogu */}
+            <g>
+              <rect x=\"30\" y=\"80\" width=\"100\" height=\"120\" fill=\"#cf2020\" stroke=\"#1a0a0a\" strokeWidth=\"2\" rx=\"4\" />
+              <text x=\"80\" y=\"100\" textAnchor=\"middle\" fill=\"#fff8e0\" fontFamily=\"var(--font-mono)\" fontSize=\"8\" fontWeight=\"700\" letterSpacing=\"2\">MAIN</text>
+              <text x=\"80\" y=\"112\" textAnchor=\"middle\" fill=\"#fff8e0\" fontFamily=\"var(--font-mono)\" fontSize=\"6\" letterSpacing=\"1.5\">63A · 3F</text>
+              {/* hebel */}
+              <motion.rect
+                x=\"62\" width=\"36\" height=\"34\" rx=\"3\"
+                fill={mainOff ? \"#3a3a40\" : \"#f4a13d\"}
+                stroke=\"#1a1a20\" strokeWidth=\"2\"
+                animate={{ y: mainOff ? 155 : 125 }}
+                transition={{ type: \"spring\", stiffness: 200, damping: 18 }}
+              />
+              <text x=\"80\" y={mainOff ? 178 : 148} textAnchor=\"middle\" fill={mainOff ? \"#f4ecd8\" : \"#1a0a0a\"} fontFamily=\"var(--font-mono)\" fontSize=\"8\" fontWeight=\"700\">
+                {mainOff ? \"OFF\" : \"ON\"}
+              </text>
+              {/* hitbox */}
+              <rect
+                x=\"30\" y=\"80\" width=\"100\" height=\"120\"
+                fill=\"transparent\"
+                pointerEvents={mainOff ? \"none\" : \"all\"}
+                style={{ cursor: mainOff ? \"default\" : \"pointer\" }}
+                onClick={handleMainOff}
+                data-testid=\"fd-main-breaker\"
+              />
+              {/* LOTO padlock gdy off */}
+              {mainOff && (
+                <motion.g initial={{ opacity: 0, scale: 0.7 }} animate={{ opacity: 1, scale: 1 }}>
+                  <circle cx=\"80\" cy=\"200\" r=\"12\" fill=\"#f4c20d\" stroke=\"#3a2a08\" strokeWidth=\"2\" />
+                  <text x=\"80\" y=\"204\" textAnchor=\"middle\" fontSize=\"11\" fontWeight=\"900\" fill=\"#3a2a08\">🔒</text>
+                </motion.g>
+              )}
+            </g>
+          </svg>
+
+          {/* MULTIMETR — w lewym dolnym rogu */}
+          <div className=\"absolute bottom-6 left-6 z-10\">
+            <div
+              data-testid=\"fd-multimeter\"
+              className=\"relative\"
+              style={{
+                width: 220,
+                background: \"linear-gradient(180deg, #d97a1f 0%, #a85a10 100%)\",
+                border: \"2px solid #5a3608\",
+                borderRadius: 12,
+                padding: \"12px 14px 16px\",
+                boxShadow: \"0 16px 40px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.18)\",
+              }}
+            >
+              <div className=\"flex items-center justify-between\">
+                <span style={{ color: \"#fff8e0\", fontFamily: \"var(--font-mono)\", fontWeight: 700, fontSize: \"0.6rem\", letterSpacing: \"0.2em\" }}>FLUKE 117</span>
+                <span style={{ color: \"rgba(255,248,224,0.6)\", fontFamily: \"var(--font-mono)\", fontSize: \"0.5rem\", letterSpacing: \"0.18em\" }}>#M-04</span>
+              </div>
+              <motion.div
+                className=\"mt-2 rounded p-2\"
+                style={{
+                  background: \"linear-gradient(180deg, #0e1612 0%, #050a08 100%)\",
+                  border: \"1.5px solid #1a1c20\",
+                  boxShadow: \"inset 0 0 16px rgba(0,0,0,0.85)\",
+                }}
+                animate={foundFault ? {
+                  boxShadow: [\"inset 0 0 16px rgba(0,0,0,0.85)\", \"inset 0 0 30px rgba(0,255,102,0.45)\", \"inset 0 0 16px rgba(0,0,0,0.85)\"],
+                } : {}}
+                transition={{ duration: 1, repeat: foundFault ? Infinity : 0 }}
+              >
+                <div className=\"flex items-center justify-between\">
+                  <span style={{ color: reading.color, fontFamily: \"var(--font-mono)\", fontWeight: 600, fontSize: \"0.55rem\", letterSpacing: \"0.16em\", textShadow: `0 0 4px ${reading.color}` }}>
+                    {reading.mode}
+                  </span>
+                  {reading.buzz && (
+                    <motion.div
+                      animate={{ scale: [1, 1.3, 1] }}
+                      transition={{ duration: 0.4, repeat: Infinity }}
+                      data-testid=\"fd-buzzer\"
+                    >
+                      <Volume2 size={12} style={{ color: reading.color, filter: `drop-shadow(0 0 4px ${reading.color})` }} />
+                    </motion.div>
+                  )}
+                </div>
+                <div className=\"mt-1 text-center\">
+                  <span style={{ color: reading.color, fontFamily: \"var(--font-mono)\", fontWeight: 700, fontSize: \"1.6rem\", letterSpacing: \"0.04em\", textShadow: `0 0 8px ${reading.color}, 0 0 18px ${reading.color}50` }}>
+                    {reading.value}
+                  </span>
+                </div>
+              </motion.div>
+              {/* Fale dźwiękowe */}
+              {reading.buzz && (
+                <div className=\"pointer-events-none absolute right-[-12px] top-[20px]\">
+                  {[0, 1, 2].map((i) => (
+                    <motion.div
+                      key={i}
+                      className=\"absolute rounded-full border\"
+                      style={{
+                        width: 16 + i * 12,
+                        height: 16 + i * 12,
+                        borderColor: \"#58d896\",
+                        top: -i * 6,
+                        right: -i * 6,
+                      }}
+                      animate={{ opacity: [0.8, 0, 0.8], scale: [0.5, 1.4, 0.5] }}
+                      transition={{ duration: 1.4, repeat: Infinity, delay: i * 0.2 }}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* SONDY */}
+          <Probe
+            color=\"red\"
+            label=\"Czerwona\"
+            terminal={redOn ? TERMINALS.find(t => t.id === redOn) : null}
+            active={activeProbe === \"red\"}
+            onClick={() => handleProbeClick(\"red\")}
+            onDetach={() => detach(\"red\")}
+            rest={PROBE_REST.red}
+            disabled={!mainOff}
+            shake={shakeWarning && activeProbe !== \"red\" && !mainOff}
+          />
+          <Probe
+            color=\"black\"
+            label=\"Czarna\"
+            terminal={blackOn ? TERMINALS.find(t => t.id === blackOn) : null}
+            active={activeProbe === \"black\"}
+            onClick={() => handleProbeClick(\"black\")}
+            onDetach={() => detach(\"black\")}
+            rest={PROBE_REST.black}
+            disabled={!mainOff}
+            shake={shakeWarning && activeProbe !== \"black\" && !mainOff}
+          />
+
+          {/* Warning gdy próbujesz sondy bez OFF */}
+          <AnimatePresence>
+            {shakeWarning && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className=\"absolute left-1/2 top-6 z-30 -translate-x-1/2 rounded-full px-4 py-2\"
+                style={{
+                  background: \"rgba(255,56,56,0.18)\",
+                  border: \"1px solid rgba(255,56,56,0.55)\",
+                  color: \"#ffd9d9\",
+                  fontFamily: \"var(--font-body)\",
+                  fontSize: \"0.92rem\",
+                  backdropFilter: \"blur(8px)\",
+                }}
+              >
+                ⚠ Najpierw WYŁĄCZ napięcie. Multimetr w trybie Ω wpuszcza prąd testowy — pod napięciem się spali.
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Live crew */}
+          <div className=\"absolute right-4 top-4 z-20\">
+            <LiveCrewFeed running={!done} />
+          </div>
+        </div>
+
+        {/* HUD */}
+        <aside className=\"lg:sticky lg:top-4 lg:self-start\">
+          {!done ? (
+            <Panel strong className=\"space-y-4\">
+              <div>
+                <div className=\"text-[0.7rem] uppercase tracking-[0.32em]\" style={{ color: \"var(--info)\", fontFamily: \"var(--font-mono)\" }}>
+                  Krok {currentIdx + 1} / 3 · {STEPS[currentIdx]?.title}
+                </div>
+                <div className=\"mt-1 text-[1.35rem] leading-[1.18]\" style={{ color: \"var(--text)\", fontFamily: \"var(--font-display)\" }}>
+                  {instruction}
+                </div>
+              </div>
+
+              <BHPAlert>
+                Ciągłość (Ω) MUSI być mierzona BEZ napięcia. Miernik wpuszcza własny prąd testowy — na żyłach pod napięciem wzmacniacz pada.
+              </BHPAlert>
+
+              <div>
+                <div className=\"mb-2 text-[0.6rem] uppercase tracking-[0.28em]\" style={{ color: \"var(--text-muted)\", fontFamily: \"var(--font-mono)\" }}>
+                  Metoda diagnostyczna
+                </div>
+                <Stepper steps={STEPS} currentIdx={currentIdx} completed={completed} vertical />
+              </div>
+
+              {mainOff && (
+                <div className=\"rounded-[var(--radius-sm)] border p-3\" style={{ background: \"var(--info-dim)\", borderColor: \"var(--info)\", borderLeftWidth: 3 }}>
+                  <div className=\"text-[0.6rem] uppercase tracking-[0.28em]\" style={{ color: \"var(--info)\", fontFamily: \"var(--font-mono)\", fontWeight: 600 }}>
+                    Notatnik pomiarów
+                  </div>
+                  <div className=\"mt-1.5 flex flex-col gap-0.5\" style={{ fontFamily: \"var(--font-mono)\", fontSize: \"0.78rem\" }}>
+                    {measurements.size === 0 && <span style={{ color: \"var(--text-muted)\" }}>— jeszcze brak —</span>}
+                    {[...measurements].map((p) => {
+                      const ok = p === [FAULT_PHASE, \"PE\"].sort().join(\"-\");
+                      return (
+                        <div key={p} className=\"flex items-center justify-between\">
+                          <span style={{ color: ok ? \"var(--success)\" : \"var(--text)\" }}>{p.replace(\"-\", \" ↔ \")}</span>
+                          <span style={{ color: ok ? \"var(--success)\" : \"var(--text-muted)\" }}>{ok ? \"0.4 Ω · BUZZ\" : \"OL\"}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div className=\"border-t pt-3\" style={{ borderColor: \"var(--panel-border)\" }}>
+                <OrganicProgressBar value={Math.round((completed.size / STEPS.length) * 100)} label=\"\" />
+              </div>
+
+              <div className=\"flex items-center gap-2 text-[0.62rem] uppercase tracking-[0.22em]\" style={{ color: \"var(--text-muted)\", fontFamily: \"var(--font-mono)\" }}>
+                <span className=\"inline-block h-1.5 w-1.5 rounded-full\" style={{ background: \"var(--success)\", boxShadow: \"0 0 6px var(--success)\" }} />
+                serwis · 3 ekipy diagnozują dziś podobne usterki
+              </div>
+
+              {redOn || blackOn ? (
+                <button
+                  onClick={() => { setRedOn(null); setBlackOn(null); }}
+                  className=\"w-full rounded-[var(--radius-sm)] border px-3 py-2 text-[0.7rem] uppercase tracking-[0.22em] transition hover:bg-white/5\"
+                  style={{ borderColor: \"var(--panel-border)\", color: \"var(--text-muted)\", fontFamily: \"var(--font-mono)\" }}
+                  data-testid=\"fd-detach-all\"
+                >
+                  ↺ Odepnij sondy
+                </button>
+              ) : null}
+            </Panel>
+          ) : (
+            <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}>
+              <Panel strong>
+                <div className=\"text-[0.7rem] uppercase tracking-[0.32em]\" style={{ color: \"var(--success)\", fontFamily: \"var(--font-mono)\" }}>
+                  ✓ usterka znaleziona
+                </div>
+                <h2 className=\"mt-2 text-[2rem] leading-[1.05]\" style={{ color: \"var(--text)\", fontFamily: \"var(--font-display)\" }}>
+                  Zwarcie L2 ↔ PE. Faza dotyka obudowy.
+                </h2>
+                <div className=\"mt-1 text-[0.85rem]\" style={{ color: \"var(--text-muted)\", fontFamily: \"var(--font-mono)\" }}>
+                  +200 XP · {measurements.size} pomiar{measurements.size > 1 ? \"y\" : \"\"} · zdiagnozowane samodzielnie
+                </div>
+                <p className=\"mt-4 text-[0.92rem] leading-relaxed\" style={{ color: \"var(--text)\", fontFamily: \"var(--font-body)\" }}>
+                  Co teraz? Silnik do warsztatu — przewinięcie uzwojenia lub wymiana. Tymczasowo wystarcza odłączyć i powiadomić klienta. <strong>Nigdy</strong> nie obchodź różnicówki — ona właśnie uratowała komuś życie.
+                </p>
+                <div className=\"mt-4 rounded-[var(--radius-sm)] border-l-2 p-3\" style={{ background: \"var(--info-dim)\", borderLeftColor: \"var(--info)\" }}>
+                  <div className=\"text-[0.6rem] uppercase tracking-[0.28em]\" style={{ color: \"var(--info)\", fontFamily: \"var(--font-mono)\", fontWeight: 600 }}>
+                    Wiedziałeś, że...
+                  </div>
+                  <p className=\"mt-1 text-[0.88rem] leading-snug\" style={{ color: \"var(--text)\", fontFamily: \"var(--font-body)\" }}>
+                    Test ciągłości używa około 1–3 mA prądu wewnątrz miernika. To wystarczy aby usłyszeć brzęczyk poniżej 30 Ω, ale za mało żeby zrobić sobie krzywdę — pod warunkiem że napięcie zewnętrzne jest 0.
+                  </p>
+                </div>
+                <div className=\"mt-5 flex gap-2\">
+                  <PrimaryButton onClick={() => navigate(\"/\")} variant=\"success\" testid=\"fd-back-map\" className=\"flex-1\">
+                    ► Wracaj na mapę
+                  </PrimaryButton>
+                  <button
+                    onClick={reset}
+                    className=\"rounded-[var(--radius-sm)] border px-3 py-2 text-[0.7rem] uppercase tracking-[0.22em]\"
+                    style={{ borderColor: \"var(--panel-border)\", color: \"var(--text-muted)\", fontFamily: \"var(--font-mono)\" }}
+                    data-testid=\"fd-reset\"
+                  >
+                    <RotateCcw size={12} style={{ display: \"inline\" }} /> Powtórz
+                  </button>
+                </div>
+              </Panel>
+            </motion.div>
+          )}
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   PROBE — sonda multimetru z animacją kabla
+   ============================================================ */
+function Probe({ color, label, terminal, active, onClick, onDetach, rest, disabled, shake }) {
+  const isRed = color === \"red\";
+  const colorHex = isRed ? \"#cf4040\" : \"#1a1a1a\";
+  const targetX = terminal ? terminal.x : rest.x;
+  const targetY = terminal ? terminal.y + 28 : rest.y;
+
+  return (
+    <>
+      {/* Kabel — SVG path animowany */}
+      <svg className=\"pointer-events-none absolute inset-0 h-full w-full\" viewBox=\"0 0 800 680\" preserveAspectRatio=\"xMidYMid meet\">
+        <motion.path
+          d={`M ${isRed ? 50 : 750} 680 Q ${isRed ? 100 : 700} 600 ${targetX} ${targetY}`}
+          stroke={colorHex}
+          strokeWidth=\"3\"
+          fill=\"none\"
+          strokeLinecap=\"round\"
+          animate={{ d: `M ${isRed ? 50 : 750} 680 Q ${isRed ? 100 : 700} 600 ${targetX} ${targetY}` }}
+          transition={{ type: \"spring\", stiffness: 80, damping: 16 }}
+        />
+      </svg>
+
+      {/* Końcówka sondy */}
+      <motion.div
+        data-testid={`fd-probe-${color}`}
+        className=\"absolute z-20\"
+        animate={{
+          x: targetX - 14,
+          y: targetY - 38,
+          rotate: shake ? [0, -8, 8, -6, 6, 0] : active ? -10 : 0,
+          scale: active ? 1.12 : 1,
+        }}
+        transition={{ type: \"spring\", stiffness: 200, damping: 20, x: { type: \"spring\", stiffness: 120, damping: 18 }, y: { type: \"spring\", stiffness: 120, damping: 18 } }}
+        style={{ pointerEvents: \"auto\", left: 0, top: 0 }}
+        onClick={terminal ? onDetach : onClick}
+        whileHover={!disabled ? { scale: 1.18 } : {}}
+        whileTap={!disabled ? { scale: 0.95 } : {}}
+      >
+        <div style={{ cursor: disabled ? \"not-allowed\" : \"pointer\", filter: active ? `drop-shadow(0 0 10px ${colorHex})` : \"none\" }}>
+          {/* uchwyt */}
+          <div style={{
+            width: 28,
+            height: 64,
+            background: `linear-gradient(180deg, ${colorHex} 0%, ${isRed ? \"#7a1a1a\" : \"#0a0a0a\"} 100%)`,
+            borderRadius: 6,
+            border: \"1.5px solid #0a0a0a\",
+            boxShadow: \"0 4px 10px rgba(0,0,0,0.5)\",
+            position: \"relative\",
+          }}>
+            {/* pierścień */}
+            <div style={{ position: \"absolute\", left: 4, right: 4, top: 16, height: 4, background: \"rgba(255,255,255,0.15)\" }} />
+            {/* etykieta + - */}
+            <div style={{ position: \"absolute\", left: 0, right: 0, top: 4, textAlign: \"center\", color: \"#fff\", fontFamily: \"var(--font-mono)\", fontSize: \"0.55rem\", fontWeight: 700, letterSpacing: \"0.1em\" }}>
+              {isRed ? \"+\" : \"−\"}
+            </div>
+          </div>
+          {/* igła */}
+          <div style={{
+            width: 4,
+            height: 22,
+            background: \"#c8d2e6\",
+            margin: \"0 auto\",
+            borderRadius: \"0 0 1px 1px\",
+            border: \"0.5px solid #5a5a60\",
+          }} />
+          {/* tip czerwony / czarny */}
+          <div style={{
+            width: 6,
+            height: 6,
+            background: colorHex,
+            margin: \"0 auto\",
+            marginTop: -2,
+            borderRadius: \"50%\",
+            border: \"1px solid #0a0a0a\",
+            boxShadow: `0 0 4px ${colorHex}`,
+          }} />
+          {/* etykieta */}
+          {!terminal && (
+            <div style={{ marginTop: 4, textAlign: \"center\", color: colorHex, fontFamily: \"var(--font-mono)\", fontSize: \"0.55rem\", letterSpacing: \"0.18em\", textTransform: \"uppercase\", fontWeight: 600, textShadow: active ? `0 0 4px ${colorHex}` : \"none\" }}>
+              {active ? \"▼ kliknij zacisk\" : label}
+            </div>
+          )}
+        </div>
+      </motion.div>
+    </>
+  );
+}
+"
+Observation: Create successful: /app/frontend/src/navig/scenes/FaultDiagnosisScene.jsx
