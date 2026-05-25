@@ -1,0 +1,88 @@
+
+Action: file_editor create /app/frontend/src/navig/shared/ui/WorkOrderBanner.jsx --file-text "import React from \"react\";
+import { Briefcase, MapPin } from \"lucide-react\";
+
+/**
+ * WorkOrderBanner — kontekst zawodowy: firma, klient, adres.
+ * Niewielka belka stylizowana na \"kartę zlecenia\" z brigady elektrycznej.
+ */
+const ORDERS = {
+  apartment: {
+    company: \"ElektroMistrz Sp. z o.o.\",
+    orderNo: \"ZS-042/26\",
+    client: \"p. Krystyna W.\",
+    address: \"ul. Marszałkowska 8 · m.4 · Warszawa\",
+    note: \"Wymiana gniazdka po remoncie. Klient w domu.\",
+  },
+  multimeter: {
+    company: \"ElektroMistrz Sp. z o.o.\",
+    orderNo: \"ZS-117/26\",
+    client: \"Wspólnota Mieszkaniowa „Stara Praga\\"\",
+    address: \"ul. Targowa 24 · klatka B · Warszawa\",
+    note: \"Diagnostyka tablicy. Fluke 117 — narzędzie firmowe #M-04.\",
+  },
+  switchgear: {
+    company: \"ElektroMistrz Sp. z o.o.\",
+    orderNo: \"ZS-088/26\",
+    client: \"Biuro „Atlas Logistyka\\"\",
+    address: \"Al. Jerozolimskie 102 · piwnica · Warszawa\",
+    note: \"Rozdzielnia główna RG-1. LOTO obowiązkowe.\",
+  },
+  factory: {
+    company: \"ElektroMistrz Sp. z o.o.\",
+    orderNo: \"ZS-203/26\",
+    client: \"Zakład Produkcyjny „Profil-Stal\\"\",
+    address: \"ul. Fabryczna 17 · hala B · Pruszków\",
+    note: \"Silnik 3F 5.5 kW — uruchomienie po remoncie.\",
+  },
+  solar: {
+    company: \"ElektroMistrz Sp. z o.o.\",
+    orderNo: \"ZS-311/26\",
+    client: \"p. Tomasz K. (instalacja prosument)\",
+    address: \"Konstancin · ul. Sosnowa 12 · dach\",
+    note: \"Inwerter Huawei 5kW — wyłączenie serwisowe.\",
+  },
+};
+
+export default function WorkOrderBanner({ variant = \"apartment\", className = \"\" }) {
+  const o = ORDERS[variant] || ORDERS.apartment;
+  return (
+    <div
+      data-testid=\"work-order-banner\"
+      className={`flex flex-wrap items-center gap-x-5 gap-y-1.5 rounded-[var(--radius-sm)] border px-4 py-2.5 ${className}`}
+      style={{
+        background: \"rgba(20,28,48,0.55)\",
+        borderColor: \"var(--panel-border)\",
+        borderLeft: \"3px solid var(--info)\",
+        backdropFilter: \"var(--blur)\",
+        fontFamily: \"var(--font-mono)\",
+      }}
+    >
+      <div className=\"flex items-center gap-2\">
+        <Briefcase size={13} style={{ color: \"var(--info)\" }} />
+        <span className=\"text-[0.62rem] uppercase tracking-[0.28em]\" style={{ color: \"var(--info)\" }}>
+          {o.company}
+        </span>
+      </div>
+      <span className=\"text-[0.7rem]\" style={{ color: \"var(--text)\" }}>
+        Zlecenie <strong style={{ color: \"var(--accent)\" }}>{o.orderNo}</strong>
+      </span>
+      <span className=\"text-[0.7rem]\" style={{ color: \"var(--text-muted)\" }}>
+        klient: {o.client}
+      </span>
+      <div className=\"flex items-center gap-1.5\">
+        <MapPin size={11} style={{ color: \"var(--text-muted)\" }} />
+        <span className=\"text-[0.68rem]\" style={{ color: \"var(--text-muted)\" }}>{o.address}</span>
+      </div>
+      {o.note && (
+        <span className=\"hidden xl:inline text-[0.68rem] italic\" style={{ color: \"var(--text-faint)\", fontFamily: \"var(--font-body)\" }}>
+          „{o.note}\"
+        </span>
+      )}
+    </div>
+  );
+}
+
+export { ORDERS };
+"
+Observation: Create successful: /app/frontend/src/navig/shared/ui/WorkOrderBanner.jsx
