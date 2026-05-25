@@ -1,0 +1,112 @@
+
+Action: file_editor create /app/frontend/src/navig/shared/ui/Stepper.jsx --file-text "import React from \"react\";
+import { motion } from \"framer-motion\";
+import { Check } from \"lucide-react\";
+
+/**
+ * Stepper — wizualne kroki misji.
+ * Endowed Progress Effect — uczeń widzi jak daleko zaszedł.
+ *
+ * Props:
+ *  steps: [{ id, title }]
+ *  currentIdx: number
+ *  completed: Set<string>  (ids ukończonych)
+ *  vertical: bool          (true = po prawej w HUD, false = poziomo)
+ */
+export default function Stepper({ steps = [], currentIdx = 0, completed = new Set(), vertical = false }) {
+  if (vertical) {
+    return (
+      <ol data-testid=\"stepper-v\" className=\"flex flex-col gap-3\">
+        {steps.map((s, i) => {
+          const done = completed.has(s.id) || completed.has(s.targetId);
+          const active = i === currentIdx && !done;
+          const future = !done && !active;
+          return (
+            <li key={s.id} className=\"relative flex items-start gap-3\" data-testid={`step-v-${i}`}>
+              {i < steps.length - 1 && (
+                <span
+                  aria-hidden
+                  className=\"absolute left-[11px] top-[24px] w-[2px]\"
+                  style={{
+                    height: 30,
+                    background: done ? \"var(--success)\" : \"rgba(255,255,255,0.12)\",
+                  }}
+                />
+              )}
+              <motion.span
+                className=\"z-10 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full\"
+                animate={active ? { boxShadow: [\"0 0 0 rgba(244,161,61,0)\", \"0 0 16px rgba(244,161,61,0.7)\", \"0 0 0 rgba(244,161,61,0)\"] } : {}}
+                transition={active ? { duration: 1.8, repeat: Infinity } : {}}
+                style={{
+                  background: done ? \"var(--success-dim)\" : active ? \"var(--accent-dim)\" : \"rgba(255,255,255,0.05)\",
+                  color: done ? \"var(--success)\" : active ? \"var(--accent)\" : \"var(--text-muted)\",
+                  border: `1.5px solid ${done ? \"var(--success)\" : active ? \"var(--accent)\" : \"rgba(255,255,255,0.12)\"}`,
+                  fontFamily: \"var(--font-mono)\",
+                  fontSize: \"0.7rem\",
+                  fontWeight: 600,
+                }}
+              >
+                {done ? <Check size={12} /> : i + 1}
+              </motion.span>
+              <div className=\"pt-0.5\">
+                <div
+                  className=\"text-[0.7rem] uppercase tracking-[0.18em]\"
+                  style={{
+                    color: done ? \"var(--success)\" : active ? \"var(--accent)\" : \"var(--text-muted)\",
+                    fontFamily: \"var(--font-mono)\",
+                    opacity: future ? 0.5 : 1,
+                  }}
+                >
+                  {s.title}
+                </div>
+                {active && s.subtitle && (
+                  <div className=\"mt-0.5 text-[0.78rem]\" style={{ color: \"var(--text-muted)\", fontFamily: \"var(--font-body)\" }}>
+                    {s.subtitle}
+                  </div>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    );
+  }
+
+  // poziomy stepper
+  return (
+    <div data-testid=\"stepper-h\" className=\"flex flex-wrap items-center gap-2.5\" style={{ fontFamily: \"var(--font-mono)\" }}>
+      {steps.map((s, i) => {
+        const done = completed.has(s.id) || completed.has(s.targetId);
+        const active = i === currentIdx && !done;
+        return (
+          <div key={s.id} className=\"flex items-center gap-2\" data-testid={`step-h-${i}`}>
+            <motion.span
+              className=\"flex h-6 w-6 items-center justify-center rounded-full text-[0.7rem]\"
+              animate={active ? { scale: [1, 1.08, 1] } : {}}
+              transition={active ? { duration: 1.6, repeat: Infinity } : {}}
+              style={{
+                background: done ? \"var(--success-dim)\" : active ? \"var(--accent-dim)\" : \"rgba(255,255,255,0.05)\",
+                color: done ? \"var(--success)\" : active ? \"var(--accent)\" : \"var(--text-muted)\",
+                border: `1px solid ${done ? \"var(--success)\" : active ? \"var(--accent)\" : \"rgba(255,255,255,0.12)\"}`,
+              }}
+            >
+              {done ? <Check size={12} /> : i + 1}
+            </motion.span>
+            <span
+              className=\"text-[0.7rem] uppercase tracking-[0.18em]\"
+              style={{
+                color: done ? \"var(--success)\" : active ? \"var(--accent)\" : \"var(--text-muted)\",
+                opacity: done || active ? 1 : 0.5,
+              }}
+            >
+              {s.title}
+            </span>
+            {i < steps.length - 1 && <span className=\"mx-0.5 text-[var(--text-faint)]\">›</span>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+"
+Observation: Create successful: /app/frontend/src/navig/shared/ui/Stepper.jsx
