@@ -1,0 +1,221 @@
+import React, { useState, useRef, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ArrowLeft, RotateCcw, Volume2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Panel } from "../shared/ui/Panel";
+import BHPAlert from "../shared/ui/BHPAlert";
+import PrimaryButton from "../shared/ui/PrimaryButton";
+import Stepper from "../shared/ui/Stepper";
+import FloatingXP from "../shared/ui/FloatingXP";
+import OrganicProgressBar from "../OrganicProgressBar";
+import LiveCrewFeed from "../social/LiveCrewFeed";
+
+const TERMINALS = [
+  { id: "L1", label: "L1", x: 200, y: 280, color: "#b8801a", desc: "Faza 1 · brąz" },
+  { id: "L2", label: "L2", x: 290, y: 280, color: "#1a1a1a", desc: "Faza 2 · czarny" },
+  { id: "L3", label: "L3", x: 380, y: 280, color: "#3a3a3a", desc: "Faza 3 · szary" },
+  { id: "N",  label: "N",  x: 470, y: 280, color: "#1f5fb3", desc: "Zero · niebieski" },
+  { id: "PE", label: "PE", x: 560, y: 280, color: "#58d896", desc: "Ochrona · żółto-zielony", stripe: true },
+];
+
+const FAULT_PHASE = "L2";
+
+const PROBE_REST = {
+  red:   { x: 100, y: 480 },
+  black: { x: 660, y: 480 },
+};
+
+const STEPS = [
+  { id: "loto",       title: "Zabezpiecz · OFF + LOTO" },
+  { id: "first_meas", title: "1. pomiar ciągłości" },
+  { id: "fault",      title: "Znajdź zwarcie" },
+];
+
+export default function FaultDiagnosisScene() {
+  const navigate = useNavigate();
+  const [mainOff, setMainOff] = useState(false);
+  const [activeProbe, setActiveProbe] = useState(null); // "red" | "black" | null
+  const [redOn, setRedOn] = useState(null);             // id terminala lub null
+  const [blackOn, setBlackOn] = useState(null);
+  const [measurements, setMeasurements] = useState(new Set()); // pary "L1-PE" itp.
+  const [foundFault, setFoundFault] = useState(false);
+  const [done, setDone] = useState(false);
+  const [floatingXP, setFloatingXP] = useState([]);
+  const [completed, setCompleted] = useState(new Set());
+  const [shakeWarning, setShakeWarning] = useState(false);
+  const containerRef = useRef(null);
+
+  const xpBurst = (label, x, y) => {
+    const id = Date.now() + Math.random();
+    const r = containerRef.current?.getBoundingClientRect();
+    setFloatingXP((f) => [...f, { id, label, x: x ?? (r?.width || 800) / 2, y: y ?? 200 }]);
+    setTimeout(() => setFloatingXP((f) => f.filter((it) => it.id !== id)), 1300);
+  };
+
+  const pairKey = (a, b) => [a, b].sort().join("-");
+  const hasFault = (redId, blackId) => {
+    if (!redId || !blackId) return false;
+    const pair = pairKey(redId, blackId);
+    return pair === pairKey(FAULT_PHASE, "PE");
+  };
+
+  const isPhaseToPe = (a, b) => {
+    if (!a || !b) return false;
+    const isPhaseA = ["L1", "L2", "L3"].includes(a);
+    const isPhaseB = ["L1", "L2", "L3"].includes(b);
+    return (isPhaseA && b === "PE") || (isPhaseB && a === "PE");
+  };
+
+  useEffect(() => {
+    if (!mainOff) return;
+    if (redOn && blackOn && redOn !== blackOn) {
+      const key = pairKey(redOn, blackOn);
+      if (!measurements.has(key)) {
+        const ms = new Set(measurements);
+        ms.add(key);
+        setMeasurements(ms);
+
+        if (!completed.has("first_meas")) {
+          setCompleted((c) => new Set([...c, "first_meas"]));
+          xpBurst("+30 XP · pomiar 1", null, 260);
+        }
+
+        if (hasFault(redOn, blackOn) && !foundFault) {
+          setFoundFault(true);
+          setCompleted((c) => new Set([...c, "fault"]));
+          xpBurst("+120 XP · ZNALEZIONE!", null, 200);
+          setTimeout(() => setDone(true), 2200);
+        }
+      }
+    }
+  }, [redOn, blackOn, mainOff]);
+
+  const handleMainOff = () => {
+    setMainOff(true);
+    setCompleted((c) => new Set([...c, "loto"]));
+    xpBurst("+50 XP · LOTO", null, 250);
+  };
+
+  const handleProbeClick = (color) => {
+    if (!mainOff) {
+      setShakeWarning(true);
+      setTimeout(() => setShakeWarning(false), 600);
+      return;
+    }
+    setActiveProbe(activeProbe === color ? null : color);
+  };
+
+  const handleTerminalClick = (id) => {
+    if (!mainOff || !activeProbe) return;
+    if (activeProbe === "red" && blackOn === id) return;
+    if (activeProbe === "black" && redOn === id) return;
+    if (activeProbe === "red") setRedOn(id);
+    else setBlackOn(id);
+    setActiveProbe(null);
+  };
+
+  const detach = (color) => {
+    if (color === "red") setRedOn(null);
+    else setBlackOn(null);
+  };
+
+  const reset = () => {
+    setMainOff(false);
+    setActiveProbe(null);
+    setRedOn(null);
+    setBlackOn(null);
+    setMeasurements(new Set());
+    setFoundFault(false);
+    setDone(false);
+    setCompleted(new Set());
+  };
+
+  const reading = (() => {
+    if (!mainOff || !redOn || !blackOn) return { value: "----", mode: "·)))", bg: "#0a160e", color: "#00ff66", buzz: false };
+    if (hasFault(redOn, blackOn)) return { value: "0.4 Ω", mode: "·)))", bg: "#0a160e", color: "#00ff66", buzz: true };
+    if (isPhaseToPe(redOn, blackOn)) return { value: "OL", mode: "·)))", bg: "#0a160e", color: "#00ff66", buzz: false };
+    return { value: "OL", mode: "·)))", bg: "#0a160e", color: "#00ff66", buzz: false };
+  })();
+
+  const currentIdx = !completed.has("loto") ? 0 : !completed.has("first_meas") ? 1 : 2;
+
+  const instruction = (() => {
+    if (done) return "Misja wykonana. Wymień uszkodzony silnik lub przewiń izolację.";
+    if (!mainOff) return "Silnik wybija różnicówkę po starcie. Zabezpiecz instalację — odłącz główny zasilanie. Nie tykaj sond pod napięciem.";
+    if (!redOn && !blackOn) return "Użyj testu CIĄGŁOŚCI (·))) między każdą fazą a PE. Znajdź gdzie izolacja przebija do masy.";
+    return "Kontynuuj pomiar. Brzęczyk = znalazłeś zwarcie. OL = obwód sprawny.";
+  })();
+
+  return (
+    <div
+      data-testid="fault-diagnosis-scene"
+      className="navig-body relative min-h-screen w-full overflow-hidden"
+      style={{ background: "var(--bg)", color: "var(--text)" }}
+    >
+      <FloatingXP items={floatingXP} />
+
+      {/* HEADER */}
+      <header className="relative z-30 mx-auto flex max-w-[1600px] flex-col gap-2 px-6 py-4">
+        <div className="flex items-center justify-between gap-4">
+          <button
+            data-testid="fd-back"
+            onClick={() => navigate("")}
+            className="flex items-center gap-2 rounded-full border px-3 py-1.5 text-[0.78rem] uppercase tracking-[0.22em] transition hover:bg-white10"
+            style={{ borderColor: "var(--panel-border)", background: "rgba(255,255,255,0.04)", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}
+          >
+            <ArrowLeft size={14} /> Mapa
+          </button>
+          <div className="text-[0.7rem] uppercase tracking-[0.32em]" style={{ color: "var(--accent)", fontFamily: "var(--font-mono)" }}>
+            ● MISJA 09 · DIAGNOSTYKA · ZWARCIE DO MASY
+          </div>
+          <div className="text-[0.72rem] uppercase tracking-[0.22em]" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
+            {done ? "Ukończone" : `Krok ${currentIdx + 1} / 3`}
+          </div>
+        </div>
+        {/* Work order */}
+        <div
+          className="flex flex-wrap items-center gap-x-5 gap-y-1.5 rounded-[var(--radius-sm)] border px-4 py-2.5"
+          style={{ background: "rgba(20,28,48,0.55)", borderColor: "var(--panel-border)", borderLeft: "3px solid var(--danger)", backdropFilter: "var(--blur)", fontFamily: "var(--font-mono)" }}
+        >
+          <span className="text-[0.62rem] uppercase tracking-[0.28em]" style={{ color: "var(--danger)" }}>● PILNE</span>
+          <span className="text-[0.7rem]" style={{ color: "var(--text)" }}>Zlecenie <strong style={{ color: "var(--accent)" }}>ZS-41726</strong></span>
+          <span className="text-[0.7rem]" style={{ color: "var(--text-muted)" }}>klient: Pralnia „Mydlana Bania"</span>
+          <span className="text-[0.68rem]" style={{ color: "var(--text-muted)" }}>ul. Wolska 88 · Warszawa</span>
+          <span className="hidden xl:inline text-[0.68rem] italic" style={{ color: "var(--text-faint)", fontFamily: "var(--font-body)" }}>
+            „Silnik bębna wybija różnicówkę. Klient: „od rana 5 razy."
+          </span>
+        </div>
+      </header>
+
+      {/* LAYOUT 70/30 */}
+      <div className="relative z-10 mx-auto grid w-full max-w-[1600px] grid-cols-1 gap-5 px-4 pb-10 lg:grid-cols-[minmax(0,1fr)_380px]">
+        {/* WORKSPACE */}
+        <div
+          ref={containerRef}
+          className="relative overflow-hidden rounded-[var(--radius)] border"
+          style={{
+            background: "radial-gradient(ellipse 80% 60% at 50% 40%, #142036 0%, #0c1322 60%, #050811 100%)",
+            borderColor: "var(--panel-border)",
+            minHeight: 680,
+            boxShadow: "var(--shadow)",
+          }}
+        >
+          {/* Grid bg */}
+          <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.08]"
+            style={{ backgroundImage: "repeating-linear-gradient(0deg, rgba(120,170,230,0.45) 0 1px, transparent 1px 28px), repeating-linear-gradient(90deg, rgba(120,170,230,0.45) 0 1px, transparent 1px 28px)" }} />
+
+          <svg viewBox="0 0 800 680" className="absolute inset-0 h-full w-full" preserveAspectRatio="xMidYMid meet">
+            <defs>
+              <linearGradient id="motor-body" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#5a6b80" />
+                <stop offset="100%" stopColor="#2a3445" />
+              </linearGradient>
+              <linearGradient id="terminal-block" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#e8d8b2" />
+                <stop offset="100%" stopColor="#a89875" />
+              </linearGradient>
+            </defs>
+
+            {/* SILNIK — z boku, korpus */}
+            <g>
+              <ellipse cx="400" cy="500" rx="280" ry="50" 
