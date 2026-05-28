@@ -1,0 +1,139 @@
+Teraz tworzę pojedyncze komponenty zadań i TaskEngine.
+Action: file_editor create /app/frontend/src/components/tasks/LOTOSequence.jsx --file-text "import React, { useMemo, useState, useEffect } from \"react\";
+import { motion } from \"framer-motion\";
+import { GripVertical, CheckCircle2, ArrowDownUp } from \"lucide-react\";
+import PrimaryButton from \"../core/PrimaryButton\";
+
+/**
+ * LOTOSequence — drag-and-drop reorder task.
+ * Props:
+ *   payload.correctOrder: string[]   - the canonical order
+ *   onResult(passed: boolean, mistake?: {key, explanation})
+ *   resetKey: number — bump to force re-shuffle
+ */
+const shuffleArr = (arr, seed = 1) => {
+  const a = [...arr];
+  // Deterministic-ish shuffle so 2x same arr gives stable initial
+  let m = a.length, t, i;
+  let r = seed * 9301 + 49297;
+  while (m) {
+    r = (r * 9301 + 49297) % 233280;
+    i = Math.floor((r / 233280) * m--);
+    t = a[m]; a[m] = a[i]; a[i] = t;
+  }
+  return a;
+};
+
+export const LOTOSequence = ({ payload, onResult, hint, resetKey = 0 }) => {
+  const { correctOrder } = payload;
+  const [items, setItems] = useState(() =>
+    shuffleArr(correctOrder.map((t, i) => ({ id: `s-${i}`, text: t, correctIdx: i })), resetKey + 7)
+  );
+  const [dragId, setDragId] = useState(null);
+  const [submitted, setSubmitted] = useState(false);
+
+  useEffect(() => {
+    setItems(shuffleArr(correctOrder.map((t, i) => ({ id: `s-${i}`, text: t, correctIdx: i })), resetKey + 7));
+    setSubmitted(false);
+  }, [resetKey, correctOrder]);
+
+  const handleDragStart = (id) => setDragId(id);
+  const handleDragOver = (e, overId) => {
+    e.preventDefault();
+    if (!dragId || dragId === overId) return;
+    setItems((cur) => {
+      const from = cur.findIndex((x) => x.id === dragId);
+      const to = cur.findIndex((x) => x.id === overId);
+      if (from < 0 || to < 0) return cur;
+      const next = [...cur];
+      const [m] = next.splice(from, 1);
+      next.splice(to, 0, m);
+      return next;
+    });
+  };
+  const handleDrop = (e) => { e.preventDefault(); setDragId(null); };
+
+  const moveUp = (i) => {
+    if (i === 0) return;
+    setItems((cur) => { const n = [...cur]; [n[i - 1], n[i]] = [n[i], n[i - 1]]; return n; });
+  };
+  const moveDown = (i) => {
+    if (i === items.length - 1) return;
+    setItems((cur) => { const n = [...cur]; [n[i + 1], n[i]] = [n[i], n[i + 1]]; return n; });
+  };
+
+  const submit = () => {
+    setSubmitted(true);
+    const correct = items.every((x, idx) => x.correctIdx === idx);
+    if (correct) onResult(true);
+    else {
+      const firstWrong = items.findIndex((x, idx) => x.correctIdx !== idx);
+      const wrongItem = items[firstWrong];
+      onResult(false, {
+        key: `loto-order-${wrongItem?.correctIdx}-at-${firstWrong}`,
+        explanation:
+          `Krok „${wrongItem?.text}” jest w złym miejscu (powinien być nr ${wrongItem?.correctIdx + 1}, jest nr ${firstWrong + 1}). ` +
+          `W LOTO kolejność nie jest dekoracją — to procedura, która ratuje życie. ` +
+          `Zasada: ODŁĄCZ → ZABLOKUJ → POINFORMUJ → SPRAWDŹ → UZIEM (przy wysokich napięciach). Każdy z tych kroków ma sens fizyczny.`,
+      });
+    }
+  };
+
+  return (
+    <div className=\"space-y-3\" data-testid=\"loto-sequence\">
+      <div className=\"flex items-start gap-2 text-xs\" style={{ color: \"var(--text-low)\" }}>
+        <ArrowDownUp size={14} className=\"mt-0.5 flex-shrink-0\" />
+        <span>Przeciągnij kroki w prawidłową kolejność BHP. Kolejność MA znaczenie — to nie ozdoba.</span>
+      </div>
+      <ol className=\"space-y-2\">
+        {items.map((it, idx) => {
+          const isCorrectPos = submitted && it.correctIdx === idx;
+          const isWrongPos = submitted && it.correctIdx !== idx;
+          return (
+            <motion.li
+              key={it.id}
+              layout
+              draggable={!submitted}
+              onDragStart={() => handleDragStart(it.id)}
+              onDragOver={(e) => handleDragOver(e, it.id)}
+              onDrop={handleDrop}
+              className={`loto-step ${dragId === it.id ? \"dragging\" : \"\"} ${isCorrectPos ? \"locked-correct\" : \"\"}`}
+              style={isWrongPos ? { borderColor: \"var(--danger)\", background: \"rgba(255,90,95,0.06)\" } : undefined}
+              data-testid={`loto-item-${idx}`}
+            >
+              <GripVertical size={16} style={{ color: \"var(--text-low)\" }} />
+              <span className=\"font-display text-sm\" style={{ color: \"var(--accent)\" }}>{String(idx + 1).padStart(2, \"0\")}</span>
+              <span className=\"flex-1 text-sm\">{it.text}</span>
+              {isCorrectPos && <CheckCircle2 size={16} style={{ color: \"var(--success)\" }} />}
+              {!submitted && (
+                <div className=\"flex flex-col gap-1 ml-2\">
+                  <button
+                    onClick={() => moveUp(idx)}
+                    className=\"text-xs leading-none px-1.5 py-0.5 rounded\"
+                    style={{ background: \"var(--bg-deep)\", color: \"var(--text-mid)\" }}
+                    data-testid={`loto-up-${idx}`}
+                    aria-label=\"Up\"
+                  >▲</button>
+                  <button
+                    onClick={() => moveDown(idx)}
+                    className=\"text-xs leading-none px-1.5 py-0.5 rounded\"
+                    style={{ background: \"var(--bg-deep)\", color: \"var(--text-mid)\" }}
+                    data-testid={`loto-down-${idx}`}
+                    aria-label=\"Down\"
+                  >▼</button>
+                </div>
+              )}
+            </motion.li>
+          );
+        })}
+      </ol>
+      {!submitted && (
+        <PrimaryButton onClick={submit} data-testid=\"loto-submit-btn\">Zatwierdź kolejność</PrimaryButton>
+      )}
+    </div>
+  );
+};
+
+export default LOTOSequence;
+"
+Observation: Create successful: /app/frontend/src/components/tasks/LOTOSequence.jsx
