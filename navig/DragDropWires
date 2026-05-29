@@ -1,0 +1,160 @@
+
+Action: file_editor create /app/frontend/src/components/tasks/DragDropWires.jsx --file-text "import React, { useState, useEffect } from \"react\";
+import { motion } from \"framer-motion\";
+import { Cable, CheckCircle2 } from \"lucide-react\";
+import PrimaryButton from \"../core/PrimaryButton\";
+
+/**
+ * DragDropWires — drag colored wire chips onto terminal slots.
+ * payload: { wires: [{id, phase, label}], terminals: [{id, label, expects}], explainOnMistake }
+ */
+export const DragDropWires = ({ payload, onResult, hint, resetKey = 0 }) => {
+  const { wires, terminals, explainOnMistake } = payload;
+  const [placement, setPlacement] = useState({}); // wireId -> terminalId
+  const [dragging, setDragging] = useState(null);
+  const [dropTarget, setDropTarget] = useState(null);
+  const [submitted, setSubmitted] = useState(false);
+
+  useEffect(() => { setPlacement({}); setSubmitted(false); }, [resetKey]);
+
+  const placedWires = Object.keys(placement);
+  const filledTerminals = Object.values(placement);
+
+  const onDragStart = (e, wireId) => {
+    if (placedWires.includes(wireId)) { e.preventDefault(); return; }
+    setDragging(wireId);
+    try { e.dataTransfer.setData(\"text/plain\", wireId); e.dataTransfer.effectAllowed = \"move\"; } catch {}
+  };
+  const onDragOver = (e, terminalId) => {
+    e.preventDefault();
+    if (filledTerminals.includes(terminalId)) return;
+    setDropTarget(terminalId);
+  };
+  const onDragLeave = () => setDropTarget(null);
+  const onDrop = (e, terminalId) => {
+    e.preventDefault();
+    const wireId = e.dataTransfer.getData(\"text/plain\") || dragging;
+    if (!wireId || filledTerminals.includes(terminalId) || placedWires.includes(wireId)) return;
+    setPlacement((cur) => ({ ...cur, [wireId]: terminalId }));
+    setDragging(null);
+    setDropTarget(null);
+  };
+  const reset = () => setPlacement({});
+
+  const submit = () => {
+    setSubmitted(true);
+    const wrongs = [];
+    for (const t of terminals) {
+      const wireId = Object.keys(placement).find((wid) => placement[wid] === t.id);
+      if (!wireId) { wrongs.push({ terminal: t, wire: null }); continue; }
+      const w = wires.find((x) => x.id === wireId);
+      if (w.phase !== t.expects) wrongs.push({ terminal: t, wire: w });
+    }
+    if (wrongs.length === 0) onResult(true);
+    else {
+      const first = wrongs[0];
+      const detail = first.wire
+        ? `Na zacisku ${first.terminal.label} powinno być ${first.terminal.expects}, a podpiąłeś ${first.wire.phase} (${first.wire.label}).`
+        : `Zacisk ${first.terminal.label} jest pusty — wymaga ${first.terminal.expects}.`;
+      onResult(false, {
+        key: `wires-${first.terminal.id}-${first.wire?.phase || \"empty\"}`,
+        explanation: `${detail} ${explainOnMistake || \"\"}`,
+      });
+    }
+  };
+
+  const allPlaced = placedWires.length === wires.length;
+
+  return (
+    <div className=\"space-y-5\" data-testid=\"dragdrop-wires\">
+      <div className=\"flex items-start gap-2 text-xs\" style={{ color: \"var(--text-low)\" }}>
+        <Cable size={14} className=\"mt-0.5 flex-shrink-0\" />
+        <span>Przeciągnij każdy przewód na właściwy zacisk. Pomyłka = łuk, kierunek odwrotny, porażenie.</span>
+      </div>
+
+      {/* Schematic mock */}
+      <div
+        className=\"relative rounded-md p-6 schem-grid\"
+        style={{ background: \"rgba(2, 8, 15, 0.85)\", border: \"1px solid var(--border-soft)\", minHeight: 220 }}
+      >
+        <div className=\"text-xs font-display tracking-widest mb-3\" style={{ color: \"var(--text-low)\" }}>
+          ⏚ SKRZYNKA ZACISKOWA
+        </div>
+        <div className=\"flex flex-wrap gap-3 md:gap-4 justify-center\">
+          {terminals.map((t) => {
+            const wireId = Object.keys(placement).find((wid) => placement[wid] === t.id);
+            const w = wireId ? wires.find((x) => x.id === wireId) : null;
+            const isCorrect = submitted && w && w.phase === t.expects;
+            const isWrong = submitted && (!w || w.phase !== t.expects);
+            return (
+              <div
+                key={t.id}
+                onDragOver={(e) => onDragOver(e, t.id)}
+                onDragLeave={onDragLeave}
+                onDrop={(e) => onDrop(e, t.id)}
+                className={`relative flex flex-col items-center justify-center rounded-md transition-all duration-150 ${
+                  dropTarget === t.id ? \"drop-active\" : \"\"
+                } ${isCorrect ? \"drop-correct\" : \"\"} ${isWrong ? \"drop-error\" : \"\"}`}
+                style={{
+                  width: 110, height: 100,
+                  background: \"rgba(15, 28, 51, 0.6)\",
+                  border: \"1px solid var(--border-soft)\",
+                }}
+                data-testid={`terminal-${t.id}`}
+              >
+                <div className=\"font-display text-lg tracking-widest\" style={{ color: \"var(--text-hi)\" }}>{t.label}</div>
+                {w ? (
+                  <motion.div
+                    initial={{ scale: 0.5, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className={`mt-1 px-2 py-0.5 rounded-sm text-[10px] font-display tracking-widest phase-${w.phase}`}
+                  >
+                    {w.phase} • {w.label}
+                  </motion.div>
+                ) : (
+                  <div className=\"text-[10px] mt-1\" style={{ color: \"var(--text-low)\" }}>
+                    ↓ upuść tu
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Wire palette */}
+      <div className=\"flex flex-wrap gap-2\">
+        {wires.map((w) => {
+          const placed = placedWires.includes(w.id);
+          return (
+            <div
+              key={w.id}
+              draggable={!placed && !submitted}
+              onDragStart={(e) => onDragStart(e, w.id)}
+              className={`wire-chip px-3 py-2 rounded-sm font-display text-xs tracking-widest phase-${w.phase} ${placed ? \"placed\" : \"\"}`}
+              data-testid={`wire-${w.id}`}
+            >
+              {placed ? <CheckCircle2 size={12} className=\"inline mr-1\" /> : null}
+              {w.phase} • {w.label}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className=\"flex gap-2\">
+        {!submitted && (
+          <>
+            <PrimaryButton onClick={submit} disabled={!allPlaced} data-testid=\"wires-submit\">
+              Zatwierdź podpięcie
+            </PrimaryButton>
+            <PrimaryButton variant=\"ghost\" onClick={reset} disabled={placedWires.length === 0} data-testid=\"wires-reset\">
+              Wyczyść
+            </PrimaryButton>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default DragDropWires;
