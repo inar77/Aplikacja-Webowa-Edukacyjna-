@@ -1,0 +1,114 @@
+
+import { motion } from \"framer-motion\";
+import { Trophy, Clock, Target, Zap } from \"lucide-react\";
+import PrimaryButton from \"../core/PrimaryButton\";
+
+const formatDuration = (ms) => {
+  const total = Math.floor(ms / 1000);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${String(s).padStart(2, \"0\")}`;
+};
+
+/**
+ * MissionComplete — summary screen with time vs expected, mistakes, speedrun badge.
+ */
+export const MissionComplete = ({ mission, durationMs, mistakeCount, mistakeLog = [], onBackToMap, onRetry }) => {
+  const expectedMs = (mission.expectedTimeMin || 10) * 60 * 1000;
+  const ratio = durationMs / expectedMs;
+  const grade =
+    mistakeCount === 0 && ratio < 0.7 ? \"MISTRZ\" :
+    mistakeCount === 0 && ratio < 1.2 ? \"FACHOWIEC\" :
+    mistakeCount <= 2 ? \"UCZEŃ Z POTENCJAŁEM\" : \"OBEJRZYJ POWTÓRKĘ\";
+  const xp = Math.max(20, 200 - mistakeCount * 30 - Math.max(0, Math.floor((ratio - 1) * 50)));
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.96 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.5 }}
+      className=\"max-w-2xl mx-auto p-8 glass rounded-md\"
+      style={{ borderColor: \"var(--success)\", borderWidth: 1 }}
+      data-testid=\"mission-complete\"
+    >
+      <div className=\"flex items-center gap-3 mb-6\">
+        <Trophy size={36} style={{ color: \"var(--success)\" }} />
+        <div>
+          <div className=\"font-display text-2xl tracking-widest\" style={{ color: \"var(--success)\" }}>
+            MISJA UKOŃCZONA
+          </div>
+          <div className=\"text-sm\" style={{ color: \"var(--text-mid)\" }}>
+            {mission.subject}
+          </div>
+        </div>
+      </div>
+
+      <div className=\"grid grid-cols-1 md:grid-cols-3 gap-4 mb-6\">
+        <div className=\"p-4 rounded-md\" style={{ background: \"rgba(2,5,11,0.5)\", border: \"1px solid var(--border-soft)\" }}>
+          <div className=\"flex items-center gap-2 mb-2\">
+            <Clock size={16} style={{ color: \"var(--accent)\" }} />
+            <span className=\"text-xs font-display tracking-widest\" style={{ color: \"var(--text-low)\" }}>CZAS</span>
+          </div>
+          <div className=\"font-display text-2xl\" style={{ color: \"var(--text-hi)\" }}>{formatDuration(durationMs)}</div>
+          <div className=\"text-xs mt-1\" style={{ color: \"var(--text-low)\" }}>
+            Doświadczony elektryk: ~{mission.expectedTimeMin} min
+          </div>
+        </div>
+
+        <div className=\"p-4 rounded-md\" style={{ background: \"rgba(2,5,11,0.5)\", border: \"1px solid var(--border-soft)\" }}>
+          <div className=\"flex items-center gap-2 mb-2\">
+            <Target size={16} style={{ color: \"var(--accent)\" }} />
+            <span className=\"text-xs font-display tracking-widest\" style={{ color: \"var(--text-low)\" }}>POMYŁKI</span>
+          </div>
+          <div className=\"font-display text-2xl\" style={{ color: mistakeCount === 0 ? \"var(--success)\" : \"var(--warning)\" }}>
+            {mistakeCount}
+          </div>
+          <div className=\"text-xs mt-1\" style={{ color: \"var(--text-low)\" }}>
+            {mistakeCount === 0 ? \"Bez błędu — czysto.\" : \"Każdy błąd to lekcja.\"}
+          </div>
+        </div>
+
+        <div className=\"p-4 rounded-md\" style={{ background: \"rgba(2,5,11,0.5)\", border: \"1px solid var(--border-soft)\" }}>
+          <div className=\"flex items-center gap-2 mb-2\">
+            <Zap size={16} style={{ color: \"var(--accent)\" }} />
+            <span className=\"text-xs font-display tracking-widest\" style={{ color: \"var(--text-low)\" }}>OCENA</span>
+          </div>
+          <div className=\"font-display text-xl\" style={{ color: \"var(--accent)\" }}>{grade}</div>
+          <div className=\"text-xs mt-1\" style={{ color: \"var(--text-low)\" }}>+{xp} XP</div>
+        </div>
+      </div>
+
+      {ratio < 0.7 && mistakeCount === 0 && (
+        <div className=\"p-3 mb-5 rounded-md text-sm\" style={{ background: \"rgba(244,161,61,0.08)\", border: \"1px solid var(--border-mid)\", color: \"var(--accent)\" }}>
+         SPEEDRUN BADGE odblokowany. Wykonałeś szybciej niż doświadczony fachowiec.
+        </div>
+      )}
+
+      {mistakeLog.length > 0 && (
+        <div className=\"mb-5\">
+          <div className=\"text-xs font-display tracking-widest mb-2\" style={{ color: \"var(--text-mid)\" }}>
+            CZEGO SIĘ NAUCZYŁEŚ
+          </div>
+          <ul className=\"space-y-1 text-xs\" style={{ color: \"var(--text-low)\" }}>
+            {mistakeLog.slice(0, 5).map((m, i) => (
+              <li key={i}>· {m}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className=\"flex gap-3\">
+        <PrimaryButton onClick={onBackToMap} variant=\"ghost\" data-testid=\"back-to-map-btn\">
+          ← Mapa
+        </PrimaryButton>
+        <PrimaryButton onClick={onRetry} data-testid=\"retry-mission-btn\">
+          Powtórz misję
+        </PrimaryButton>
+      </div>
+    </motion.div>
+  );
+};
+
+export default MissionComplete;
+"
+Observation: Create successful: /app/frontend/src/components/tasks/MissionComplete.jsx
