@@ -1,0 +1,3795 @@
+'use client';
+import { CareerProvider } from "../Tasks/CareerSystem";
+import React, { useState , useEffect, useMemo} from 'react';
+import { DistributionBoxTask } from "../Tasks/CareerSystem";
+import AssessmentQuiz  from '../Recommendation/quiz';
+import RecommendationResults from '../Recommendation/Results';
+import TasksSystem from '@/components/Tasks/TasksSystem';
+import { motion} from 'framer-motion'
+import { CareerRoadmapView } from "../Tasks/CareerSystem";
+import CareerPathCard from '../Recommendation/CareerPathCard';
+import { AppProvider} from '@/app/contexts/AppContext';
+import { useApp } from '@/app/contexts/AppContext';
+import ScenarioEngine from '../InteractiveAssessment/ScenarioEngine';
+import BoardGame from "@/components/board/BoardGame";
+import RecommendationsHeroPremium from '../Recommendation/RecommendationsHeroPremium';
+import CareerPathCardPremium from '../Recommendation/CareerPathCardPremium'; 
+import { useRouter } from 'next/navigation';
+import LearningSystem from '@/components/ContextualLearningSystem';
+import { TaskPersonalizer } from '@/utils/TaskPersonalizer';
+import { PersonalizationProvider } from 'app/contexts/PersonalizationContext';
+import  { CareerDefinition } from 'components/core/types';
+import  { SceneState, SceneEvent } from 'components/core/SceneMachine';
+import CareerPathDetails from '../Recommendation/CareerPathDetails';
+import WorkshopIntegrityPanel from '../Learning/WorkshopIntegrityPanel'
+
+import { 
+  adaptElectricianLesson, 
+  getAllElectricianLessons 
+} from '@/components/Learning/ElectricianLessonAdapter';
+import { electricianLessons } from '@/components/Learning/electrician';
+import LearningProvider from '@/app/contexts/LearningContext';
+import CognitiveGamesSystem from '@/components/SmartRecommendation/CognitiveGamesSystem';
+import SmartRecommendationSystem from '@/components/SmartRecommendation/SmartRecommendationSystem';
+import LearningPreviewPanel from "../Tasks/LearningPreviewPanel";
+import LessonsVieww from '../Learning/bottom';
+
+import CareerMap from '@/components/navig/CareerMap';
+import MultimeterTrainingScene from 'components/navig/scenes/MultimeterTrainingScene'; 
+// import QuizScene from './scenes/QuizScene';
+
+
+
+import LiveCrewFeed from '../social/LiveCrewFeed';
+
+<LiveCrewFeed running/>
+
+const mockCareer = {
+  icon: '⚡',
+  learningMetaphor: {
+    workplaceNoun: 'Stanowisko',
+    taskNoun: 'Misja',
+  },
+  theme: {
+    system: {
+      accent: '#8b5cf6',
+      success: '#10b981',
+      danger: '#ef4444',
+    },
+  },
+  toolSet: [
+    {
+      id: 'pliers',
+      name: 'Szczypce',
+      icon: '🔧',
+      description: 'Podstawowe narzędzie',
+      hotkey: '1',
+    },
+    {
+      id: 'meter',
+      name: 'Miernik',
+      icon: '📟',
+      description: 'Pomiar napięcia',
+      hotkey: '2',
+    },
+    {
+      id: 'cable',
+      name: 'Przewód',
+      icon: '🧵',
+      description: 'Łączenie obwodu',
+      hotkey: '3',
+    },
+  ],
+};
+
+const mockSceneState = {
+  phase: 'task_active',
+  score: 120,
+  errors: 1,
+  missionPanelExpanded: true,
+  completedSteps: ['step-1'],
+  selectedTool: null,
+  currentTask: {
+    title: 'Podłącz przewód do właściwego zacisku',
+    steps: [
+      {
+        id: 'step-1',
+        instruction: 'Załóż rękawice ochronne.',
+        hint: 'Bezpieczeństwo najpierw.',
+      },
+      {
+        id: 'step-2',
+        instruction: 'Wybierz odpowiedni przewód.',
+        hint: 'Zwróć uwagę na kolor i oznaczenie.',
+      },
+      {
+        id: 'step-3',
+        instruction: 'Podłącz kabel do zacisku L.',
+        hint: 'Sprawdź oznaczenie na panelu.',
+      },
+    ],
+  },
+  environment: {
+    safetyGearEquipped: false,
+  },
+};
+
+const mockSend = (event) => {
+  if (event.type === 'TOGGLE_MISSION_PANEL') {
+    setHudState(prev => ({ ...prev, missionPanelExpanded: !prev.missionPanelExpanded }));
+  }
+  if (event.type === 'SELECT_TOOL') {
+    setHudState(prev => ({ ...prev, selectedTool: event.toolId }));
+  }
+};
+
+export default function PathfinderApp() {
+   
+  const {user, setUser } = useApp();
+  const [activeSection, setActiveSection] = useState('dashboard');
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [notification, setNotification] = useState(null);
+   
+  const styles = {
+    
+    app: {
+  minHeight: '100vh',
+  backgroundColor: '#f5f5f5',
+  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+  position: 'relative'
+},
+    header: {
+      backgroundColor: 'white',
+      borderBottom: '1px solid #e5e7eb',
+      padding: '16px 24px',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      position: 'sticky',
+      top: 0,
+      zIndex: 100
+    },
+    headerLeft: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px'
+    },
+    hamburger: {
+      background: 'none',
+      border: 'none',
+      fontSize: '24px',
+      cursor: 'pointer',
+      padding: '8px'
+    },
+    logo: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      fontSize: '24px',
+      fontWeight: 'bold',
+      color: '#7c3aed'
+    },
+    headerRight: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '20px'
+    },
+    statBadge: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px',
+      padding: '8px 12px',
+      backgroundColor: '#f9fafb',
+      borderRadius: '20px',
+      fontSize: '14px',
+      fontWeight: '500'
+    },
+    avatar: {
+      width: '40px',
+      height: '40px',
+      borderRadius: '50%',
+      background: 'linear-gradient(135deg, #7c3aed 0%, #ec4899 100%)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      color: 'white',
+      fontWeight: 'bold',
+      fontSize: '16px'
+    },
+    mainLayout: {
+      
+      display: 'flex',
+      maxWidth: '1400px',
+      margin: '0 auto'
+    },
+    sidebar: {
+      width: '280px',
+      backgroundColor: 'white',
+      padding: '24px',
+      minHeight: 'calc(100vh - 73px)',
+      borderRight: '1px solid #e5e7eb'
+    },
+    progressCard: {
+      padding: '20px',
+      background: 'linear-gradient(135deg, #faf5ff 0%, #fce7f3 100%)',
+      borderRadius: '12px',
+      marginBottom: '24px'
+    },
+    progressHeader: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      fontSize: '14px',
+      marginBottom: '8px',
+      color: '#6b7280',
+      fontWeight: '500'
+    },
+    progressBar: {
+      width: '100%',
+      height: '8px',
+      backgroundColor: '#e5e7eb',
+      borderRadius: '10px',
+      overflow: 'hidden'
+    },
+    progressFill: {
+      height: '100%',
+      background: 'linear-gradient(90deg, #a855f7 0%, #ec4899 100%)',
+      borderRadius: '10px',
+      transition: 'width 0.5s ease'
+    },
+    nav: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '4px'
+    },
+    navButton: {
+      backgroundColor: 'transparent',
+      border: 'none',
+      padding: '12px 14px',
+      borderRadius: '8px',
+      cursor: 'pointer',
+      fontSize: '15px',
+      textAlign: 'left',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      transition: 'all 0.2s',
+      color: '#374151'
+    },
+    navButtonActive: {
+      backgroundColor: '#7c3aed',
+      color: 'white'
+    },
+    badge: {
+      backgroundColor: '#fbbf24',
+      color: '#78350f',
+      padding: '2px 8px',
+      borderRadius: '12px',
+      fontSize: '12px',
+      fontWeight: 'bold',
+      minWidth: '24px',
+      textAlign: 'center'
+    },
+    badgeGreen: {
+      backgroundColor: '#10b981',
+      color: 'white'
+    },
+    content: {
+      flex: 1,
+      padding: '32px'
+    }
+};
+  
+
+  useEffect(() => {
+    const onNav = (e) =>{
+      const  { section, lessonId} = e.detail || {};
+      if ( section) setActiveSection(section);
+      if(lessonId) {
+        window.dispatchEvent(new CustomEvent('openLesson' , {detail: {lessonId } }));
+
+      }
+    };
+    window.addEventListener('navigate' , onNav);
+    return () => window.removeEventListener('navigate' ,onNav);
+
+  }, []);
+  
+    // ✅ I TEN useEffect:
+  useEffect(() => {
+    const handleNotification = (e) => {
+      setNotification(e.detail);
+      setTimeout(() => setNotification(null), e.detail.duration || 3000);
+    };
+
+    window.addEventListener('showNotification', handleNotification);
+    return () => window.removeEventListener('showNotification', handleNotification);
+  }, []);
+
+  return (
+    
+    <div style={styles.app}>
+      {/* Notyfikacja toast */}
+      {notification && (
+        <div style={{
+          
+          position: 'fixed',
+          top: '80px',
+          right: '20px',
+          backgroundColor: notification.type === 'success' ? '#10b981' : '#ef4444',
+          color: 'white',
+          padding: '16px 24px',
+          borderRadius: '12px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          zIndex: 1000,
+          maxWidth: '400px'
+        }}>
+          {notification.message}
+        </div>
+      )}
+ 
+      {/* HEADER */}
+          
+      <header style={styles.header}>
+        <div style={styles.headerLeft}>
+          <button 
+            onClick={() => setSidebarOpen(!sidebarOpen)} 
+            style={styles.hamburger}
+          >
+            ☰
+          </button>
+          <div style={styles.logo}>
+            🚀 <span>PathFinder</span>
+          </div>
+        </div>
+
+        <div style={styles.headerRight}>
+          <div style={styles.statBadge}>
+            🔥 {user.streak} dni
+          </div>
+          <div style={styles.statBadge}>
+            ⭐ {user.xp} XP
+          </div>
+          <div style={styles.statBadge}>
+            💰 {user.coins}
+          </div>
+          <div style={styles.statBadge}>
+            ❤️ {user.hearts}
+          </div>
+          <div style={styles.avatar}>P</div>
+          <span style={{ fontSize: '14px', color: '#6b7280' }}>PathFinder</span>
+        </div>
+      </header>
+
+      <div style={styles.mainLayout}>
+        {/* SIDEBAR */}
+        {sidebarOpen && (
+          <aside style={styles.sidebar}>
+            <div style={styles.progressCard}>
+              <div style={styles.progressHeader}>
+                <span>Poziom {user.level}</span>
+                <span>{user.xp}/{user.xpToNext} XP</span>
+              </div>
+              <div style={styles.progressBar}>
+                <div 
+                  style={{
+                    ...styles.progressFill,
+                    width: `${(user.xp / user.xpToNext) * 100}%`
+                  }}
+                />
+              </div>
+            </div>
+
+            <nav style={styles.nav}>
+              <button
+                onClick={() => setActiveSection('dashboard')}
+                style={{
+                  ...styles.navButton,
+                  ...(activeSection === 'dashboard' ? styles.navButtonActive : {})
+                }}
+              >
+                <span>🏠 Dashboard</span>
+              </button>
+
+              <button
+                onClick={() => setActiveSection('career')}
+                style={{
+                  ...styles.navButton,
+                  ...(activeSection === 'career' ? styles.navButtonActive : {})
+                }}
+              >
+                
+                <span>🎯 Kariera</span>
+                <span style={{ ...styles.badge, ...styles.badgeGreen }}>START</span>
+              </button>
+
+              <button
+                onClick={() => setActiveSection('discovery')}
+                style={{
+                  ...styles.navButton,
+                  ...(activeSection === 'discovery' ? styles.navButtonActive : {}),
+                  background: activeSection === 'discovery' ? 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' : undefined
+                }}
+              >
+                <span>🔮 Odkrywaj</span>
+                <span style={{ ...styles.badge, backgroundColor: '#8b5cf6', color: 'white' }}>NEW</span>
+              </button>
+
+              <button
+                onClick={() => setActiveSection('lessons')}
+                style={{
+                  ...styles.navButton,
+                  ...(activeSection === 'lessons' ? styles.navButtonActive : {})
+                }}
+              >
+                <span>📚 Lekcje</span>
+                <span style={styles.badge}>3</span>
+              </button>
+
+              <button
+                onClick={() => setActiveSection('training')}
+                style={{
+                  ...styles.navButton,
+                  ...(activeSection === 'training' ? styles.navButtonActive : {}),
+                  background: activeSection === 'training' ? 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)' : undefined
+                }}
+              >
+                <span>🎮 Gry mózgu</span>
+                <span style={{ ...styles.badge, backgroundColor: '#8b5cf6', color: 'white' }}>FUN</span>
+              </button>
+
+              <button
+                onClick={() => setActiveSection('challenges')}
+                style={{
+                  ...styles.navButton,
+                  ...(activeSection === 'challenges' ? styles.navButtonActive : {})
+                }}
+              >
+                <span>🏆 Wyzwania</span>
+              </button>
+
+              <button
+                onClick={() => setActiveSection('achievements')}
+                style={{
+                  ...styles.navButton,
+                  ...(activeSection === 'achievements' ? styles.navButtonActive : {})
+                }}
+              >
+                <span>🏅 Osiągnięcia</span>
+              </button>
+
+              <button
+                onClick={() => setActiveSection('shop')}
+                style={{
+                  ...styles.navButton,
+                  ...(activeSection === 'shop' ? styles.navButtonActive : {})
+                }}
+              >
+                <span>📦 Sklep</span>
+              </button>
+
+              <button
+                onClick={() => setActiveSection('friends')}
+                style={{
+                  ...styles.navButton,
+                  ...(activeSection === 'friends' ? styles.navButtonActive : {})
+                }}
+              >
+                <span>👥 Znajomi</span>
+                <span style={styles.badge}>5</span>
+              </button>
+
+              <button
+                onClick={() => setActiveSection('settings')}
+                style={{
+                  ...styles.navButton,
+                  ...(activeSection === 'settings' ? styles.navButtonActive : {})
+                }}
+              >
+                <span>⚙️ Ustawienia</span>
+              </button>
+            </nav>
+          </aside>
+        )}
+
+        {/* MAIN CONTENT */}
+       {/* MAIN CONTENT */}
+       
+<main style={styles.content}>         
+  {activeSection === 'dashboard' && <DashboardView />}
+  {activeSection === 'career' && <CareerView />}
+  {activeSection === 'career' && <ScenarioEngine />}
+  
+  {activeSection === 'discovery' && (
+    <SmartRecommendationSystem 
+      onStartMinigame={(type, data) => console.log('Minigame:', type, data)}
+      onOpenLesson={(lessonId) => console.log('Lesson:', lessonId)}
+    />
+  )}
+    
+  {activeSection === 'achievements' && <AchievementsView />}
+   {activeSection === 'career-map' && <BoardGame />}
+   {activeSection === 'lessons' && <LessonsVieww />}
+  {activeSection === 'lesson-detail' && <LessonDetailView />}
+  {activeSection === 'shop' && <ShopView user={user} setUser={setUser} />}
+  {activeSection === 'friends' && <FriendsView />}
+  {activeSection === 'settings' && <SettingsView />}
+  {activeSection === 'training' && (
+    <CognitiveGamesSystem 
+      onSessionComplete={(session) => {
+        console.log('Session complete:', session);
+       <div
+       
+      style={{
+        display: "grid",
+        gridTemplateColumns: "minmax(0, 1.55fr) minmax(0, 1fr)",
+        gap: 16,
+        marginBottom: 28,
+      }}
+    >
+      <LearningPreviewPanel onStartLesson={handleHotspotStart} />
+      <WorkshopIntegrityPanel
+        profession="electrician"
+        paused={!!selectedLesson}
+        onRepair={() => openLesson("electrical")}
+        initialIntegrity={78}
+        decayPerSecond={0.6}
+      />
+    </div>
+        // Tu można dodać XP do użytkownika
+      }}
+    />
+  )}
+  {activeSection === 'tasks' && <TasksSystem selectedCareer="electrician" 
+  onFinish={({ lessonId, earnedXP }) => {
+      // zaktualizuj user XP w kontekście i pokaż notyfikację
+      window.dispatchEvent(new CustomEvent('showNotification', { detail: { type:'success', message:`Ukończono ${lessonId} +${earnedXP} XP`, duration:3000 } }));
+      // zrób co trzeba: increase user.xp, zapisz w backendzie itp.
+    }}/>}
+</main>
+      </div>
+    </div>
+  )
+
+// ==================== DASHBOARD VIEW ====================
+// ==================== IMPROVED DASHBOARD VIEW ====================
+  const adaptedLessons = getAllElectricianLessons(electricianLessons);
+
+function DashboardView() {
+  const { user, saveAssessmentResults, resetAssessments } = useApp();
+  const [hoveredCard, setHoveredCard] = useState(null);
+  const [showQuickActions, setShowQuickActions] = useState(false);
+
+  return (
+    
+    <div style={{ display: 'grid', gap: '24px' }}>
+      {/* ========== HERO SECTION z animowanym gradientem ========== */}
+      <div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+        style={{
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          color: 'white',
+          padding: '48px 40px',
+          borderRadius: '24px',
+          position: 'relative',
+          overflow: 'hidden',
+          boxShadow: '0 20px 60px rgba(102, 126, 234, 0.3)'
+        }}
+      >
+        {/* Animated background particles */}
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          opacity: 0.1,
+          background: 'radial-gradient(circle at 20% 50%, white 0%, transparent 50%), radial-gradient(circle at 80% 80%, white 0%, transparent 50%)',
+          animation: 'pulse 4s ease-in-out infinite'
+        }} />
+
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <div
+            initial={{ scale: 0.8 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.2, type: 'spring' }}
+            style={{ fontSize: '64px', marginBottom: '16px' }}
+          >
+            👋
+          </div>
+          
+          <h1 style={{ 
+            fontSize: '40px', 
+            marginBottom: '12px', 
+            fontWeight: '900',
+            background: 'linear-gradient(90deg, #fff, #fde68a)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text'
+          }}>
+            Cześć, UŻYTKOWNIKU!
+          </h1>
+          
+          <p style={{ fontSize: '20px', opacity: 0.95, maxWidth: '600px', lineHeight: 1.6 }}>
+            Wymiatasz 🔥 Kontynuuj naukę, aby odblokować nowe umiejętności .
+          </p>
+
+          {/* Quick stats inline */}
+          <div style={{ 
+            display: 'flex', 
+            gap: '24px', 
+            marginTop: '24px',
+            flexWrap: 'wrap'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '24px' }}>🔥</span>
+              <div>
+                <div style={{ fontSize: '24px', fontWeight: '900' }}>{user.streak}</div>
+                <div style={{ fontSize: '12px', opacity: 0.8 }}>dni z rzędu</div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '24px' }}>⭐</span>
+              <div>
+                <div style={{ fontSize: '24px', fontWeight: '900' }}>{user.xp}</div>
+                <div style={{ fontSize: '12px', opacity: 0.8 }}>punktów XP</div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '24px' }}>🏆</span>
+              <div>
+                <div style={{ fontSize: '24px', fontWeight: '900' }}>Poziom {user.level}</div>
+                <div style={{ fontSize: '12px', opacity: 0.8 }}>
+                  {user.xp}/{user.xpToNext} do {user.level + 1}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ========== STATS GRID z hover effects ========== */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+        gap: '16px'
+      }}>
+        <StatCardEnhanced 
+          icon="📚" 
+          label="Ukończone lekcje" 
+          value="12"
+          trend="+3 w tym tygodniu"
+          color="#3b82f6"
+        />
+        <StatCardEnhanced 
+          icon="🎯" 
+          label="Aktywne wyzwania" 
+          value="3"
+          trend="2 kończą się dziś"
+          color="#ec4899"
+        />
+        <StatCardEnhanced 
+          icon="🏅" 
+          label="Osiągnięcia" 
+          value="8/24"
+          trend="33% odblokowane"
+          color="#f59e0b"
+        />
+        <StatCardEnhanced 
+          icon="⏱️" 
+          label="Czas nauki" 
+          value="47h"
+          trend="w tym miesiącu"
+          color="#10b981"
+        />
+      </div>
+
+      {/* ========== DAILY CHALLENGE - ulepszona karta ========== */}
+      <div
+        
+        style={{
+          background: 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)',
+          color: 'white',
+          padding: '40px',
+          borderRadius: '24px',
+          position: 'relative',
+          overflow: 'hidden',
+          boxShadow: '0 20px 60px rgba(168, 85, 247, 0.3)',
+          cursor: 'pointer'
+        }}
+      >
+        {/* Glow effect */}
+        <div style={{
+          position: 'absolute',
+          top: '-50%',
+          right: '-50%',
+          width: '200%',
+          height: '200%',
+          background: 'radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%)',
+          animation: 'rotate 10s linear infinite'
+        }} />
+
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'start', 
+            marginBottom: '24px',
+            flexWrap: 'wrap',
+            gap: '16px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span style={{ fontSize: '32px' }}>🎯</span>
+              <h2 style={{ fontSize: '28px', fontWeight: '900', margin: 0 }}>
+                Wyzwanie dnia
+              </h2>
+            </div>
+            
+            <div style={{
+              backgroundColor: 'rgba(255,255,255,0.25)',
+              backdropFilter: 'blur(10px)',
+              padding: '10px 20px',
+              borderRadius: '24px',
+              fontSize: '14px',
+              fontWeight: '700',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              border: '1px solid rgba(255,255,255,0.2)'
+            }}>
+              <span>⏰</span>
+              <CountdownTimer targetHours={14} targetMinutes={32} targetSeconds={15} />
+            </div>
+          </div>
+          
+          <p style={{ 
+            fontSize: '18px', 
+            marginBottom: '24px',
+            lineHeight: 1.6,
+            opacity: 0.95
+          }}>
+            Ukończ 3 lekcje z instalacji elektrycznych i zdobądź <strong>bonus 500 XP!</strong>
+          </p>
+
+          {/* Progress bar */}
+          <div style={{
+            width: '100%',
+            height: '12px',
+            backgroundColor: 'rgba(255,255,255,0.25)',
+            borderRadius: '24px',
+            marginBottom: '12px',
+            overflow: 'hidden',
+            position: 'relative'
+          }}>
+            <div 
+              initial={{ width: 0 }}
+              animate={{ width: '33%' }}
+              transition={{ duration: 1, delay: 0.5 }}
+              style={{ 
+                height: '100%', 
+                background: 'linear-gradient(90deg, #fbbf24, #fff)',
+                borderRadius: '24px',
+                boxShadow: '0 0 20px rgba(251, 191, 36, 0.5)'
+              }} 
+            />
+          </div>
+          
+          <p style={{ fontSize: '14px', marginBottom: '28px', opacity: 0.9 }}>
+            <strong>1 z 3</strong> lekcji ukończonych (33%)
+          </p>
+
+          {/* Stats grid */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: '24px',
+            marginBottom: '28px',
+            textAlign: 'center'
+          }}>
+            <div style={{
+              backgroundColor: 'rgba(255,255,255,0.15)',
+              padding: '16px',
+              borderRadius: '16px',
+              backdropFilter: 'blur(10px)'
+            }}>
+              <div style={{ fontSize: '32px', fontWeight: '900' }}>87%</div>
+              <div style={{ fontSize: '13px', opacity: 0.9 }}>sukcesu</div>
+            </div>
+            <div style={{
+              backgroundColor: 'rgba(255,255,255,0.15)',
+              padding: '16px',
+              borderRadius: '16px',
+              backdropFilter: 'blur(10px)'
+            }}>
+              <div style={{ fontSize: '32px', fontWeight: '900' }}>234</div>
+              <div style={{ fontSize: '13px', opacity: 0.9 }}>ukończyło dziś</div>
+            </div>
+            <div style={{
+              backgroundColor: 'rgba(255,255,255,0.15)',
+              padding: '16px',
+              borderRadius: '16px',
+              backdropFilter: 'blur(10px)'
+            }}>
+              <div style={{ fontSize: '32px', fontWeight: '900' }}>2x XP</div>
+              <div style={{ fontSize: '13px', opacity: 0.9 }}>bonus aktywny</div>
+            </div>
+          </div>
+
+          <button style={{
+            width: '100%',
+            padding: '16px',
+            backgroundColor: 'white',
+            color: '#a855f7',
+            border: 'none',
+            borderRadius: '16px',
+            fontSize: '16px',
+            fontWeight: '900',
+            cursor: 'pointer',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+            transition: 'all 0.3s ease',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '12px'
+          }}
+          onMouseEnter={(e) => {
+            e.target.style.transform = 'translateY(-2px)';
+            e.target.style.boxShadow = '0 12px 32px rgba(0,0,0,0.2)';
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.transform = 'translateY(0)';
+            e.target.style.boxShadow = '0 8px 24px rgba(0,0,0,0.15)';
+          }}
+          >
+            <span style={{ fontSize: '20px' }}>🚀</span>
+            KONTYNUUJ WYZWANIE
+          </button>
+        </div>
+      </div>
+
+      {/* ========== CAREER PATH CTA - ulepszona ========== */}
+      <div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4 }}
+        style={{
+          background: 'linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%)',
+          color: 'white',
+          padding: '48px',
+          borderRadius: '24px',
+          position: 'relative',
+          overflow: 'hidden',
+          boxShadow: '0 20px 60px rgba(139, 92, 246, 0.3)'
+        }}
+      >
+        {/* Animated shapes */}
+        <div style={{
+          position: 'absolute',
+          top: '-100px',
+          right: '-100px',
+          width: '300px',
+          height: '300px',
+          borderRadius: '50%',
+          background: 'rgba(255,255,255,0.1)',
+          animation: 'float 6s ease-in-out infinite'
+        }} />
+        <div style={{
+          position: 'absolute',
+          bottom: '-50px',
+          left: '-50px',
+          width: '200px',
+          height: '200px',
+          borderRadius: '50%',
+          background: 'rgba(255,255,255,0.08)',
+          animation: 'float 8s ease-in-out infinite reverse'
+        }} />
+
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
+            <span style={{ fontSize: '48px' }}>🎮</span>
+            <h2 style={{ fontSize: '32px', fontWeight: '900', margin: 0 }}>
+              Odkryj swoją ścieżkę kariery!
+            </h2>
+          </div>
+          
+          <p style={{ fontSize: '18px', marginBottom: '24px', opacity: 0.95, lineHeight: 1.6 }}>
+            Zagraj w 5 mini-gier i poznaj swoje mocne strony. <br/>
+            <strong>Spersonalizowane rekomendacje</strong> pomogą Ci wybrać idealny kierunek rozwoju.
+          </p>
+
+          <div style={{ 
+            display: 'flex', 
+            gap: '32px', 
+            marginBottom: '28px', 
+            fontSize: '15px',
+            flexWrap: 'wrap'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '24px' }}>⏱️</span>
+              <span><strong>10-15 min</strong></span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '24px' }}>💡</span>
+              <span><strong>+500 XP</strong></span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '24px' }}>🏆</span>
+              <span><strong>Odblokuj ścieżki</strong></span>
+            </div>
+          </div>
+
+          <button style={{
+            padding: '16px 32px',
+            backgroundColor: 'white',
+            color: '#8b5cf6',
+            border: 'none',
+            borderRadius: '16px',
+            fontSize: '18px',
+            fontWeight: '900',
+            cursor: 'pointer',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
+            transition: 'all 0.3s ease',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '12px'
+          }}
+          onMouseEnter={(e) => {
+            e.target.style.transform = 'translateY(-3px) scale(1.02)';
+            e.target.style.boxShadow = '0 12px 32px rgba(0,0,0,0.25)';
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.transform = 'translateY(0) scale(1)';
+            e.target.style.boxShadow = '0 8px 24px rgba(0,0,0,0.2)';
+          }}
+          >
+            <span style={{ fontSize: '24px' }}>🚀</span>
+            ROZPOCZNIJ TEST
+          </button>
+        </div>
+      </div>
+
+      {/* ========== RECENT ACTIVITY ========== */}
+      <div style={{
+        background: 'white',
+        padding: '32px',
+        borderRadius: '20px',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
+      }}>
+        <h3 style={{ fontSize: '24px', fontWeight: '900', marginBottom: '24px', color: '#1f2937' }}>
+          📊 Ostatnia aktywność
+        </h3>
+        
+        <div style={{ display: 'grid', gap: '16px' }}>
+          <ActivityItem 
+            icon="✅"
+            title="Ukończono lekcję: Instalacje elektryczne - BHP"
+            time="2 godziny temu"
+            xp="+75 XP"
+          />
+          <ActivityItem 
+            icon="🏆"
+            title="Odblokowano osiągnięcie: Tydzień nauki"
+            time="Wczoraj"
+            xp="+200 XP"
+          />
+          <ActivityItem 
+            icon="⭐"
+            title="Awans na poziom 12"
+            time="3 dni temu"
+            xp="+500 XP"
+          />
+        </div>
+      </div>
+
+      {/* Dodaj style dla animacji */}
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 0.1; }
+          50% { opacity: 0.2; }
+        }
+        @keyframes rotate {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-20px); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// ========== ENHANCED STAT CARD ========== 
+
+function StatCardEnhanced({ icon, label, value, trend, color }) {
+  const [isHovered, setIsHovered] = useState(false);
+
+  return (
+    
+    <div
+      
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      style={{
+        backgroundColor: 'white',
+        padding: '24px',
+        borderRadius: '16px',
+        boxShadow: isHovered 
+          ? `0 12px 32px ${color}33`
+          : '0 2px 8px rgba(0,0,0,0.08)',
+        cursor: 'pointer',
+        position: 'relative',
+        overflow: 'hidden',
+        transition: 'box-shadow 0.3s ease'
+      }}
+    >
+      {/* Accent bar */}
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: '4px',
+        background: `linear-gradient(90deg, ${color}, ${color}88)`,
+        transform: isHovered ? 'scaleX(1)' : 'scaleX(0)',
+        transformOrigin: 'left',
+        transition: 'transform 0.3s ease'
+      }} />
+
+      <div style={{ fontSize: '32px', marginBottom: '12px' }}>{icon}</div>
+      <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '8px', fontWeight: '600' }}>
+        {label}
+      </div>
+      <div style={{ fontSize: '28px', fontWeight: '900', color: '#1f2937', marginBottom: '4px' }}>
+        {value}
+      </div>
+      <div style={{ fontSize: '12px', color: color, fontWeight: '600' }}>
+        {trend}
+      </div>
+    </div>
+  );
+}
+
+// ========== COUNTDOWN TIMER ========== 
+function CountdownTimer({ targetHours, targetMinutes, targetSeconds }) {
+  const [time, setTime] = useState({ hours: targetHours, minutes: targetMinutes, seconds: targetSeconds });
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTime(prev => {
+        if (prev.seconds > 0) {
+          return { ...prev, seconds: prev.seconds - 1 };
+        } else if (prev.minutes > 0) {
+          return { ...prev, minutes: prev.minutes - 1, seconds: 59 };
+        } else if (prev.hours > 0) {
+          return { hours: prev.hours - 1, minutes: 59, seconds: 59 };
+        }
+        return prev;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <span style={{ fontFamily: 'monospace', fontSize: '16px' }}>
+      {String(time.hours).padStart(2, '0')}:
+      {String(time.minutes).padStart(2, '0')}:
+      {String(time.seconds).padStart(2, '0')}
+    </span>
+  );
+}
+
+// ========== ACTIVITY ITEM ========== 
+function ActivityItem({ icon, title, time, xp }) {
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: '16px',
+      backgroundColor: '#f9fafb',
+      borderRadius: '12px',
+      transition: 'all 0.2s ease',
+      cursor: 'pointer'
+    }}
+    onMouseEnter={(e) => {
+      e.currentTarget.style.backgroundColor = '#f3f4f6';
+      e.currentTarget.style.transform = 'translateX(4px)';
+    }}
+    onMouseLeave={(e) => {
+      e.currentTarget.style.backgroundColor = '#f9fafb';
+      e.currentTarget.style.transform = 'translateX(0)';
+    }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <span style={{ fontSize: '28px' }}>{icon}</span>
+        <div>
+          <div style={{ fontSize: '15px', fontWeight: '700', color: '#1f2937', marginBottom: '4px' }}>
+            {title}
+          </div>
+          <div style={{ fontSize: '13px', color: '#6b7280' }}>
+            {time}
+          </div>
+        </div>
+      </div>
+      <div style={{
+        backgroundColor: '#10b981',
+        color: 'white',
+        padding: '6px 12px',
+        borderRadius: '20px',
+        fontSize: '12px',
+        fontWeight: '900'
+      }}>
+        {xp}
+      </div>
+    </div>
+  );
+}
+// Nowy komponent dla CTA
+function CareerCTA({ assessmentCompleted, careerPath }) {
+  const { resetAssessment } = useApp(); // ✅ Dodaj hook
+   
+  const setActiveMissionId = useNavigStore(state => state.setActiveMissionId);
+
+  // ✅ DODAJ RETURN:
+  return (
+    
+    <div style={{
+      background: 'linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%)',
+      color: 'white',
+      padding: '42px',
+      borderRadius: '16px',
+      position: 'relative'
+    }}>
+      {assessmentCompleted && (
+        <div style={{
+          position: 'absolute',
+          top: '16px',
+          right: '26px',
+          backgroundColor: '#10b981',
+          color: 'white',
+          padding: '6px 12px',
+          borderRadius: '20px',
+          fontSize: '12px',
+          fontWeight: 'bold'
+        }}>
+          ✅ UKOŃCZONE
+        </div>
+      )}
+
+      <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '12px' }}>
+        {assessmentCompleted 
+          ? `🎯 Twoja ścieżka: ${careerPath || 'Zobacz rekomendacje'}`
+          : '🎮 Odkryj swoją ścieżkę kariery!'
+        }
+      </h2>
+      
+      <p style={{ fontSize: '16px', marginBottom: '20px', opacity: 0.95 }}>
+        {assessmentCompleted 
+          ? 'Zobacz szczegółowe rekomendacje i plan rozwoju'
+          : ' poznaj swoje mocne strony'
+        }
+      </p>
+
+      {!assessmentCompleted && (
+        <div style={{ display: 'flex', gap: '24px', marginBottom: '20px', fontSize: '14px' }}>
+          <span>⏱️ 90 sekund</span>
+          <span>💡 +500 XP</span>
+          <span>🏆 Odblokuj ścieżki</span>
+        </div>
+      )}
+
+      <button 
+        
+        onClick={() => setActiveMissionId(null)}
+        style={{
+          padding: '14px 28px',
+          backgroundColor: 'white',
+          color: '#8b5cf6',
+          border: 'none',
+          borderRadius: '8px',
+          fontSize: '16px',
+          fontWeight: 'bold',
+          cursor: 'pointer'
+        }}
+      >
+        {assessmentCompleted ? 'ZOBACZ REKOMENDACJE →' : 'ROZPOCZNIJ TEST →'}
+      </button>
+
+      {assessmentCompleted && (
+        <button
+          onClick={() => {
+            if (confirm('Zresetować test kariery?')) {
+              resetAssessment();
+            }
+          }}
+          style={{
+            marginTop: '12px',
+            padding: '8px 16px',
+            backgroundColor: 'rgba(255,255,255,0.2)',
+            color: 'white',
+            border: '1px solid rgba(255,255,255,0.3)',
+            borderRadius: '6px',
+            fontSize: '12px',
+            cursor: 'pointer',
+            display: 'block'
+          }}
+        >
+          🔄 Reset testu
+        </button>
+      )}
+    </div>
+  );
+}
+function StatCard({ icon, label, value }) {
+  return (
+    <div style={{
+      backgroundColor: 'white',
+      padding: '20px',
+      borderRadius: '12px',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+    }}>
+      <div style={{ fontSize: '24px', marginBottom: '8px' }}>{icon}</div>
+      <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>{label}</div>
+      <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#1f2937' }}>{value}</div>
+    </div>
+  );
+}
+
+// ==================== LESSONS VIEW ====================
+
+
+function LessonPage() {
+  const handleTestComplete = (result) => {
+    console.log('Test completed:', result);
+    // Redirect lub pokaż wyniki
+  };
+
+  return (
+    <KnowledgeTestingSystem 
+      lessonId="javascript-basics-test"
+      onComplete={handleTestComplete}
+    />
+  );
+}
+
+
+
+function LessonsView() {
+  const [view, setView] = useState<"lessons" | "career">("lessons");
+  const [selectedLesson, setSelectedLesson] = useState(null);
+  const { user } = useApp();
+  const adaptedLessons = getAllElectricianLessons(electricianLessons);
+    // Jeśli wybrano lekcję - pokaż LessonView
+    if (selectedLesson) {
+  return (
+    <LearningPreviewPanel
+      lesson={selectedLesson}
+      user={user}
+      onStartHotspot={(hotspot) => setActiveHotspot(hots)}
+      onComplete={(result) => {
+        console.log('Lesson completed:', result);
+
+        window.dispatchEvent(new CustomEvent('showNotification', {
+          detail: {
+            type: 'success',
+            message: `Brawo! Zdobyłeś ${result.earnedXP} XP!`,
+            duration: 3000
+          }
+        }));
+              
+        setSelectedLesson(null);
+      }}
+    
+       
+    />
+    
+  );
+}
+  return (
+    <div>
+      <h1 style={{ fontSize: '32px', fontWeight: '900', marginBottom: '12px', color: '#1f2937' }}>
+        📚 Lekcje Elektryka
+      </h1>
+      <p style={{ fontSize: '16px', color: '#6b7280', marginBottom: '32px' }}>
+        Praktyczne lekcje z instalacji elektrycznych - od BHP do pierwszych zleceń
+      </p>
+
+      {/* Filter by category */}
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', overflowX: 'auto' }}>
+        {['wszystkie', 'basics', 'intermediate', 'advanced'].map(cat => (
+          <button
+            key={cat}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#f3f4f6',
+              border: '1px solid #e5e7eb',
+              borderRadius: '20px',
+              fontSize: '14px',
+              fontWeight: '600',
+              color: '#374151',
+              cursor: 'pointer',
+              textTransform: 'capitalize',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            {cat}
+          </button>
+        ))}
+      </div>
+       <LearningPreviewPanel
+  onStartLesson={(hotspot) => {
+    const hotspotToLesson = {
+      panel: 'electrical',
+      multimeter: 'electrical',
+      wires: 'electrical'
+    };
+
+    const lessonId = hotspotToLesson[hotspot?.id];
+    if (lessonId) {
+      setSelectedLesson(lessonId);
+      setCurrentTask(0);
+      setScore(0);
+      setSelectedAnswer(null);
+      setShowFeedback(false);
+    }
+  }}
+/>
+      {/* Grid lekcji */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+        gap: '20px'
+      }}>
+        {adaptedLessons.map((lesson, idx) => (
+          <ElectricianLessonCard
+            key={lesson.id}
+            lesson={lesson}
+            index={idx}
+            onClick={() => {
+              setSelectedLesson(lesson);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+// ============================================================================
+// SIMPLE LESSONS VIEW - DZIAŁAJĄCA WERSJA
+// ============================================================================
+
+function LessonsView() {
+  const [view, setView] = useState<"lessons" | "career">("lessons");
+  const { user, setUser } = useApp();
+  const [userProgress, setUserProgress] = useState({
+    completedLessons: ['bhp-basics'], // Demo: BHP już ukończone
+    inProgressLessons: [],
+    lessonProgress: {}
+  });
+
+  // Proste dane lekcji
+  const lessons = [
+    {
+      id: 'bhp-basics',
+      title: 'BHP: Twoje życie się liczy',
+      subtitle: 'Bezpieczeństwo w pracy z prądem - zero kompromisów',
+      icon: '⚡',
+      sections: ['Wprowadzenie', 'Zagrożenia', 'Procedury', 'Test końcowy'],
+      xp: 350,
+      duration: 18,
+      prerequisites: []
+    },
+    {
+      id: 'multimeter-basics',
+      title: 'Multimetr: Twoje trzecie oko', 
+      subtitle: 'Pomiary napięcia, ciągłości i diagnostyka - praktycznie',
+      icon: '🔧',
+      sections: ['Budowa', 'Pomiary DC', 'Pomiary AC', 'Diagnostyka'],
+      xp: 400,
+      duration: 22,
+      prerequisites: ['bhp-basics']
+    },
+    {
+      id: 'wiring-basics',
+      title: 'Okablowanie: L/N/PE i porządek',
+      subtitle: 'Standardy prowadzenia przewodów - estetyka to bezpieczeństwo', 
+      icon: '🔌',
+      sections: ['Kolory', 'Przekroje', 'Prowadzenie', 'Kontrola'],
+      xp: 380,
+      duration: 20,
+      prerequisites: ['bhp-basics', 'multimeter-basics']
+    },
+    {
+      id: 'diagnostics',
+      title: 'Diagnostyka: „Wyskakują korki"',
+      subtitle: 'Real-world case study - szukaj awarii jak pro',
+      icon: '🔍', 
+      sections: ['Wywiad', 'Pomiary', 'Analiza', 'Naprawa', 'Weryfikacja'],
+      xp: 450,
+      duration: 28,
+      prerequisites: ['bhp-basics', 'multimeter-basics', 'wiring-basics']
+    },
+    {
+      id: 'panels',
+      title: 'Rozdzielnia: Serce instalacji',
+      subtitle: 'Układ zabezpieczeń, rozłączniki, oznaczenia',
+      icon: '⚙️',
+      sections: ['Typy', 'Zabezpieczenia', 'Obwody', 'Montaż'],
+      xp: 500,  
+      duration: 35,
+      prerequisites: ['bhp-basics', 'multimeter-basics']
+    },
+    {
+      id: 'home-project',
+      title: 'Dom jednorodzinny: Pierwszy zlecenie',
+      subtitle: 'Kompletna instalacja od fundamentów do gniazdek',
+      icon: '🏠',
+      sections: ['Projekt', 'Wycena', 'Montaż', 'Odbiór', 'Dokumentacja'],
+      xp: 750,
+      duration: 45, 
+      prerequisites: ['bhp-basics', 'multimeter-basics', 'wiring-basics', 'panels']
+    }
+  ];
+
+  // Prosty handler kliknięcia
+  const handleLessonClick = (lesson) => {
+    const isUnlocked = !lesson.prerequisites || lesson.prerequisites.every(prereqId =>
+      userProgress.completedLessons.includes(prereqId)
+    );
+
+    if (!isUnlocked) {
+      // Show notification
+      window.dispatchEvent(new CustomEvent('showNotification', {
+        detail: {
+          message: `🔒 Ukończ najpierw poprzednie lekcje aby odblokować "${lesson.title}"`,
+          type: 'warning',
+          duration: 3000
+        }
+      }));
+      return;
+    }
+
+    // Success notification
+    window.dispatchEvent(new CustomEvent('showNotification', {
+      detail: {
+        message: `🚀 Otwieranie lekcji: "${lesson.title}"`,
+        type: 'success',
+        duration: 2000
+      }
+    }));
+
+    // Navigate to tasks with lesson data
+    setUser(prev => ({ ...prev, selectedLesson: lesson }));
+    
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('navigate', {
+        detail: { section: 'tasks', lessonId: lesson.id }
+      }));
+    }, 500);
+  };
+
+  return (
+    <div>
+        <header>
+        <button onClick={() => setView("lessons")}>Lekcje</button>
+        <button onClick={() => setView("career")}>Roadmap</button>
+      </header>
+     {view === "career" ? (
+  <CareerRoadmapView onClose={() => setView("lessons")} />
+) : (
+  <>
+    <YourLessonsContent />
+      <div style={{
+        textAlign: 'center',
+        marginBottom: '32px'
+      }}>
+        <h1 style={{
+          fontSize: '36px',
+          fontWeight: '900',
+          color: '#1f2937',
+          marginBottom: '8px'
+        }}>
+          📚 Lekcje Elektryka
+        </h1>
+        <p style={{
+          fontSize: '16px',
+          color: '#6b7280'
+        }}>
+          Praktyczne lekcje - od BHP do pierwszych zleceń
+        </p>
+      </div>
+     </>
+)}
+      {/* Simple Grid */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+        gap: '24px'
+      }}>
+        {lessons.map((lesson, index) => {
+          const isUnlocked = !lesson.prerequisites || lesson.prerequisites.every(prereqId =>
+            userProgress.completedLessons.includes(prereqId)
+          );
+          const isCompleted = userProgress.completedLessons.includes(lesson.id);
+
+          return (
+            <div
+              key={lesson.id}
+              onClick={() => handleLessonClick(lesson)}
+              style={{
+                backgroundColor: 'white',
+                padding: '24px',
+                borderRadius: '16px',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+                cursor: isUnlocked ? 'pointer' : 'not-allowed',
+                opacity: isUnlocked ? 1 : 0.6,
+                border: '2px solid transparent',
+                transition: 'all 0.3s ease',
+                position: 'relative'
+              }}
+              onMouseEnter={(e) => {
+                if (isUnlocked) {
+                  e.target.style.borderColor = '#7c3aed';
+                  e.target.style.transform = 'translateY(-4px)';
+                  e.target.style.boxShadow = '0 12px 32px rgba(124, 58, 237, 0.15)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (isUnlocked) {
+                  e.target.style.borderColor = 'transparent';
+                  e.target.style.transform = 'translateY(0)';
+                  e.target.style.boxShadow = '0 4px 20px rgba(0,0,0,0.08)';
+                }
+              }}
+            >
+              {/* Status Badge */}
+              <div style={{
+                position: 'absolute',
+                top: '12px',
+                right: '12px',
+                padding: '4px 8px',
+                borderRadius: '8px',
+                fontSize: '10px',
+                fontWeight: '900',
+                ...(isCompleted ? {
+                  backgroundColor: '#10b981',
+                  color: 'white'
+                } : !isUnlocked ? {
+                  backgroundColor: '#fbbf24',
+                  color: '#78350f'
+                } : {
+                  backgroundColor: '#3b82f6',
+                  color: 'white'
+                })
+              }}>
+                {isCompleted ? '✅ UKOŃCZONE' : 
+                 !isUnlocked ? '🔒 ZABLOKOWANE' : '▶️ DOSTĘPNE'}
+              </div>
+
+              {/* Icon */}
+              <div style={{ 
+                fontSize: '48px', 
+                marginBottom: '16px',
+                textAlign: 'center'
+              }}>
+                {lesson.icon}
+              </div>
+
+              {/* Title */}
+              <h3 style={{
+                fontSize: '18px',
+                fontWeight: '800',
+                color: '#1f2937',
+                marginBottom: '8px',
+                textAlign: 'center'
+              }}>
+                {lesson.title}
+              </h3>
+
+              {/* Subtitle */}
+              <p style={{
+                fontSize: '13px',
+                color: '#6b7280',
+                marginBottom: '16px',
+                textAlign: 'center',
+                lineHeight: 1.4
+              }}>
+                {lesson.subtitle}
+              </p>
+
+              {/* Stats */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: '8px',
+                paddingTop: '16px',
+                borderTop: '1px solid #f3f4f6',
+                textAlign: 'center'
+              }}>
+                <div>
+                  <div style={{ fontSize: '16px', fontWeight: '900', color: '#7c3aed' }}>
+                    {lesson.sections.length}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#9ca3af' }}>sekcji</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '16px', fontWeight: '900', color: '#10b981' }}>
+                    +{lesson.xp}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#9ca3af' }}>XP</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '16px', fontWeight: '900', color: '#f59e0b' }}>
+                    {lesson.duration}'
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#9ca3af' }}>czas</div>
+                </div>
+              </div>
+
+              {/* Simple CTA Button */}
+              <button style={{
+                width: '100%',
+                padding: '10px',
+                marginTop: '16px',
+                backgroundColor: isCompleted ? '#10b981' : 
+                                !isUnlocked ? '#e5e7eb' : '#7c3aed',
+                color: isCompleted ? 'white' : 
+                       !isUnlocked ? '#9ca3af' : 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '13px',
+                fontWeight: '700',
+                cursor: isUnlocked ? 'pointer' : 'not-allowed'
+              }}>
+                {isCompleted ? '🏆 Przejrzyj' :
+                 !isUnlocked ? '🔒 Zablokowane' : '▶️ Rozpocznij'}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Debug Button */}
+      <div style={{ 
+        marginTop: '32px',
+        textAlign: 'center'
+      }}>
+        <button
+          onClick={() => {
+            // Complete BHP to unlock next lesson
+            setUserProgress(prev => ({
+              ...prev,
+              completedLessons: prev.completedLessons.includes('multimeter-basics') ? 
+                [] : [...prev.completedLessons, 'multimeter-basics']
+            }));
+          }}
+          style={{
+            padding: '8px 16px',
+            backgroundColor: '#f3f4f6',
+            border: '1px solid #d1d5db',
+            borderRadius: '8px',
+            fontSize: '12px',
+            cursor: 'pointer'
+          }}
+        >
+          🔧 Debug: Toggle Multimeter Unlock
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Komponent karty lekcji
+function ElectricianLessonCard({ lesson, index, onClick }) {
+  const isLocked = lesson.prerequisites?.length > 0;
+
+  return (
+    <div
+      onClick={!isLocked ? onClick : undefined}
+      style={{
+        backgroundColor: "white",
+        padding: "28px",
+        borderRadius: "20px",
+        boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+        border: "2px solid transparent",
+        cursor: isLocked ? "not-allowed" : "pointer",
+        transition: "all 0.3s ease",
+        opacity: isLocked ? 0.6 : 1,
+        position: "relative",
+        animation: `slideIn 0.5s ease ${index * 0.1}s backwards`,
+      }}
+      onMouseEnter={(e) => {
+        if (!isLocked) {
+          e.currentTarget.style.borderColor = "#7c3aed";
+          e.currentTarget.style.transform = "translateY(-4px)";
+          e.currentTarget.style.boxShadow =
+            "0 12px 32px rgba(124, 58, 237, 0.15)";
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!isLocked) {
+          e.currentTarget.style.borderColor = "transparent";
+          e.currentTarget.style.transform = "translateY(0)";
+          e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.08)";
+        }
+      }}
+    >
+      {isLocked && (
+        <div
+          style={{
+            position: "absolute",
+            top: "16px",
+            right: "16px",
+            backgroundColor: "#fbbf24",
+            color: "#78350f",
+            padding: "6px 12px",
+            borderRadius: "12px",
+            fontSize: "11px",
+            fontWeight: "900",
+          }}
+        >
+          🔒 ZABLOKOWANE
+        </div>
+      )}
+
+      <div style={{ fontSize: "56px", marginBottom: "16px" }}>{lesson.icon}</div>
+
+      <h3
+        style={{
+          fontSize: "20px",
+          fontWeight: "900",
+          color: "#1f2937",
+          marginBottom: "8px",
+        }}
+      >
+        {lesson.title}
+      </h3>
+
+      <p
+        style={{
+          fontSize: "14px",
+          color: "#6b7280",
+          marginBottom: "20px",
+          lineHeight: 1.6,
+        }}
+      >
+        {lesson.description}
+      </p>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(3, 1fr)",
+          gap: "12px",
+          paddingTop: "20px",
+          borderTop: "1px solid #f3f4f6",
+        }}
+      >
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: "18px", fontWeight: "900", color: "#7c3aed" }}>
+            {lesson.content?.length ?? lesson.tasks ?? 0}
+          </div>
+          <div style={{ fontSize: "12px", color: "#9ca3af" }}>zadań</div>
+        </div>
+
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: "18px", fontWeight: "900", color: "#10b981" }}>
+            +{lesson.xp}
+          </div>
+          <div style={{ fontSize: "12px", color: "#9ca3af" }}>XP</div>
+        </div>
+
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: "18px", fontWeight: "900", color: "#f59e0b" }}>
+            {lesson.duration}
+          </div>
+          <div style={{ fontSize: "12px", color: "#9ca3af" }}>czas</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ElectricianLessonCard({ lesson, index, onClick }) {
+  const isLocked = lesson.prerequisites?.length > 0;
+
+  return (
+    <div
+      onClick={!isLocked ? onClick : undefined}
+      style={{
+        backgroundColor: "white",
+        padding: "28px",
+        borderRadius: "20px",
+        boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+        border: "2px solid transparent",
+        cursor: isLocked ? "not-allowed" : "pointer",
+        transition: "all 0.3s ease",
+        opacity: isLocked ? 0.6 : 1,
+        position: "relative",
+        animation: `slideIn 0.5s ease ${index * 0.1}s backwards`,
+      }}
+      onMouseEnter={(e) => {
+        if (!isLocked) {
+          e.currentTarget.style.borderColor = "#7c3aed";
+          e.currentTarget.style.transform = "translateY(-4px)";
+          e.currentTarget.style.boxShadow =
+            "0 12px 32px rgba(124, 58, 237, 0.15)";
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!isLocked) {
+          e.currentTarget.style.borderColor = "transparent";
+          e.currentTarget.style.transform = "translateY(0)";
+          e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.08)";
+        }
+      }}
+    >
+      {isLocked && (
+        <div
+          style={{
+            position: "absolute",
+            top: "16px",
+            right: "16px",
+            backgroundColor: "#fbbf24",
+            color: "#78350f",
+            padding: "6px 12px",
+            borderRadius: "12px",
+            fontSize: "11px",
+            fontWeight: "900",
+          }}
+        >
+          🔒 ZABLOKOWANE
+        </div>
+      )}
+
+      <div style={{ fontSize: "56px", marginBottom: "16px" }}>{lesson.icon}</div>
+
+      <h3
+        style={{
+          fontSize: "20px",
+          fontWeight: "900",
+          color: "#1f2937",
+          marginBottom: "8px",
+        }}
+      >
+        {lesson.title}
+      </h3>
+
+      <p
+        style={{
+          fontSize: "14px",
+          color: "#6b7280",
+          marginBottom: "20px",
+          lineHeight: 1.6,
+        }}
+      >
+        {lesson.description}
+      </p>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(3, 1fr)",
+          gap: "12px",
+          paddingTop: "20px",
+          borderTop: "1px solid #f3f4f6",
+        }}
+      >
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: "18px", fontWeight: "900", color: "#7c3aed" }}>
+            {lesson.content?.length ?? lesson.tasks ?? 0}
+          </div>
+          <div style={{ fontSize: "12px", color: "#9ca3af" }}>zadań</div>
+        </div>
+
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: "18px", fontWeight: "900", color: "#10b981" }}>
+            +{lesson.xp}
+          </div>
+          <div style={{ fontSize: "12px", color: "#9ca3af" }}>XP</div>
+        </div>
+
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: "18px", fontWeight: "900", color: "#f59e0b" }}>
+            {lesson.duration}
+          </div>
+          <div style={{ fontSize: "12px", color: "#9ca3af" }}>czas</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────
+// Główny widok lekcji
+// ──────────────────────────────────────────────────────────────
+function LessonsView() {
+  const [selectedLesson, setSelectedLesson] = useState(null);
+  const [currentTask, setCurrentTask] = useState(0);
+  const [score, setScore] = useState(0);
+  const [selectedAnswer, setSelectedAnswer] = useState(null);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [matchPicks, setMatchPicks] = useState({}); // dla typu 'matching'
+  const [search, setSearch] = useState("");
+  const [toast, setToast] = useState(null);
+
+  // Lista lekcji
+  const lessons = [
+    {
+      id: "electrical",
+      icon: "⚡",
+      title: "Instalacje elektryczne",
+      description: "Podstawy bezpiecznej pracy z prądem",
+      hotspotId: "panel",
+      tasks: 4,
+      xp: 275,
+      duration: "15 min",
+      content: [
+        {
+          type: "multiple-choice",
+          question:
+            "Jakie napięcie jest standardowo w gniazdku domowym w Polsce?",
+          options: ["110V", "230V", "380V", "12V"],
+          correct: 1,
+          points: 50,
+        },
+        {
+          type: "matching",
+          question: "Dopasuj narzędzia do ich zastosowania:",
+          pairs: [
+            { left: "Multimetr", right: "Pomiar napięcia i rezystancji" },
+            { left: "Ściągacz izolacji", right: "Zdejmowanie izolacji z przewodów" },
+            { left: "Próbnik napięcia", right: "Sprawdzanie obecności napięcia" },
+            { left: "Zaciskarka", right: "Montaż końcówek kablowych" },
+          ],
+          points: 100,
+        },
+      ],
+    },
+    {
+      id: "multimeter",
+      icon: "🔌",
+      title: "Pomiary multimetrem",
+      description: "Bezpieczne mierzenie napięcia, prądu i rezystancji",
+      hotspotId: "multimeter",
+      tasks: 3,
+      xp: 220,
+      duration: "12 min",
+      content: [
+        {
+          type: "multiple-choice",
+          question: "Który zakres ustawisz, aby zmierzyć 230 V AC?",
+          options: ["200 mV DC", "20 V AC", "750 V AC", "10 A DC"],
+          correct: 2,
+          points: 60,
+        },
+      ],
+    },
+    {
+      id: "circuit",
+      icon: "🧵",
+      title: "Budowa obwodu",
+      description: "Kolory żył, zaciski, prowadzenie przewodów",
+      hotspotId: "wires",
+      tasks: 3,
+      xp: 240,
+      duration: "14 min",
+      content: [
+        {
+          type: "multiple-choice",
+          question: "Jaki kolor ma przewód ochronny PE?",
+          options: ["Niebieski", "Brązowy", "Żółto-zielony", "Czarny"],
+          correct: 2,
+          points: 60,
+        },
+      ],
+    },
+    {
+      id: "javascript",
+      icon: "💻",
+      title: "JavaScript Podstawy",
+      description: "Zmienne, funkcje i pętle",
+      tasks: 5,
+      xp: 300,
+      duration: "20 min",
+      content: [
+        {
+          type: "multiple-choice",
+          question: "Jak deklarujemy stałą w JavaScript?",
+          options: ["var", "let", "const", "static"],
+          correct: 2,
+          points: 60,
+        },
+      ],
+    },
+  ];
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return lessons;
+    return lessons.filter(
+      (l) =>
+        l.title.toLowerCase().includes(q) ||
+        l.description.toLowerCase().includes(q)
+    );
+  }, [search, lessons]);
+
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2200);
+  };
+
+  // Po kliknięciu hotspota w panelu zwiastunu — otwórz odpowiednią lekcję
+  const handleHotspotStart = (hotspot) => {
+    const lesson = lessons.find((l) => l.hotspotId === hotspot?.id);
+    if (lesson) {
+      setSelectedLesson(lesson.id);
+      setCurrentTask(0);
+      setScore(0);
+      setSelectedAnswer(null);
+      setShowFeedback(false);
+      setMatchPicks({});
+    }
+  };
+
+  // ─────────── WIDOK LEKCJI ───────────
+  if (selectedLesson) {
+    const lesson = lessons.find((l) => l.id === selectedLesson);
+    const task = lesson.content[currentTask];
+    const totalTasks = lesson.content.length;
+
+    const goNextOrFinish = (gained) => {
+      const newScore = score + (gained || 0);
+      if (currentTask < totalTasks - 1) {
+        setCurrentTask(currentTask + 1);
+        setSelectedAnswer(null);
+        setShowFeedback(false);
+        setMatchPicks({});
+        setScore(newScore);
+      } else {
+        showToast(`🎉 Lekcja ukończona! +${newScore} XP`);
+        setSelectedLesson(null);
+        setCurrentTask(0);
+        setScore(0);
+        setSelectedAnswer(null);
+        setShowFeedback(false);
+        setMatchPicks({});
+      }
+    };
+
+    return (
+      <div>
+        <button
+          onClick={() => {
+            setSelectedLesson(null);
+            setCurrentTask(0);
+            setScore(0);
+            setSelectedAnswer(null);
+            setShowFeedback(false);
+            setMatchPicks({});
+          }}
+          style={{
+            background: "none",
+            border: "none",
+            color: "#7c3aed",
+            cursor: "pointer",
+            fontSize: "14px",
+            marginBottom: "12px",
+          }}
+        >
+          ← Wróć do lekcji
+        </button>
+
+        <h1 style={{ fontSize: "28px", fontWeight: "bold", marginBottom: "12px" }}>
+          {lesson.title}
+        </h1>
+
+        <div style={{ display: "flex", gap: "16px", marginBottom: "16px" }}>
+          <span style={{ fontSize: "14px", color: "#6b7280" }}>
+            Zadanie {currentTask + 1} z {totalTasks}
+          </span>
+          <span style={{ fontSize: "14px", color: "#6b7280" }}>
+            Punkty: {score} XP
+          </span>
+        </div>
+
+        <div
+          style={{
+            width: "100%",
+            height: "8px",
+            backgroundColor: "#e5e7eb",
+            borderRadius: "10px",
+            overflow: "hidden",
+            marginBottom: "24px",
+          }}
+        >
+          <div
+            style={{
+              width: `${((currentTask + 1) / totalTasks) * 100}%`,
+              height: "100%",
+              background: "linear-gradient(90deg, #a855f7 0%, #ec4899 100%)",
+              borderRadius: "10px",
+              transition: "width 0.4s ease",
+            }}
+          />
+        </div>
+
+        <div
+          style={{
+            backgroundColor: "white",
+            padding: "32px",
+            borderRadius: "12px",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+          }}
+        >
+          <h2
+            style={{
+              fontSize: "20px",
+              fontWeight: "bold",
+              marginBottom: "24px",
+            }}
+          >
+            {task.question}
+          </h2>
+
+          {/* MULTIPLE CHOICE */}
+          {task.type === "multiple-choice" && (
+            <>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "12px",
+                  marginBottom: "24px",
+                }}
+              >
+                {task.options.map((option, idx) => {
+                  const isPicked = selectedAnswer === idx;
+                  const isCorrect = showFeedback && idx === task.correct;
+                  const isWrong =
+                    showFeedback && isPicked && idx !== task.correct;
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => !showFeedback && setSelectedAnswer(idx)}
+                      disabled={showFeedback}
+                      style={{
+                        padding: "16px 20px",
+                        backgroundColor: isCorrect
+                          ? "#dcfce7"
+                          : isWrong
+                          ? "#fee2e2"
+                          : isPicked
+                          ? "#ede9fe"
+                          : "white",
+                        border: isCorrect
+                          ? "2px solid #10b981"
+                          : isWrong
+                          ? "2px solid #ef4444"
+                          : isPicked
+                          ? "2px solid #7c3aed"
+                          : "2px solid #e5e7eb",
+                        borderRadius: "8px",
+                        textAlign: "left",
+                        fontSize: "16px",
+                        cursor: showFeedback ? "default" : "pointer",
+                      }}
+                    >
+                      {option}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                onClick={() => {
+                  if (showFeedback) return;
+                  setShowFeedback(true);
+                  const gained =
+                    selectedAnswer === task.correct ? task.points : 0;
+                  setTimeout(() => goNextOrFinish(gained), 1500);
+                }}
+                disabled={selectedAnswer === null}
+                style={{
+                  width: "100%",
+                  padding: "14px",
+                  backgroundColor:
+                    selectedAnswer !== null ? "#7c3aed" : "#d1d5db",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "8px",
+                  fontSize: "16px",
+                  fontWeight: "bold",
+                  cursor: selectedAnswer !== null ? "pointer" : "not-allowed",
+                }}
+              >
+                Potwierdź
+              </button>
+            </>
+          )}
+
+          {/* MATCHING */}
+          {task.type === "matching" && (
+            <>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: "12px",
+                  marginBottom: "24px",
+                }}
+              >
+                {task.pairs.map((p, i) => (
+                  <React.Fragment key={i}>
+                    <div
+                      style={{
+                        padding: "12px 14px",
+                        background: "#f9fafb",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: 8,
+                        fontWeight: 700,
+                        color: "#1f2937",
+                      }}
+                    >
+                      {p.left}
+                    </div>
+                    <select
+                      value={matchPicks[i] ?? ""}
+                      onChange={(e) =>
+                        setMatchPicks({
+                          ...matchPicks,
+                          [i]: e.target.value,
+                        })
+                      }
+                      disabled={showFeedback}
+                      style={{
+                        padding: "12px 14px",
+                        borderRadius: 8,
+                        border: "1px solid #e5e7eb",
+                        background: "white",
+                        fontSize: 14,
+                      }}
+                    >
+                      <option value="">— wybierz —</option>
+                      {task.pairs.map((p2, j) => (
+                        <option key={j} value={p2.right}>
+                          {p2.right}
+                        </option>
+                      ))}
+                    </select>
+                  </React.Fragment>
+                ))}
+              </div>
+
+              <button
+                onClick={() => {
+                  if (showFeedback) return;
+                  const allCorrect = task.pairs.every(
+                    (p, i) => matchPicks[i] === p.right
+                  );
+                  setShowFeedback(true);
+                  const gained = allCorrect ? task.points : 0;
+                  if (!allCorrect) showToast("Spróbuj jeszcze raz w kolejnej lekcji 💪");
+                  setTimeout(() => goNextOrFinish(gained), 1500);
+                }}
+                disabled={
+                  Object.keys(matchPicks).length < task.pairs.length ||
+                  Object.values(matchPicks).some((v) => !v)
+                }
+                style={{
+                  width: "100%",
+                  padding: "14px",
+                  backgroundColor:
+                    Object.keys(matchPicks).length === task.pairs.length
+                      ? "#7c3aed"
+                      : "#d1d5db",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "8px",
+                  fontSize: "16px",
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                }}
+              >
+                Sprawdź dopasowania
+              </button>
+            </>
+          )}
+        </div>
+
+        {toast && <Toast message={toast} />}
+      </div>
+    );
+  }
+
+  // ─────────── WIDOK LISTY LEKCJI ───────────
+  return (
+    <div>
+      <style>{`
+        @keyframes slideIn {
+          from { opacity: 0; transform: translateY(12px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
+
+      <h1 style={{ fontSize: "28px", fontWeight: "bold", marginBottom: "24px" }}>
+        Dostępne lekcje
+      </h1>
+
+      <div style={{ marginBottom: "32px" }}>
+        <LearningPreviewPanel onStartLesson={handleHotspotStart} />
+      </div>
+
+      {/* Pasek wyszukiwania */}
+      <div
+        style={{
+          display: "flex",
+          gap: 12,
+          marginBottom: 20,
+          alignItems: "center",
+        }}
+      >
+        <input
+          type="text"
+          placeholder="🔍 Szukaj lekcji…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{
+            flex: 1,
+            padding: "12px 16px",
+            borderRadius: 12,
+            border: "2px solid #e5e7eb",
+            fontSize: 14,
+            outline: "none",
+          }}
+          onFocus={(e) => (e.target.style.borderColor = "#7c3aed")}
+          onBlur={(e) => (e.target.style.borderColor = "#e5e7eb")}
+        />
+        <div
+          style={{
+            padding: "10px 14px",
+            background: "#ede9fe",
+            color: "#6d28d9",
+            borderRadius: 12,
+            fontWeight: 800,
+            fontSize: 13,
+          }}
+        >
+          {filtered.length} / {lessons.length}
+        </div>
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
+          gap: "20px",
+        }}
+      >
+        {filtered.map((lesson, i) => (
+          <ElectricianLessonCard
+            key={lesson.id}
+            lesson={lesson}
+            index={i}
+            onClick={() => {
+              setSelectedLesson(lesson.id);
+              setCurrentTask(0);
+              setScore(0);
+              setSelectedAnswer(null);
+              setShowFeedback(false);
+              setMatchPicks({});
+            }}
+          />
+        ))}
+        {filtered.length === 0 && (
+          <div
+            style={{
+              gridColumn: "1 / -1",
+              padding: 40,
+              textAlign: "center",
+              color: "#9ca3af",
+              background: "white",
+              borderRadius: 16,
+              border: "2px dashed #e5e7eb",
+            }}
+          >
+            Brak wyników dla „{search}”
+          </div>
+        )}
+      </div>
+
+      {toast && <Toast message={toast} />}
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────
+// Mały toast
+// ──────────────────────────────────────────────────────────────
+function Toast({ message }) {
+  return (
+    <div
+      style={{
+        position: "fixed",
+        bottom: 24,
+        left: "50%",
+        transform: "translateX(-50%)",
+        background: "#10122a",
+        color: "#ffd27a",
+        padding: "12px 20px",
+        borderRadius: 12,
+        border: "2px solid #ffb547",
+        boxShadow: "4px 4px 0 rgba(0,0,0,0.5)",
+        fontWeight: 800,
+        fontSize: 14,
+        zIndex: 9999,
+        animation: "slideIn 0.3s ease",
+      }}
+    >
+      {message}
+    </div>
+  );
+}   
+ 
+
+// ==================== ACHIEVEMENTS VIEW ====================
+function AchievementsView() {
+  const [activeFilter, setActiveFilter] = useState('wszystkie');
+
+  const achievements = [
+    { id: 1, icon: '⚡', name: 'Pierwszy krok', desc: 'Ukończ pierwszą lekcję', unlocked: true, reward: '50 XP', category: 'nauka' },
+    { id: 2, icon: '🔥', name: 'Tydzień nauki', desc: '7 dni z rzędu', unlocked: true, reward: '200 XP + Tytuł', category: 'nauka' },
+    { id: 3, icon: '🤝', name: 'Pomocnik', desc: 'Pomóż 5 osobom', unlocked: true, reward: '100 XP', category: 'społeczność' },
+    { id: 4, icon: '⚡', name: 'Mistrz Elektryki', desc: 'Ukończ wszystkie lekcje elektryczne', unlocked: false, progress: 65, progressText: '13/20', reward: '500 XP + Avatar', category: 'nauka' },
+    { id: 5, icon: '👑', name: 'Mistrz', desc: 'Osiągnij poziom 50', unlocked: false, progress: 24, progressText: 'Poziom 12/50', reward: '1000 XP + Złota ramka', category: 'wyzwania' },
+    { id: 6, icon: '🎯', name: 'Perfekcjonista', desc: '100% w 10 lekcjach', unlocked: false, progress: 30, progressText: '3/10', reward: '300 XP', category: 'wyzwania' }
+  ];
+
+  const filters = ['wszystkie', 'nauka', 'społeczność', 'wyzwania', 'specjalne'];
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px' }}>
+        <h1 style={{ fontSize: '28px', fontWeight: 'bold' }}>Twoje osiągnięcia</h1>
+        <div style={{
+          backgroundColor: '#f3f4f6',
+          padding: '8px 16px',
+          borderRadius: '20px',
+          fontSize: '14px'
+        }}>
+          🏅 Odblokowane: 3/8
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', overflowX: 'auto' }}>
+        {filters.map(filter => (
+          <button
+            key={filter}
+            onClick={() => setActiveFilter(filter)}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: activeFilter === filter ? '#7c3aed' : 'white',
+              color: activeFilter === filter ? 'white' : '#4b5563',
+              border: '1px solid #e5e7eb',
+              borderRadius: '20px',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              textTransform: 'capitalize'
+            }}
+          >
+            {filter.charAt(0).toUpperCase() + filter.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+        gap: '16px'
+      }}>
+        {achievements.map(achievement => (
+          <div
+            key={achievement.id}
+            style={{
+              backgroundColor: achievement.unlocked ? '#dcfce7' : 'white',
+              padding: '20px',
+              borderRadius: '12px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+              position: 'relative'
+            }}
+          >
+            {achievement.unlocked && (
+              <span style={{
+                position: 'absolute',
+                top: '10px',
+                right: '10px',
+                backgroundColor: '#10b981',
+                color: 'white',
+                padding: '4px 8px',
+                borderRadius: '12px',
+                fontSize: '10px',
+                fontWeight: 'bold'
+              }}>
+                ODBLOKOWANE
+              </span>
+            )}
+
+            <div style={{ fontSize: '48px', marginBottom: '12px' }}>{achievement.icon}</div>
+            <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '8px' }}>
+              {achievement.name}
+            </h3>
+            <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '12px' }}>
+              {achievement.desc}
+            </p>
+
+            {!achievement.unlocked && achievement.progress && (
+              <>
+                <div style={{
+                  width: '100%',
+                  height: '4px',
+                  backgroundColor: '#e5e7eb',
+                  borderRadius: '2px',
+                  marginBottom: '8px'
+                }}>
+                  <div style={{
+                    width: `${achievement.progress}%`,
+                    height: '100%',
+                    backgroundColor: '#7c3aed',
+                    borderRadius: '2px'
+                  }} />
+                </div>
+                <p style={{ fontSize: '12px', color: '#6b7280', marginBottom: '12px' }}>
+                  {achievement.progressText}
+                </p>
+              </>
+            )}
+
+            <div style={{
+              padding: '6px 12px',
+              backgroundColor: achievement.unlocked ? '#10b981' : '#f3f4f6',
+              borderRadius: '6px',
+              fontSize: '12px',
+              color: achievement.unlocked ? 'white' : '#6b7280',
+              display: 'inline-block'
+            }}>
+              💰 {achievement.reward}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ==================== SHOP VIEW ====================
+function ShopView({ user, setUser }) {
+  const [activeCategory, setActiveCategory] = useState('wszystko');
+  const [ownedItems] = useState(['freeze_streak', 'xp_boost_2x', 'mega_xp_boost']);
+
+  const categories = [
+    { id: 'wszystko', icon: '📦', name: 'Wszystko' },
+    { id: 'boostery', icon: '⚡', name: 'Boostery' },
+    { id: 'wygląd', icon: '👁️', name: 'Wygląd' },
+    { id: 'pomocnicy', icon: '🤝', name: 'Pomocnicy' },
+    { id: 'specjalne', icon: '✨', name: 'Specjalne' }
+  ];
+
+  const items = [
+    { id: 'freeze_streak', category: 'boostery', icon: '❄️', name: 'Zamrożenie serii', desc: 'Zachowaj swój streak przez 1 dzień', effect: 'Twoja seria nie zostanie przerwana', duration: '24h', price: 200 },
+    { id: 'xp_boost_2x', category: 'boostery', icon: '⚡', name: 'XP Boost 2x', desc: 'Podwój zdobywane XP', effect: '200% XP ze wszystkich aktywności', duration: '1h', price: 150 },
+    { id: 'mega_xp_boost', category: 'boostery', icon: '💎', name: 'MEGA XP Boost', desc: 'Potrój zdobywane XP', effect: '300% XP ze wszystkich aktywności', duration: '30 min', price: 400 },
+    { id: 'extra_life', category: 'boostery', icon: '❤️', name: 'Dodatkowe życie', desc: 'Otrzymaj +1 serce', effect: 'Możesz popełnić dodatkowy błąd', duration: '', price: 100 }
+  ];
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px' }}>
+        <h1 style={{ fontSize: '28px', fontWeight: 'bold' }}>📦 Sklep</h1>
+        <div style={{
+          fontSize: '20px',
+          fontWeight: 'bold',
+          color: '#7c3aed'
+        }}>
+          💰 {user.coins}
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', overflowX: 'auto' }}>
+        {categories.map(cat => (
+          <button
+            key={cat.id}
+            onClick={() => setActiveCategory(cat.id)}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: activeCategory === cat.id ? '#7c3aed' : 'white',
+              color: activeCategory === cat.id ? 'white' : '#4b5563',
+              border: '1px solid #e5e7eb',
+              borderRadius: '20px',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            <span>{cat.icon}</span>
+            <span>{cat.name}</span>
+          </button>
+        ))}
+      </div>
+
+      <div style={{
+        background: 'linear-gradient(135deg, #7c3aed 0%, #ec4899 100%)',
+        color: 'white',
+        padding: '24px',
+        borderRadius: '12px',
+        marginBottom: '24px'
+      }}>
+        <div style={{
+          backgroundColor: '#fbbf24',
+          color: '#78350f',
+          padding: '4px 12px',
+          borderRadius: '12px',
+          fontSize: '12px',
+          fontWeight: 'bold',
+          display: 'inline-block',
+          marginBottom: '12px'
+        }}>
+          OFERTA DNIA
+        </div>
+        <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '8px' }}>
+          Pakiet Mistrza 🏆
+        </h2>
+        <p style={{ fontSize: '14px', marginBottom: '16px', opacity: 0.9 }}>
+          3x XP Boost + 10 Serc + Avatar Premium
+        </p>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <span style={{ textDecoration: 'line-through', opacity: 0.7 }}>1200</span>
+          <span style={{ fontSize: '24px', fontWeight: 'bold' }}>799 💰</span>
+          <span style={{
+            backgroundColor: '#ef4444',
+            padding: '4px 8px',
+            borderRadius: '8px',
+            fontSize: '12px'
+          }}>
+            -33%
+          </span>
+        </div>
+        <p style={{ fontSize: '12px', marginTop: '12px', opacity: 0.8 }}>
+          Kończy się za: 23:45:12
+        </p>
+      </div>
+
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+        gap: '16px'
+      }}>
+        {items.map(item => {
+          const owned = ownedItems.includes(item.id);
+          return (
+            <div
+              key={item.id}
+              style={{
+                backgroundColor: 'white',
+                padding: '20px',
+                borderRadius: '12px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                position: 'relative'
+              }}
+            >
+              {owned && (
+                <span style={{
+                  position: 'absolute',
+                  top: '10px',
+                  right: '10px',
+                  backgroundColor: '#9ca3af',
+                  color: 'white',
+                  padding: '4px 8px',
+                  borderRadius: '12px',
+                  fontSize: '10px',
+                  fontWeight: 'bold'
+                }}>
+                  POSIADANE
+                </span>
+              )}
+
+              <div style={{ fontSize: '48px', marginBottom: '12px' }}>{item.icon}</div>
+              <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '8px' }}>
+                {item.name}
+              </h3>
+              <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '12px' }}>
+                {item.desc}
+              </p>
+
+              {item.effect && (
+                <div style={{
+                  backgroundColor: '#f9fafb',
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  marginBottom: '12px'
+                }}>
+                  ✨ {item.effect}
+                </div>
+              )}
+
+              {item.duration && (
+                <div style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '12px' }}>
+                  ⏰ {item.duration}
+                </div>
+              )}
+
+              <button
+                disabled={owned}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  backgroundColor: owned ? '#e5e7eb' : '#7c3aed',
+                  color: owned ? '#9ca3af' : 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                  cursor: owned ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {owned ? 'Posiadane' : `💰 ${item.price}`}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ==================== CAREER VIEW ====================
+// 2) PODMIEŃ CAŁĄ funkcję CareerView na tę wersję
+
+function CareerView() {
+  const { user } = useApp();
+  const [assessmentComplete, setAssessmentComplete] = useState(false);
+  const [userProfile, setUserProfile] = useState(null);
+  const [selectedPath, setSelectedPath] = useState(null);
+
+  const handleAssessmentComplete = (profile) => {
+    setUserProfile(profile);
+    setTimeout(() => setAssessmentComplete(true), 800);
+  };
+
+  // 1) Dopóki test nieukończony — quiz
+  if (!assessmentComplete || !userProfile) {
+    return <AssessmentQuiz onComplete={handleAssessmentComplete} />;
+  }
+
+  // 2) Po teście mamy listę ścieżek
+  const paths = buildPathsFromProfile(userProfile);
+
+  // 3) Jeśli użytkownik kliknął "Zobacz szczegóły" – widok szczegółów
+  if (selectedPath) {
+    return (
+      <CareerPathDetails
+        path={selectedPath}
+         profile={userProfile}
+        onBack={() => setSelectedPath(null)}
+        onStartPath={(id) => {
+          // Toast
+          window.dispatchEvent(new CustomEvent('showNotification', {
+            detail: { type: 'success', message: 'Start ścieżki zapisany! Przenoszę do zadań…', duration: 3000 }
+          }));
+          // (Opcjonalnie) przełącz do zadań/lekcji – zależnie od Twojej architektury:
+          // np. trigger sekcji "tasks" lub "lessons"
+          const btn = document.querySelector('button span')?.textContent?.includes('Lekcje');
+          // Zostawiam prosty wariant: wróć + scroll top
+          setSelectedPath(null);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onCompare={(id) => {
+          window.dispatchEvent(new CustomEvent('showNotification', {
+            detail: { type: 'success', message: 'Dodano do porównania.', duration: 2000 }
+          }));
+        }}
+        onSave={(id) => {
+          window.dispatchEvent(new CustomEvent('showNotification', {
+            detail: { type: 'success', message: 'Zapisano w ulubionych.', duration: 2000 }
+          }));
+        }}
+      />
+    );
+  }
+
+  // 4) Widok rekomendacji (Hero + Grid kart)
+  return (
+    
+    <div style={{ display: 'grid', gap: 16 }}>
+      <RecommendationsHeroPremium
+        icon={<span style={{ fontSize: 18 }}>🎯</span>}
+        title="Twoje spersonalizowane ścieżki kariery"
+        subtitle="Na podstawie Twojego stylu działania wybraliśmy trzy najlepsze kierunki."
+        topTrait={{ name: userProfile?.dominantTrait || 'Analityczny', color: 'violet' }}
+      />
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', gap: 12 }}>
+        {paths.map((p, i) => (
+          <CareerPathCard
+            key={p.id || `${p.title}-${i}`}
+            path={p}
+            rank={i + 1}
+            onClick={() => {
+              setSelectedPath(makeDetailsFromPath(p)); // wzbogacamy dane dla szczegółów
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+function makeDetailsFromPath(p) {
+  return {
+    
+    ...p,
+    timeline: p.timeline?.length ? p.timeline : [
+      { id: 'bhp',   label: 'BHP i podstawy',     hours: 20, costPLN: 0,   description: 'Bezpieczeństwo, podstawy zawodu.' },
+      { id: 'tools', label: 'Narzędzia i praktyka', hours: 30, costPLN: 600, description: 'Obsługa narzędzi i technik.' },
+      { id: 'core',  label: 'Moduły rdzeniowe',   hours: 50, costPLN: 800, description: 'Case’y i praca własna.' },
+      { id: 'cert',  label: 'Certyfikat / egzamin', hours: 10, costPLN: 350, description: 'Przygotowanie i formalności.' },
+    ],
+    skills: normalizeSkillTags(p.skills),
+    pros: p.pros?.length ? p.pros : ['Widoczne efekty pracy', 'Stabilne zlecenia', 'Realny progres co tydzień'],
+    cons: p.cons?.length ? p.cons : ['Wysiłek fizyczny', 'BHP i dyscyplina', 'Terminy zleceń'],
+    employers: p.employers?.length ? p.employers : (
+      p.careerId==='electrician' ? ['Lokalne firmy', 'Serwis instalacji', 'Deweloperzy'] :
+      p.careerId==='plumber'     ? ['Hydro-Serwis', 'Wspólnoty mieszk.', 'Serwisy 24/7'] :
+                                   ['Lokalne firmy', 'SME', 'Kontrakty']
+    ),
+    timeInvestment: p.timeInvestment || { hoursPerWeek: 6, totalHours: 110 },
+  };
+}
+function normalizeSkillTags(arr){
+  if(!Array.isArray(arr)) return [];
+  if(arr.length && typeof arr[0]==='string') return arr.map(n=>({name:n,level:'rec'}));
+  return arr.map(s=>({ name: s.name, level: s.level || 'rec' }));
+}
+
+function buildPathsFromProfile(profile) {
+  // TO TYLKO PRZYKŁAD – dostosuj pod swoje dane z profile
+  // Możesz mapować profile.traits → careerId / skill tags itd.
+  const base = [
+    {
+      id: 'electrician',
+      careerId: 'electrician',
+      title: 'Elektryk / Instalator',
+      description: 'Montaż i diagnostyka instalacji.',
+      salary: '7.000 – 15.000 PLN',
+      timeToJob: '4–8 miesięcy',
+      demand: 'Wysoki',
+      difficulty: 'Średnia',
+      fitTier: 'Silne dopasowanie',
+      skills: ['BHP', 'Precyzja', 'Multimetr', 'Okablowanie', 'Diagnostyka'],
+    },
+    {
+      id: 'plumber',
+      careerId: 'plumber',
+      title: 'Hydraulik',
+      description: 'Instalacje wod.-kan. i serwis.',
+      salary: '6.000 – 13.000 PLN',
+      timeToJob: '3–6 miesięcy',
+      demand: 'Wysoki',
+      difficulty: 'Średnia',
+      fitTier: 'Umiarkowane dopasowanie',
+      skills: ['Szczelność', 'Narzędzia', 'Schematy', 'Diagnoza'],
+    },
+    {
+      id: 'carpenter',
+      careerId: 'carpenter',
+      title: 'Stolarz',
+      description: 'Projekty meblowe i montaż.',
+      salary: '5.500 – 12.000 PLN',
+      timeToJob: '6–12 miesięcy',
+      demand: 'Średni',
+      difficulty: 'Średnia',
+      fitTier: 'Silne dopasowanie',
+      skills: ['Precyzja', 'Narzędzia', 'Wykończenie', 'Projekt'],
+    },
+  ];
+
+  // Przykład prostego dopasowania po cesze dominującej:
+  if (profile?.dominantTrait === 'Praktyczny') {
+    // kolejność: elektryk → hydraulik → stolarz
+    return base;
+  }
+  if (profile?.dominantTrait === 'Analityczny') {
+    // możesz dodać data_analyst itp., ale trzymamy się zawodów praktycznych
+    return base;
+  }
+  // domyślnie:
+  return base;
+}
+// ==================== PLACEHOLDER VIEWS ====================
+function FriendsView() {
+  return <div style={{ padding: '20px' }}><h2>👥 ZARAZ BEDZIE</h2></div>;
+}
+
+function SettingsView() {
+  return <div style={{ padding: '20px' }}><h2>⚙️ Ustawienia - w budowie</h2></div>;
+}
+
+// ==================== 🏆 CHALLENGES VIEW - KOMPLETNY SYSTEM ====================
+function ChallengesView() {
+  const [activeTab, setActiveTab] = useState('active');
+  const [selectedChallenge, setSelectedChallenge] = useState(null);
+
+  const tabs = [
+    { id: 'active', label: 'Aktywne', icon: '🔥', count: 3 },
+    { id: 'daily', label: 'Dzienne', icon: '📅', count: 1 },
+    { id: 'weekly', label: 'Tygodniowe', icon: '📆', count: 2 },
+    { id: 'special', label: 'Specjalne', icon: '⭐', count: 1 },
+    { id: 'completed', label: 'Ukończone', icon: '✅', count: 12 }
+  ];
+
+  return (
+    <div style={{ display: 'grid', gap: '24px' }}>
+      {/* ========== HEADER ========== */}
+      <div style={{
+        background: 'linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%)',
+        color: 'white',
+        padding: '48px',
+        borderRadius: '24px',
+        position: 'relative',
+        overflow: 'hidden',
+        boxShadow: '0 20px 60px rgba(236, 72, 153, 0.3)'
+      }}>
+        {/* Animated background */}
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'radial-gradient(circle at 30% 50%, rgba(255,255,255,0.1), transparent)',
+          animation: 'pulse 4s ease-in-out infinite'
+        }} />
+
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <div style={{ fontSize: '64px', marginBottom: '16px' }}>🏆</div>
+          
+          <h1 style={{ 
+            fontSize: '40px', 
+            fontWeight: '900', 
+            marginBottom: '12px' 
+          }}>
+            Twoje wyzwania
+          </h1>
+          
+          <p style={{ 
+            fontSize: '18px', 
+            opacity: 0.95, 
+            marginBottom: '24px',
+            lineHeight: 1.6
+          }}>
+            Ukończ wyzwania, zdobywaj nagrody i wspinaj się po rankingu
+          </p>
+
+          {/* Quick stats */}
+          <div style={{ 
+            display: 'flex', 
+            gap: '32px', 
+            flexWrap: 'wrap'
+          }}>
+            <div>
+              <div style={{ fontSize: '32px', fontWeight: '900' }}>3</div>
+              <div style={{ fontSize: '14px', opacity: 0.9 }}>aktywne wyzwania</div>
+            </div>
+            <div>
+              <div style={{ fontSize: '32px', fontWeight: '900' }}>12</div>
+              <div style={{ fontSize: '14px', opacity: 0.9 }}>ukończone</div>
+            </div>
+            <div>
+              <div style={{ fontSize: '32px', fontWeight: '900' }}>2.400 XP</div>
+              <div style={{ fontSize: '14px', opacity: 0.9 }}>łącznie zdobyte</div>
+            </div>
+            <div>
+              <div style={{ fontSize: '32px', fontWeight: '900' }}>#47</div>
+              <div style={{ fontSize: '14px', opacity: 0.9 }}>w rankingu Kraków</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ========== TABS ========== */}
+      <div style={{
+        display: 'flex',
+        gap: '12px',
+        overflowX: 'auto',
+        padding: '4px'
+      }}>
+        {tabs.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            style={{
+              padding: '12px 24px',
+              backgroundColor: activeTab === tab.id ? '#7c3aed' : 'white',
+              color: activeTab === tab.id ? 'white' : '#4b5563',
+              border: activeTab === tab.id ? '2px solid #7c3aed' : '2px solid #e5e7eb',
+              borderRadius: '16px',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontWeight: '700',
+              fontSize: '15px',
+              transition: 'all 0.3s ease',
+              boxShadow: activeTab === tab.id ? '0 8px 24px rgba(124, 58, 237, 0.25)' : 'none'
+            }}
+          >
+            <span style={{ fontSize: '20px' }}>{tab.icon}</span>
+            <span>{tab.label}</span>
+            {tab.count > 0 && (
+              <span style={{
+                backgroundColor: activeTab === tab.id ? 'rgba(255,255,255,0.25)' : '#f3f4f6',
+                color: activeTab === tab.id ? 'white' : '#1f2937',
+                padding: '2px 8px',
+                borderRadius: '12px',
+                fontSize: '12px',
+                fontWeight: '900'
+              }}>
+                {tab.count}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* ========== ACTIVE CHALLENGES ========== */}
+      {activeTab === 'active' && <ActiveChallenges onSelect={setSelectedChallenge} />}
+      
+      {/* ========== DAILY CHALLENGES ========== */}
+      {activeTab === 'daily' && <DailyChallenges />}
+      
+      {/* ========== WEEKLY CHALLENGES ========== */}
+      {activeTab === 'weekly' && <WeeklyChallenges />}
+      
+      {/* ========== SPECIAL CHALLENGES ========== */}
+      {activeTab === 'special' && <SpecialChallenges />}
+      
+      {/* ========== COMPLETED CHALLENGES ========== */}
+      {activeTab === 'completed' && <CompletedChallenges />}
+
+      {/* ========== LEADERBOARD ========== */}
+      <ChallengesLeaderboard />
+
+      {/* CSS Animations */}
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 0.1; }
+          50% { opacity: 0.2; }
+        }
+        @keyframes shimmer {
+          0% { background-position: -1000px 0; }
+          100% { background-position: 1000px 0; }
+        }
+        @keyframes countdownPulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.05); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// ========== 🔥 ACTIVE CHALLENGES ========== 
+function ActiveChallenges({ onSelect }) {
+  const challenges = [
+    {
+      id: 1,
+      icon: '⚡',
+      title: 'Tydzień praktyki',
+      description: 'Ukończ 5 lekcji praktycznych w ciągu 7 dni',
+      progress: 3,
+      total: 5,
+      timeLeft: { hours: 14, minutes: 32, seconds: 15 },
+      difficulty: 'medium',
+      xp: 500,
+      coins: 250,
+      category: 'learning',
+      participants: 234,
+      color: '#3b82f6',
+      tasks: [
+        { id: 1, title: 'Diagnostyka usterek', completed: true },
+        { id: 2, title: 'Okablowanie L/N/PE', completed: true },
+        { id: 3, title: 'Rozdzielnia - montaż', completed: true },
+        { id: 4, title: 'Pomiary multimetrem', completed: false },
+        { id: 5, title: 'Case study: wyskakujące korki', completed: false }
+      ]
+    },
+    {
+      id: 2,
+      icon: '🎯',
+      title: 'Perfekcjonista',
+      description: 'Zdobądź 100% w 3 quizach BHP',
+      progress: 1,
+      total: 3,
+      timeLeft: { hours: 47, minutes: 18, seconds: 42 },
+      difficulty: 'hard',
+      xp: 750,
+      coins: 400,
+      badge: '🏅 Mistrz BHP',
+      category: 'achievement',
+      participants: 89,
+      color: '#f59e0b'
+    },
+    {
+      id: 3,
+      icon: '🤝',
+      title: 'Pomocnik społeczności',
+      description: 'Pomóż 5 osobom w forum lub grupie',
+      progress: 2,
+      total: 5,
+      timeLeft: { hours: 71, minutes: 45, seconds: 30 },
+      difficulty: 'easy',
+      xp: 300,
+      coins: 150,
+      category: 'community',
+      participants: 156,
+      color: '#10b981'
+    }
+  ];
+
+  return (
+    <div style={{ display: 'grid', gap: '20px' }}>
+      {challenges.map((challenge, idx) => (
+        <ChallengeCard 
+          key={challenge.id} 
+          challenge={challenge} 
+          index={idx}
+          onSelect={onSelect}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ========== 🎴 CHALLENGE CARD ========== 
+function ChallengeCard({ challenge, index, onSelect }) {
+  const progressPercent = (challenge.progress / challenge.total) * 100;
+
+  const difficultyColors = {
+    easy: { bg: '#10b981', text: 'Łatwe' },
+    medium: { bg: '#f59e0b', text: 'Średnie' },
+    hard: { bg: '#ef4444', text: 'Trudne' }
+  };
+
+  return (
+    <div
+      onClick={() => onSelect?.(challenge)}
+      style={{
+        backgroundColor: 'white',
+        padding: '32px',
+        borderRadius: '20px',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+        border: '2px solid transparent',
+        cursor: 'pointer',
+        transition: 'all 0.3s ease',
+        animation: `slideIn 0.5s ease ${index * 0.1}s backwards`,
+        position: 'relative',
+        overflow: 'hidden'
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = challenge.color;
+        e.currentTarget.style.transform = 'translateY(-4px)';
+        e.currentTarget.style.boxShadow = `0 12px 32px ${challenge.color}33`;
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = 'transparent';
+        e.currentTarget.style.transform = 'translateY(0)';
+        e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.08)';
+      }}
+    >
+      {/* Accent bar */}
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: '4px',
+        background: `linear-gradient(90deg, ${challenge.color}, ${challenge.color}88)`
+      }} />
+
+      {/* Header */}
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between',
+        alignItems: 'start',
+        marginBottom: '20px',
+        gap: '16px'
+      }}>
+        <div style={{ display: 'flex', gap: '16px', alignItems: 'start', flex: 1 }}>
+          {/* Icon */}
+          <div style={{
+            fontSize: '48px',
+            width: '72px',
+            height: '72px',
+            borderRadius: '20px',
+            background: `${challenge.color}22`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0
+          }}>
+            {challenge.icon}
+          </div>
+
+          {/* Title & Description */}
+          <div style={{ flex: 1 }}>
+            <h3 style={{ 
+              fontSize: '22px', 
+              fontWeight: '900', 
+              margin: '0 0 8px 0',
+              color: '#1f2937'
+            }}>
+              {challenge.title}
+            </h3>
+            
+            <p style={{ 
+              fontSize: '15px', 
+              color: '#6b7280',
+              margin: '0 0 12px 0',
+              lineHeight: 1.5
+            }}>
+              {challenge.description}
+            </p>
+
+            {/* Badges */}
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <span style={{
+                padding: '4px 12px',
+                backgroundColor: `${difficultyColors[challenge.difficulty].bg}22`,
+                color: difficultyColors[challenge.difficulty].bg,
+                borderRadius: '12px',
+                fontSize: '12px',
+                fontWeight: '700'
+              }}>
+                {difficultyColors[challenge.difficulty].text}
+              </span>
+
+              <span style={{
+                padding: '4px 12px',
+                backgroundColor: '#f3f4f6',
+                color: '#1f2937',
+                borderRadius: '12px',
+                fontSize: '12px',
+                fontWeight: '700'
+              }}>
+                👥 {challenge.participants} uczestników
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Timer */}
+        <CountdownTimer 
+          hours={challenge.timeLeft.hours}
+          minutes={challenge.timeLeft.minutes}
+          seconds={challenge.timeLeft.seconds}
+          color={challenge.color}
+        />
+      </div>
+
+      {/* Progress */}
+      <div style={{ marginBottom: '20px' }}>
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between',
+          marginBottom: '8px',
+          fontSize: '14px',
+          fontWeight: '600'
+        }}>
+          <span style={{ color: '#6b7280' }}>Postęp</span>
+          <span style={{ color: challenge.color }}>
+            {challenge.progress}/{challenge.total} ({Math.round(progressPercent)}%)
+          </span>
+        </div>
+
+        <div style={{
+          width: '100%',
+          height: '10px',
+          backgroundColor: '#f3f4f6',
+          borderRadius: '10px',
+          overflow: 'hidden'
+        }}>
+          <div style={{
+            width: `${progressPercent}%`,
+            height: '100%',
+            background: `linear-gradient(90deg, ${challenge.color}, ${challenge.color}cc)`,
+            borderRadius: '10px',
+            transition: 'width 0.5s ease',
+            boxShadow: `0 0 10px ${challenge.color}66`
+          }} />
+        </div>
+      </div>
+
+      {/* Rewards */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingTop: '20px',
+        borderTop: '1px solid #f3f4f6'
+      }}>
+        <div style={{ display: 'flex', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '20px' }}>⭐</span>
+            <span style={{ fontSize: '16px', fontWeight: '900', color: '#1f2937' }}>
+              {challenge.xp} XP
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '20px' }}>💰</span>
+            <span style={{ fontSize: '16px', fontWeight: '900', color: '#1f2937' }}>
+              {challenge.coins}
+            </span>
+          </div>
+
+          {challenge.badge && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '14px', fontWeight: '700', color: '#7c3aed' }}>
+                {challenge.badge}
+              </span>
+            </div>
+          )}
+        </div>
+
+        <button style={{
+          padding: '10px 20px',
+          backgroundColor: challenge.color,
+          color: 'white',
+          border: 'none',
+          borderRadius: '12px',
+          fontSize: '14px',
+          fontWeight: '900',
+          cursor: 'pointer',
+          transition: 'all 0.2s ease'
+        }}
+        onMouseEnter={(e) => {
+          e.target.style.transform = 'scale(1.05)';
+          e.target.style.boxShadow = `0 8px 20px ${challenge.color}66`;
+        }}
+        onMouseLeave={(e) => {
+          e.target.style.transform = 'scale(1)';
+          e.target.style.boxShadow = 'none';
+        }}
+        >
+          KONTYNUUJ →
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ========== ⏱️ COUNTDOWN TIMER ========== 
+function CountdownTimer({ hours, minutes, seconds, color }) {
+  const [time, setTime] = useState({ hours, minutes, seconds });
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTime(prev => {
+        if (prev.seconds > 0) {
+          return { ...prev, seconds: prev.seconds - 1 };
+        } else if (prev.minutes > 0) {
+          return { ...prev, minutes: prev.minutes - 1, seconds: 59 };
+        } else if (prev.hours > 0) {
+          return { hours: prev.hours - 1, minutes: 59, seconds: 59 };
+        }
+        return prev;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const isUrgent = time.hours < 24;
+
+  return (
+    <div style={{
+      backgroundColor: isUrgent ? '#fee2e2' : '#f3f4f6',
+      padding: '12px 16px',
+      borderRadius: '16px',
+      textAlign: 'center',
+      minWidth: '140px',
+      animation: isUrgent ? 'countdownPulse 2s infinite' : 'none'
+    }}>
+      <div style={{ 
+        fontSize: '11px', 
+        color: isUrgent ? '#ef4444' : '#6b7280',
+        fontWeight: '700',
+        marginBottom: '4px'
+      }}>
+        ⏰ POZOSTAŁO
+      </div>
+      <div style={{ 
+        fontSize: '20px', 
+        fontWeight: '900',
+        color: isUrgent ? '#dc2626' : '#1f2937',
+        fontFamily: 'monospace'
+      }}>
+        {String(time.hours).padStart(2, '0')}:
+        {String(time.minutes).padStart(2, '0')}:
+        {String(time.seconds).padStart(2, '0')}
+      </div>
+    </div>
+  );
+}
+
+// ========== 📅 DAILY CHALLENGES ========== 
+function DailyChallenges() {
+  const dailyChallenge = {
+    id: 'daily_1',
+    icon: '🎯',
+    title: 'Dzienna dawka wiedzy',
+    description: 'Ukończ 1 lekcję z dowolnego modułu',
+    progress: 0,
+    total: 1,
+    resetsIn: { hours: 8, minutes: 30, seconds: 0 },
+    xp: 100,
+    coins: 50,
+    streak: 7,
+    color: '#ec4899'
+  };
+
+  return (
+    <div style={{ display: 'grid', gap: '20px' }}>
+      {/* Main daily challenge */}
+      <div style={{
+        background: 'linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%)',
+        color: 'white',
+        padding: '40px',
+        borderRadius: '24px',
+        position: 'relative',
+        overflow: 'hidden'
+      }}>
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'radial-gradient(circle at 30% 50%, rgba(255,255,255,0.15), transparent)',
+          animation: 'pulse 4s ease-in-out infinite'
+        }} />
+
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '24px' }}>
+            <div>
+              <div style={{ fontSize: '64px', marginBottom: '12px' }}>{dailyChallenge.icon}</div>
+              <h2 style={{ fontSize: '28px', fontWeight: '900', margin: '0 0 8px 0' }}>
+                {dailyChallenge.title}
+              </h2>
+              <p style={{ fontSize: '16px', opacity: 0.95, margin: 0 }}>
+                {dailyChallenge.description}
+              </p>
+            </div>
+
+            <div style={{
+              backgroundColor: 'rgba(255,255,255,0.25)',
+              backdropFilter: 'blur(10px)',
+              padding: '16px',
+              borderRadius: '20px',
+              textAlign: 'center',
+              border: '2px solid rgba(255,255,255,0.3)'
+            }}>
+              <div style={{ fontSize: '12px', fontWeight: '700', marginBottom: '8px', opacity: 0.9 }}>
+                ODNAWIA SIĘ ZA
+              </div>
+              <div style={{ fontSize: '24px', fontWeight: '900', fontFamily: 'monospace' }}>
+                {String(dailyChallenge.resetsIn.hours).padStart(2, '0')}:
+                {String(dailyChallenge.resetsIn.minutes).padStart(2, '0')}
+              </div>
+            </div>
+          </div>
+
+          {/* Streak */}
+          <div style={{
+            backgroundColor: 'rgba(255,255,255,0.2)',
+            padding: '20px',
+            borderRadius: '16px',
+            marginBottom: '24px',
+            backdropFilter: 'blur(10px)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+              <span style={{ fontSize: '32px' }}>🔥</span>
+              <div>
+                <div style={{ fontSize: '24px', fontWeight: '900' }}>{dailyChallenge.streak} dni z rzędu!</div>
+                <div style={{ fontSize: '14px', opacity: 0.9 }}>Nie przerywaj serii!</div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px' }}>
+              {[...Array(7)].map((_, i) => (
+                <div
+                  key={i}
+                  style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '10px',
+                    backgroundColor: i < dailyChallenge.streak ? '#fbbf24' : 'rgba(255,255,255,0.2)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '20px',
+                    fontWeight: '900',
+                    color: i < dailyChallenge.streak ? '#78350f' : 'rgba(255,255,255,0.5)'
+                  }}
+                >
+                  {i < dailyChallenge.streak ? '✓' : i + 1}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Rewards */}
+          <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+            <button style={{
+              flex: 1,
+              padding: '16px',
+              backgroundColor: 'white',
+              color: '#ec4899',
+              border: 'none',
+              borderRadius: '16px',
+              fontSize: '16px',
+              fontWeight: '900',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '12px'
+            }}>
+              <span style={{ fontSize: '24px' }}>🚀</span>
+              ROZPOCZNIJ
+            </button>
+
+            <div style={{
+              backgroundColor: 'rgba(255,255,255,0.2)',
+              padding: '16px',
+              borderRadius: '16px',
+              backdropFilter: 'blur(10px)',
+              display: 'flex',
+              gap: '16px'
+            }}>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '20px', fontWeight: '900' }}>⭐ {dailyChallenge.xp}</div>
+                <div style={{ fontSize: '11px', opacity: 0.9 }}>XP</div>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '20px', fontWeight: '900' }}>💰 {dailyChallenge.coins}</div>
+                <div style={{ fontSize: '11px', opacity: 0.9 }}>MONET</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ========== 📆 WEEKLY CHALLENGES ========== 
+function WeeklyChallenges() {
+  const weeklyChallenges = [
+    {
+      id: 1,
+      icon: '⚡',
+      title: 'Tydzień mocy',
+      description: 'Zdobądź 1000 XP w ciągu tygodnia',
+      progress: 650,
+      total: 1000,
+      daysLeft: 3,
+      xp: 800,
+      coins: 500,
+      badge: '💎 Power User',
+      color: '#7c3aed'
+    },
+    {
+      id: 2,
+      icon: '🎓',
+      title: 'Master Class',
+      description: 'Ukończ 10 lekcji z oceną 90%+',
+      progress: 6,
+      total: 10,
+      daysLeft: 4,
+      xp: 1000,
+      coins: 600,
+      badge: '🏆 Perfekcjonista',
+      color: '#f59e0b'
+    }
+  ];
+
+  return (
+    <div style={{ display: 'grid', gap: '20px' }}>
+      {weeklyChallenges.map((challenge, idx) => (
+        <ChallengeCard 
+          key={challenge.id}
+          challenge={{
+            ...challenge,
+            timeLeft: { hours: challenge.daysLeft * 24, minutes: 0, seconds: 0 },
+            participants: Math.floor(Math.random() * 300) + 100,
+            difficulty: 'medium'
+          }}
+          index={idx}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ========== ⭐ SPECIAL CHALLENGES ========== 
+function SpecialChallenges() {
+  return (
+    <div style={{
+      background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+      color: '#78350f',
+      padding: '48px',
+      borderRadius: '24px',
+      textAlign: 'center'
+    }}>
+      <div style={{ fontSize: '80px', marginBottom: '20px' }}>🎁</div>
+      <h2 style={{ fontSize: '32px', fontWeight: '900', marginBottom: '12px' }}>
+        Specjalne wyzwanie miesiąca
+      </h2>
+      <p style={{ fontSize: '18px', marginBottom: '32px', opacity: 0.9 }}>
+        Ukończ wszystkie moduły elektryczne i zdobądź <strong>5.000 XP + Certyfikat</strong>
+      </p>
+      <button style={{
+        padding: '16px 32px',
+        backgroundColor: '#78350f',
+        color: '#fef3c7',
+        border: 'none',
+        borderRadius: '16px',
+        fontSize: '18px',
+        fontWeight: '900',
+        cursor: 'pointer'
+      }}>
+        ZOBACZ SZCZEGÓŁY →
+      </button>
+    </div>
+  );
+}
+
+// ========== ✅ COMPLETED CHALLENGES ========== 
+function CompletedChallenges() {
+  const completed = [
+    { id: 1, title: 'Pierwsza lekcja', xp: 100, completedAt: '3 dni temu' },
+    { id: 2, title: 'Tydzień nauki', xp: 200, completedAt: '1 tydzień temu' },
+    { id: 3, title: 'Pomocnik', xp: 150, completedAt: '2 tygodnie temu' }
+  ];
+
+  return (
+    <div style={{ display: 'grid', gap: '12px' }}>
+      {completed.map(c => (
+        <div
+          key={c.id}
+          style={{
+            backgroundColor: '#f9fafb',
+            padding: '20px',
+            borderRadius: '16px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            border: '2px solid #e5e7eb'
+          }}
+        >
+          <div>
+            <div style={{ fontSize: '16px', fontWeight: '700', color: '#1f2937', marginBottom: '4px' }}>
+              ✅ {c.title}
+            </div>
+            <div style={{ fontSize: '13px', color: '#6b7280' }}>
+              Ukończono {c.completedAt}
+            </div>
+          </div>
+          <div style={{
+            backgroundColor: '#10b981',
+            color: 'white',
+            padding: '8px 16px',
+            borderRadius: '12px',
+            fontSize: '14px',
+            fontWeight: '900'
+          }}>
+            +{c.xp} XP
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ========== 🏅 CHALLENGES LEADERBOARD ========== 
+function ChallengesLeaderboard() {
+  const leaders = [
+    { rank: 1, name: 'Tomasz K.', xp: 4200, challenges: 18, avatar: 'TK', streak: 14 },
+    { rank: 2, name: 'Anna W.', xp: 3800, challenges: 16, avatar: 'AW', streak: 12 },
+    { rank: 3, name: 'Paweł M.', xp: 3500, challenges: 15, avatar: 'PM', streak: 10 },
+    { rank: 47, name: 'Ty (Marcin)', xp: 2400, challenges: 12, avatar: 'M', streak: 7, isCurrentUser: true }
+  ];
+
+  return (
+    
+    <div style={{
+      background: 'white',
+      padding: '32px',
+      borderRadius: '20px',
+      boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
+    }}>
+      <h3 style={{ fontSize: '24px', fontWeight: '900', marginBottom: '24px', color: '#1f2937' }}>
+        🏅 Ranking Kraków - Wyzwania
+      </h3>
+
+      <div style={{ display: 'grid', gap: '12px' }}>
+        {leaders.map(leader => (
+          <div
+            key={leader.rank}
+            style={{
+              padding: '20px',
+              background: leader.isCurrentUser 
+                ? 'linear-gradient(135deg, #fef3c7, #fde68a)'
+                : '#f9fafb',
+              borderRadius: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '16px',
+              border: leader.isCurrentUser ? '2px solid #fbbf24' : '2px solid #e5e7eb'
+            }}
+          >
+            {/* Rank */}
+            <div style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: '50%',
+              background: leader.rank <= 3 
+                ? (leader.rank === 1 ? '#fbbf24' : leader.rank === 2 ? '#94a3b8' : '#f97316')
+                : '#e5e7eb',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '20px',
+              fontWeight: '900',
+              color: leader.rank <= 3 ? 'white' : '#6b7280'
+            }}>
+              {leader.rank <= 3 ? '🏆' : `#${leader.rank}`}
+            </div>
+
+            {/* Avatar */}
+            <div style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, #7c3aed, #ec4899)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white',
+              fontWeight: '900',
+              fontSize: '16px'
+            }}>
+              {leader.avatar}
+            </div>
+
+            {/* Info */}
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: '16px', fontWeight: '900', color: '#1f2937', marginBottom: '4px' }}>
+                {leader.name}
+              </div>
+              <div style={{ fontSize: '13px', color: '#6b7280', display: 'flex', gap: '16px' }}>
+                <span>⭐ {leader.xp} XP</span>
+                <span>🏆 {leader.challenges} wyzwań</span>
+                <span>🔥 {leader.streak} dni</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+}
