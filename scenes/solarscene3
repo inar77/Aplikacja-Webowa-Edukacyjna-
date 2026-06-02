@@ -1,0 +1,851 @@
+Now the centerpiece — the immersive `SolarFarmScene`. This is large; I'll write it carefully with the exit button, state machine, and the route-entry transition (`y: "100%"`):
+Action: file_editor create /app/frontend/src/pages/SolarFarmScene.jsx --file-text "import React, { useEffect, useRef, useState } from \"react\";
+import { motion, AnimatePresence, useSpring } from \"framer-motion\";
+import { useNavigate } from \"react-router-dom\";
+import {
+  ArrowLeft,
+  Sun,
+  Flame,
+  Zap,
+  AlertTriangle,
+  RotateCcw,
+  Trophy,
+  Radio,
+  Crosshair,
+  CheckCircle2,
+  Power,
+} from \"lucide-react\";
+import { useProgress } from \"@/context/ProgressContext\";
+
+/* Three PV strings — the MIDDLE one is the damaged anomaly (120V). */
+const STRINGS = [
+  { id: \"s1\", label: \"STRING 1\", voltage: 378, x: 70 },
+  { id: \"s2\", label: \"STRING 2\", voltage: 120, x: 335, damaged: true },
+  { id: \"s3\", label: \"STRING 3\", voltage: 379, x: 600 },
+];
+
+const PHASE_TITLE = {
+  scan: \"ZNAJDŹ ANOMALIĘ\",
+  thermal: \"POTWIERDŹ TERMOWIZJĄ\",
+  arc_trap: \"ROZŁĄCZ BEZPIECZNIE\",
+  swap: \"WYMIANA PANELA…\",
+  measure: \"POMIAR Voc\",
+  finish: \"ZAŁĄCZ INSTALACJĘ\",
+};
+
+const PHASE_OBJECTIVE = {
+  scan: \"Klient zgłasza spadek produkcji. Skanuj stringi celownikiem — szukaj odstępstwa od ~380V DC.\",
+  thermal: \"Włącz kamerę termowizyjną. Uszkodzone ogniwo grzeje się >80°C — zobaczysz hotspot.\",
+  arc_trap: \"Złącza MC4 są w zasięgu. ZANIM rozepniesz — upewnij się, że obwód NIE jest pod obciążeniem (DC = OFF).\",
+  swap: \"Wymiana panela w toku…\",
+  measure: \"Chwyć sondy multimetru i podepnij do MC4. Voc ≈ 380V DC. Polaryzacja MA znaczenie.\",
+  finish: \"Wszystko gotowe. Załącz rozłącznik DC z powrotem na ON i obserwuj produkcję.\",
+};
+
+const PHASES = [
+  { id: \"scan\", label: \"Skan stringów\" },
+  { id: \"thermal\", label: \"Termowizja\" },
+  { id: \"arc_trap\", label: \"Rozłączenie DC\" },
+  { id: \"swap\", label: \"Wymiana panela\" },
+  { id: \"measure\", label: \"Pomiar Voc\" },
+  { id: \"finish\", label: \"Załączenie\" },
+];
+
+const formatPower = (kW) => `${kW.toFixed(2)} kW`;
+
+export default function SolarFarmScene() {
+  const navigate = useNavigate();
+  const { addXp, completeLesson } = useProgress();
+
+  const [phase, setPhase] = useState(\"scan\");
+  const [irradiance, setIrradiance] = useState(1.0);
+  const [scannedString, setScannedString] = useState(null);
+  const [thermoOn, setThermoOn] = useState(false);
+  const [dcSwitch, setDcSwitch] = useState(\"ON\");
+  const [acSwitch] = useState(\"ON\");
+  const [arcFlash, setArcFlash] = useState(false);
+  const [bhpModal, setBhpModal] = useState(null);
+  const [probes, setProbes] = useState({ red: null, black: null });
+  const [draggingProbe, setDraggingProbe] = useState(null);
+  const [measurementShown, setMeasurementShown] = useState(null);
+  const [panelSwapped, setPanelSwapped] = useState(false);
+  const [xpItems, setXpItems] = useState([]);
+  const [feed, setFeed] = useState([
+    { id: 1, text: \"AdamSEP zdał egzamin za pierwszym razem\", t: \"20:21\" },
+    { id: 2, text: \"Janek33 zaliczył krok: Odetnij Napięcie\", t: \"20:21\" },
+    { id: 3, text: \"Piotrek_W podpiął fazę w gnieździe\", t: \"20:21\" },
+  ]);
+  const [mistakes, setMistakes] = useState(0);
+  const [completed, setCompleted] = useState(null);
+  const startTs = useRef(Date.now());
+  const awarded = useRef(false);
+
+  /* ---- live inverter power via spring ---- */
+  const powerSpring = useSpring(4.82, { stiffness: 60, damping: 22 });
+  const [powerDisplay, setPowerDisplay] = useState(4.82);
+  useEffect(() => powerSpring.on(\"change\", (v) => setPowerDisplay(v)), [powerSpring]);
+  useEffect(() => {
+    let target = 5.42 * irradiance;
+    if (!panelSwapped) target = Math.max(0.6, target - 0.6);
+    if (dcSwitch === \"OFF\" || acSwitch === \"OFF\") target = 0;
+    powerSpring.set(target);
+  }, [irradiance, panelSwapped, dcSwitch, acSwitch, powerSpring]);
+
+  const isLoadActive = dcSwitch === \"ON\" && acSwitch === \"ON\" && powerDisplay > 0.05;
+
+  /* ---- helpers ---- */
+  const floatXp = (kind, value, label) => {
+    const id = Date.now() + Math.random();
+    setXpItems((c) => [...c, { id, kind, value, label }]);
+    setTimeout(() => setXpItems((c) => c.filter((x) => x.id !== id)), 2000);
+  };
+  const logFeed = (text) =>
+    setFeed((c) => [{ id: Date.now(), text: `Ty: ${text}`, t: \"teraz\" }, ...c].slice(0, 4));
+
+  const exitToDashboard = () => navigate(\"/dashboard\");
+
+  /* ---- SCAN ---- */
+  const handleStringClick = (s) => {
+    if (phase !== \"scan\") return;
+    setScannedString(s.id);
+    if (s.damaged) {
+      floatXp(\"plus\", 25, \"DIAGNOZA\");
+      logFeed(\"zlokalizował uszkodzony string (120V zamiast 380V)\");
+      setTimeout(() => setPhase(\"thermal\"), 900);
+    } else {
+      floatXp(\"ok\", 0, \"OK\");
+      logFeed(`sprawdził ${s.label} — bez anomalii`);
+    }
+  };
+
+  /* ---- THERMAL ---- */
+  useEffect(() => {
+    if (phase === \"thermal\" && thermoOn) {
+      const t = setTimeout(() => {
+        floatXp(\"plus\", 30, \"HOTSPOT\");
+        setPhase(\"arc_trap\");
+      }, 2200);
+      return () => clearTimeout(t);
+    }
+  }, [phase, thermoOn]);
+
+  /* ---- ARC TRAP / MEASURE terminal clicks ---- */
+  const handleTerminalClick = (terminal) => {
+    if (phase === \"arc_trap\") {
+      if (isLoadActive) {
+        triggerArcFlash();
+      } else {
+        floatXp(\"plus\", 50, \"LOTO OK\");
+        logFeed(\"rozłączył MC4 bezpiecznie (DC=OFF)\");
+        setPhase(\"swap\");
+      }
+    } else if (phase === \"measure\") {
+      placeProbe(terminal);
+    }
+  };
+
+  const triggerArcFlash = () => {
+    setArcFlash(true);
+    setMistakes((m) => m + 1);
+    floatXp(\"minus\", 30, \"BHP\");
+    setTimeout(() => setArcFlash(false), 650);
+    setBhpModal({
+      title: \"KATASTROFA — ŁUK ELEKTRYCZNY DC\",
+      body: \"Rozpiąłeś MC4 przy obciążonym DC. Łuk 5000°C stopił złącza i wypalił rękawicę. W realu — oparzenia, ślepota od błysku. DC nie ma przejścia przez zero jak AC — łuk nie gaśnie sam. ZAWSZE najpierw rozłącznik DC na OFF, zmierz brak napięcia, dopiero potem rozpinaj.\",
+    });
+  };
+
+  const handleDcToggle = () => {
+    setDcSwitch((s) => {
+      const next = s === \"ON\" ? \"OFF\" : \"ON\";
+      if (phase === \"arc_trap\" && next === \"OFF\") floatXp(\"plus\", 15, \"DC OFF\");
+      logFeed(next === \"OFF\" ? \"wyłączył DC w inwerterze\" : \"załączył DC\");
+      return next;
+    });
+  };
+
+  /* ---- SWAP ---- */
+  useEffect(() => {
+    if (phase === \"swap\") {
+      const t = setTimeout(() => {
+        setPanelSwapped(true);
+        logFeed(\"wymienił uszkodzony panel #2\");
+        floatXp(\"plus\", 40, \"PANEL OK\");
+        setPhase(\"measure\");
+      }, 2400);
+      return () => clearTimeout(t);
+    }
+  }, [phase]);
+
+  /* ---- MEASURE ---- */
+  const placeProbe = (terminal) => {
+    if (!draggingProbe) return;
+    setProbes((cur) => {
+      const next = { ...cur };
+      Object.keys(next).forEach((k) => {
+        if (next[k] === terminal && k !== draggingProbe) next[k] = null;
+      });
+      next[draggingProbe] = terminal;
+      return next;
+    });
+    setDraggingProbe(null);
+  };
+
+  useEffect(() => {
+    if (phase !== \"measure\") return;
+    if (probes.red && probes.black && probes.red !== probes.black) {
+      const correct = probes.red === \"plus\" && probes.black === \"minus\";
+      setMeasurementShown(correct ? 380 : -380);
+      if (correct) {
+        floatXp(\"plus\", 40, \"Voc OK\");
+        logFeed(\"zmierzył Voc = +380V (polaryzacja OK)\");
+        const t = setTimeout(() => setPhase(\"finish\"), 1700);
+        return () => clearTimeout(t);
+      } else {
+        setMistakes((m) => m + 1);
+        const t = setTimeout(() => {
+          setBhpModal({
+            title: \"ODWROTNA POLARYZACJA\",
+            body: \"Multimetr pokazuje −380V. Czerwona sonda na MINUS, czarna na PLUS. Odwrócona polaryzacja DC potrafi rozwalić wejście MPPT falownika (~3000 zł). Czerwona = +, czarna = −. ZAWSZE.\",
+          });
+        }, 700);
+        return () => clearTimeout(t);
+      }
+    }
+  }, [probes, phase]);
+
+  /* ---- FINISH ---- */
+  useEffect(() => {
+    if (phase === \"finish\" && dcSwitch === \"ON\" && acSwitch === \"ON\" && powerDisplay > 4.9 && panelSwapped) {
+      const t = setTimeout(() => {
+        setCompleted({ duration: Date.now() - startTs.current, perfect: mistakes === 0 });
+      }, 1400);
+      return () => clearTimeout(t);
+    }
+  }, [phase, dcSwitch, acSwitch, powerDisplay, panelSwapped, mistakes]);
+
+  /* ---- award XP once on completion ---- */
+  useEffect(() => {
+    if (completed && !awarded.current) {
+      awarded.current = true;
+      addXp(150);
+      completeLesson(\"solar-farm\");
+    }
+  }, [completed, addXp, completeLesson]);
+
+  const undoMistake = () => {
+    setBhpModal(null);
+    if (phase === \"measure\") {
+      setProbes({ red: null, black: null });
+      setMeasurementShown(null);
+    }
+  };
+
+  const showMC4 = [\"arc_trap\", \"swap\", \"measure\", \"finish\"].includes(phase);
+  const darken = (1 - irradiance) * 0.55;
+  const cloudOpacity = 0.25 + (1 - irradiance) * 0.5;
+
+  return (
+    <motion.div
+      initial={{ y: \"100%\" }}
+      animate={{ y: 0 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
+      className=\"fixed inset-0 z-50 flex flex-col bg-[hsl(230_40%_5%)] lg:flex-row\"
+    >
+      {/* ===================== SCENE (left / top) ===================== */}
+      <div className=\"relative min-h-[52vh] flex-1 overflow-hidden lg:min-h-0\">
+        {/* SVG world */}
+        <svg
+          className=\"absolute inset-0 h-full w-full\"
+          viewBox=\"0 0 900 600\"
+          preserveAspectRatio=\"xMidYMid slice\"
+        >
+          <defs>
+            <linearGradient id=\"sky\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\">
+              <stop offset=\"0%\" stopColor=\"#1a2a52\" />
+              <stop offset=\"55%\" stopColor=\"#39559a\" />
+              <stop offset=\"100%\" stopColor=\"#caa06a\" />
+            </linearGradient>
+            <linearGradient id=\"ground\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\">
+              <stop offset=\"0%\" stopColor=\"#3a4a22\" />
+              <stop offset=\"100%\" stopColor=\"#1c2410\" />
+            </linearGradient>
+            <linearGradient id=\"panelGrad\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"1\">
+              <stop offset=\"0%\" stopColor=\"#1b2b52\" />
+              <stop offset=\"100%\" stopColor=\"#0d1730\" />
+            </linearGradient>
+            <radialGradient id=\"sunGlow\">
+              <stop offset=\"0%\" stopColor=\"#fff7e0\" />
+              <stop offset=\"35%\" stopColor=\"#ffd277\" />
+              <stop offset=\"100%\" stopColor=\"#ffd27700\" />
+            </radialGradient>
+            <pattern id=\"cells\" width=\"22\" height=\"22\" patternUnits=\"userSpaceOnUse\">
+              <rect width=\"22\" height=\"22\" fill=\"none\" />
+              <rect x=\"1\" y=\"1\" width=\"20\" height=\"20\" fill=\"none\" stroke=\"#5878c8\" strokeOpacity=\"0.35\" strokeWidth=\"1\" />
+            </pattern>
+          </defs>
+
+          {/* sky + sun + clouds */}
+          <rect x=\"0\" y=\"0\" width=\"900\" height=\"600\" fill=\"url(#sky)\" />
+          <circle cx=\"775\" cy=\"150\" r=\"120\" fill=\"url(#sunGlow)\" opacity={irradiance} />
+          <circle cx=\"775\" cy=\"150\" r=\"44\" fill=\"#fff3d0\" opacity={irradiance} />
+          <g fill=\"#dfe6f2\" opacity={cloudOpacity}>
+            <ellipse cx=\"200\" cy=\"120\" rx=\"80\" ry=\"26\" />
+            <ellipse cx=\"250\" cy=\"135\" rx=\"60\" ry=\"22\" />
+            <ellipse cx=\"560\" cy=\"95\" rx=\"70\" ry=\"22\" />
+          </g>
+
+          {/* ground */}
+          <rect x=\"0\" y=\"392\" width=\"900\" height=\"208\" fill=\"url(#ground)\" />
+          <line x1=\"0\" y1=\"394\" x2=\"900\" y2=\"394\" stroke=\"#9aa86a\" strokeOpacity=\"0.3\" strokeWidth=\"2\" />
+
+          {/* support poles */}
+          {[120, 240, 360, 480, 600, 720].map((x) => (
+            <rect key={x} x={x} y=\"392\" width=\"5\" height=\"70\" fill=\"#11160c\" opacity=\"0.7\" />
+          ))}
+
+          {/* panels */}
+          {STRINGS.map((s, i) => {
+            const x0 = s.x;
+            const damaged = s.damaged && !panelSwapped;
+            const dim = phase !== \"scan\" && !s.damaged && phase !== \"finish\" ? 0.5 : 1;
+            const pts = `${x0 + 26},230 ${x0 + 232},212 ${x0 + 214},372 ${x0 + 8},390`;
+            const scanned = scannedString === s.id;
+            return (
+              <g key={s.id} opacity={dim} style={{ cursor: phase === \"scan\" ? \"crosshair\" : \"default\" }}>
+                <polygon
+                  points={pts}
+                  fill=\"url(#panelGrad)\"
+                  stroke={scanned ? \"#7c9cf0\" : \"#0a1226\"}
+                  strokeWidth=\"2\"
+                  onClick={() => handleStringClick(s)}
+                  data-testid={`string-${s.id}`}
+                />
+                <polygon points={pts} fill=\"url(#cells)\" pointerEvents=\"none\" />
+                {/* reflection */}
+                <polygon
+                  points={`${x0 + 26},230 ${x0 + 232},212 ${x0 + 150},250 ${x0 + 40},262`}
+                  fill=\"#9fb6ee\"
+                  opacity=\"0.12\"
+                  pointerEvents=\"none\"
+                />
+                {/* damaged hotspot under thermal */}
+                {damaged && thermoOn && (
+                  <g pointerEvents=\"none\">
+                    <circle cx={x0 + 120} cy={300} r=\"46\" fill=\"#ff5a2a\" opacity=\"0.55\">
+                      <animate attributeName=\"r\" values=\"40;52;40\" dur=\"1.4s\" repeatCount=\"indefinite\" />
+                    </circle>
+                    <circle cx={x0 + 120} cy={300} r=\"22\" fill=\"#ffd23a\" opacity=\"0.85\" />
+                  </g>
+                )}
+                {/* scan voltage label */}
+                {phase === \"scan\" && scanned && (
+                  <g pointerEvents=\"none\">
+                    <rect x={x0 + 40} y={290} width=\"150\" height=\"30\" rx=\"6\" fill=\"#0a1020\" opacity=\"0.85\" />
+                    <text x={x0 + 115} y={310} textAnchor=\"middle\" fontFamily=\"monospace\" fontSize=\"15\" fill={s.damaged ? \"#ff6b4a\" : \"#5ce08a\"}>
+                      {s.label}: {s.voltage}V
+                    </text>
+                  </g>
+                )}
+                {/* crosshair on middle panel during scan */}
+                {phase === \"scan\" && s.damaged && !scanned && (
+                  <g pointerEvents=\"none\">
+                    <circle cx={x0 + 120} cy={300} r=\"18\" fill=\"none\" stroke=\"#cfe0ff\" strokeWidth=\"2\" opacity=\"0.8\">
+                      <animate attributeName=\"opacity\" values=\"0.4;1;0.4\" dur=\"1.4s\" repeatCount=\"indefinite\" />
+                    </circle>
+                    <line x1={x0 + 120} y1={276} x2={x0 + 120} y2={324} stroke=\"#cfe0ff\" strokeWidth=\"2\" opacity=\"0.8\" />
+                    <line x1={x0 + 96} y1={300} x2={x0 + 144} y2={300} stroke=\"#cfe0ff\" strokeWidth=\"2\" opacity=\"0.8\" />
+                  </g>
+                )}
+              </g>
+            );
+          })}
+
+          {/* darken overlay when shaded */}
+          <rect x=\"0\" y=\"0\" width=\"900\" height=\"600\" fill=\"#05060f\" opacity={darken} pointerEvents=\"none\" />
+        </svg>
+
+        {/* ===== Exit button (top-left, INSIDE the scene) ===== */}
+        <button
+          data-testid=\"exit-scene-btn\"
+          onClick={exitToDashboard}
+          className=\"back-btn absolute left-4 top-4 z-30 inline-flex items-center gap-2 rounded-xl border border-border bg-[hsl(230_30%_10%/0.85)] px-4 py-2.5 font-display text-sm font-semibold text-foreground backdrop-blur-md transition-transform hover:scale-[1.04] active:scale-95\"
+        >
+          <ArrowLeft className=\"h-4 w-4\" /> Opuść Obiekt
+        </button>
+
+        {/* ===== Live crew feed (top-right) ===== */}
+        <div className=\"absolute right-4 top-4 z-20 w-[260px] max-w-[60%] rounded-xl border border-border/60 bg-[hsl(230_35%_7%/0.7)] p-3 backdrop-blur-md\">
+          <div className=\"mb-2 flex items-center gap-2 font-mono text-[11px] tracking-widest text-gold\">
+            <Radio className=\"h-3.5 w-3.5\" /> KRÓTKOFALÓWKA BRYGADY
+          </div>
+          <div className=\"flex flex-col gap-1.5\">
+            <AnimatePresence initial={false}>
+              {feed.map((f) => (
+                <motion.p
+                  key={f.id}
+                  initial={{ opacity: 0, x: 12 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0 }}
+                  className=\"font-mono text-[11px] leading-snug text-muted-foreground\"
+                >
+                  <span className=\"text-info\">[{f.t}]</span> {f.text}
+                </motion.p>
+              ))}
+            </AnimatePresence>
+          </div>
+        </div>
+
+        {/* ===== Thermal toggle (top-center, thermal phase) ===== */}
+        {phase === \"thermal\" && (
+          <button
+            data-testid=\"thermal-toggle\"
+            onClick={() => setThermoOn((t) => !t)}
+            className=\"absolute left-1/2 top-4 z-20 inline-flex -translate-x-1/2 items-center gap-2 rounded-xl border px-4 py-2.5 font-display text-sm font-semibold transition-transform hover:scale-[1.04]\"
+            style={{
+              background: thermoOn ? \"hsl(var(--accent-hot))\" : \"hsl(230 30% 10% / 0.85)\",
+              color: thermoOn ? \"hsl(22 90% 8%)\" : \"hsl(var(--accent-hot))\",
+              borderColor: \"hsl(var(--accent-hot))\",
+            }}
+          >
+            <Flame className=\"h-4 w-4\" /> {thermoOn ? \"TERMO ON\" : \"WŁĄCZ TERMO\"}
+          </button>
+        )}
+
+        {/* ===== Weather / shade slider (bottom-left) ===== */}
+        <div className=\"absolute bottom-4 left-4 z-20 w-[240px] rounded-xl border border-border/60 bg-[hsl(230_35%_7%/0.75)] p-3 backdrop-blur-md\">
+          <div className=\"mb-2 flex items-center justify-between font-mono text-[11px] tracking-widest text-muted-foreground\">
+            <span className=\"flex items-center gap-1.5\">
+              <Sun className=\"h-3.5 w-3.5 text-gold\" /> ZACIENIENIE
+            </span>
+            <span className=\"text-gold\">{Math.round((1 - irradiance) * 100)}%</span>
+          </div>
+          <input
+            type=\"range\"
+            min=\"0\"
+            max=\"1\"
+            step=\"0.01\"
+            value={irradiance}
+            onChange={(e) => setIrradiance(parseFloat(e.target.value))}
+            className=\"w-full accent-[hsl(var(--gold))]\"
+            data-testid=\"weather-input\"
+          />
+        </div>
+
+        {/* ===== Inverter panel (bottom-right) ===== */}
+        <div className=\"absolute bottom-4 right-4 z-20 w-[200px] rounded-2xl border-2 border-border bg-[hsl(220_8%_85%)] p-3 shadow-card\">
+          <p className=\"mb-2 text-center font-mono text-[11px] tracking-widest text-[hsl(220_10%_25%)]\">
+            SOL · INV-5K
+          </p>
+          <div className=\"rounded-md bg-[hsl(150_30%_6%)] px-3 py-2 text-center\">
+            <p className=\"font-mono text-2xl font-bold text-[hsl(150_80%_55%)]\">
+              {formatPower(powerDisplay)}
+            </p>
+            <p className=\"font-mono text-[10px] tracking-widest text-info\">PRODUKCJA · LIVE</p>
+          </div>
+          <div className=\"mt-3 grid grid-cols-2 gap-2\">
+            <button
+              data-testid=\"dc-switch\"
+              onClick={handleDcToggle}
+              className=\"rounded-md border-2 px-2 py-2 text-center transition-colors\"
+              style={{
+                borderColor: dcSwitch === \"ON\" ? \"hsl(var(--accent-hot))\" : \"hsl(220 8% 60%)\",
+                background: dcSwitch === \"ON\" ? \"hsl(var(--accent-hot) / 0.18)\" : \"hsl(220 8% 78%)\",
+              }}
+            >
+              <span className=\"block font-mono text-[10px] font-bold text-[hsl(22_70%_30%)]\">DC</span>
+              <span className=\"block font-mono text-xs font-bold text-[hsl(220_12%_18%)]\">{dcSwitch}</span>
+            </button>
+            <div
+              className=\"rounded-md border-2 px-2 py-2 text-center\"
+              style={{
+                borderColor: \"hsl(var(--success))\",
+                background: \"hsl(var(--success) / 0.18)\",
+              }}
+            >
+              <span className=\"block font-mono text-[10px] font-bold text-[hsl(150_40%_28%)]\">AC</span>
+              <span className=\"block font-mono text-xs font-bold text-[hsl(220_12%_18%)]\">{acSwitch}</span>
+            </div>
+          </div>
+          <div className=\"mt-2 flex items-center justify-center gap-1.5 font-mono text-[9px] tracking-widest text-[hsl(220_10%_30%)]\">
+            <span
+              className=\"inline-block h-2 w-2 rounded-full\"
+              style={{ background: isLoadActive ? \"hsl(var(--destructive))\" : \"hsl(220 8% 55%)\" }}
+            />
+            LOAD {isLoadActive ? \"ACTIVE\" : \"IDLE\"}
+          </div>
+        </div>
+
+        {/* ===== MC4 connectors (center-bottom) ===== */}
+        {showMC4 && (
+          <div className=\"absolute bottom-4 left-1/2 z-20 -translate-x-1/2 rounded-xl border border-border bg-[hsl(230_35%_7%/0.85)] p-3 backdrop-blur-md\">
+            <p className=\"mb-2 text-center font-mono text-[10px] tracking-widest text-muted-foreground\">
+              ZŁĄCZA MC4 · PANEL #2
+            </p>
+            <div className=\"flex items-center gap-4\">
+              <Terminal
+                sign=\"+\"
+                tone=\"hsl(var(--destructive))\"
+                onClick={() => handleTerminalClick(\"plus\")}
+                onDrop={() => placeProbe(\"plus\")}
+                redOn={probes.red === \"plus\"}
+                blackOn={probes.black === \"plus\"}
+                clickable={phase === \"arc_trap\" || phase === \"measure\"}
+                testid=\"mc4-plus\"
+              />
+              <Terminal
+                sign=\"−\"
+                tone=\"hsl(220 10% 35%)\"
+                onClick={() => handleTerminalClick(\"minus\")}
+                onDrop={() => placeProbe(\"minus\")}
+                redOn={probes.red === \"minus\"}
+                blackOn={probes.black === \"minus\"}
+                clickable={phase === \"arc_trap\" || phase === \"measure\"}
+                testid=\"mc4-minus\"
+              />
+            </div>
+            {phase === \"arc_trap\" && isLoadActive && (
+              <p className=\"mt-2 text-center font-mono text-[10px] text-destructive\">
+                ⚠ obwód pod obciążeniem!
+              </p>
+            )}
+            {phase === \"swap\" && (
+              <p className=\"mt-2 text-center font-mono text-[10px] text-gold\">wymiana panela…</p>
+            )}
+          </div>
+        )}
+
+        {/* arc flash overlay */}
+        <AnimatePresence>
+          {arcFlash && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0, 1, 0.2, 1, 0] }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.6 }}
+              className=\"pointer-events-none absolute inset-0 z-40 bg-white\"
+            />
+          )}
+        </AnimatePresence>
+
+        {/* floating XP */}
+        <div className=\"pointer-events-none absolute inset-0 z-30\">
+          <AnimatePresence>
+            {xpItems.map((x) => (
+              <motion.div
+                key={x.id}
+                initial={{ opacity: 0, y: 0, scale: 0.8 }}
+                animate={{ opacity: 1, y: -60, scale: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 1.8 }}
+                className=\"absolute left-1/2 top-1/2 -translate-x-1/2 rounded-full px-4 py-1.5 font-mono text-sm font-bold\"
+                style={{
+                  background:
+                    x.kind === \"minus\"
+                      ? \"hsl(var(--destructive) / 0.2)\"
+                      : x.kind === \"ok\"
+                        ? \"hsl(220 10% 30% / 0.4)\"
+                        : \"hsl(var(--xp) / 0.2)\",
+                  color:
+                    x.kind === \"minus\"
+                      ? \"hsl(var(--destructive))\"
+                      : x.kind === \"ok\"
+                        ? \"hsl(var(--muted-foreground))\"
+                        : \"hsl(var(--xp))\",
+                }}
+              >
+                {x.kind === \"minus\" ? \"−\" : x.value > 0 ? \"+\" : \"\"}
+                {x.value > 0 ? `${x.value} XP · ` : \"\"}
+                {x.label}
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
+      </div>
+
+      {/* ===================== HUD (right / bottom) ===================== */}
+      <aside className=\"flex w-full shrink-0 flex-col gap-5 overflow-y-auto border-t border-border bg-card p-5 lg:w-[360px] lg:border-l lg:border-t-0\">
+        <div>
+          <p className=\"font-mono text-[11px] tracking-widest text-primary-glow\">
+            ZLECENIE PV · FARMA 5kW
+          </p>
+          <h2 className=\"mt-1 font-display text-2xl font-bold text-foreground\">
+            {PHASE_TITLE[phase]}
+          </h2>
+        </div>
+
+        <div className=\"rounded-xl border border-border bg-secondary/40 p-4\">
+          <p className=\"text-sm leading-relaxed text-muted-foreground\">
+            {PHASE_OBJECTIVE[phase]}
+          </p>
+        </div>
+
+        {/* BHP note */}
+        <div className=\"flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/10 p-4\">
+          <AlertTriangle className=\"mt-0.5 h-5 w-5 shrink-0 text-destructive\" />
+          <p className=\"text-xs leading-relaxed text-destructive-foreground/90\">
+            W DC łuk elektryczny nie gaśnie sam (brak przejścia przez zero). Każda manipulacja MC4 pod obciążeniem = zagrożenie życia.
+          </p>
+        </div>
+
+        <PhaseTimeline phase={phase} />
+
+        <div className=\"mt-auto grid grid-cols-2 gap-3\">
+          <div className=\"rounded-xl border border-border bg-secondary/40 p-3 text-center\">
+            <p className=\"font-mono text-xl font-bold text-foreground\">{mistakes}</p>
+            <p className=\"font-mono text-[10px] tracking-widest text-muted-foreground\">BŁĘDY</p>
+          </div>
+          <div className=\"rounded-xl border border-gold/30 bg-gold/10 p-3 text-center\">
+            <p className=\"font-mono text-xl font-bold text-gold\">+150</p>
+            <p className=\"font-mono text-[10px] tracking-widest text-muted-foreground\">NAGRODA XP</p>
+          </div>
+        </div>
+
+        {/* Multimeter (measure phase) */}
+        <AnimatePresence>
+          {phase === \"measure\" && (
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className=\"rounded-xl border border-border bg-[hsl(230_30%_9%)] p-4\"
+            >
+              <p className=\"mb-2 font-mono text-[11px] tracking-widest text-muted-foreground\">
+                MULTIMETR · CAT III 1000V
+              </p>
+              <div className=\"rounded-md bg-[hsl(150_30%_6%)] px-3 py-3 text-center\">
+                <p className=\"font-mono text-2xl font-bold text-[hsl(150_80%_55%)]\">
+                  {measurementShown == null
+                    ? \"----\"
+                    : `${measurementShown > 0 ? \"+\" : \"\"}${measurementShown}V`}
+                </p>
+                <p className=\"font-mono text-[10px] tracking-widest text-info\">DC · Voc</p>
+              </div>
+              <p className=\"mt-3 text-center font-mono text-[10px] text-muted-foreground\">
+                Kliknij sondę, potem złącze MC4 ↓
+              </p>
+              <div className=\"mt-2 flex gap-2\">
+                <ProbeBtn
+                  color=\"red\"
+                  active={draggingProbe === \"red\"}
+                  placed={probes.red}
+                  onClick={() => setDraggingProbe(\"red\")}
+                />
+                <ProbeBtn
+                  color=\"black\"
+                  active={draggingProbe === \"black\"}
+                  placed={probes.black}
+                  onClick={() => setDraggingProbe(\"black\")}
+                />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </aside>
+
+      {/* BHP modal */}
+      <AnimatePresence>
+        {bhpModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className=\"fixed inset-0 z-[60] grid place-items-center bg-black/70 p-5 backdrop-blur-sm\"
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className=\"w-full max-w-md rounded-2xl border border-destructive/50 bg-card p-6 shadow-elegant\"
+            >
+              <div className=\"mb-3 flex items-center gap-2 text-destructive\">
+                <AlertTriangle className=\"h-6 w-6\" />
+                <h3 className=\"font-display text-lg font-bold\">{bhpModal.title}</h3>
+              </div>
+              <p className=\"mb-3 font-mono text-xs italic text-muted-foreground\">
+                *huk + błysk + zapach palonej miedzi*
+              </p>
+              <p className=\"text-sm leading-relaxed text-foreground/90\">{bhpModal.body}</p>
+              <button
+                onClick={undoMistake}
+                className=\"mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl gradient-primary px-4 py-3 font-display text-sm font-semibold text-primary-foreground\"
+              >
+                <RotateCcw className=\"h-4 w-4\" /> Zrozumiałem błąd, cofnij czas
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Completion screen */}
+      <AnimatePresence>
+        {completed && (
+          <CompletionScreen
+            completed={completed}
+            mistakes={mistakes}
+            onExit={exitToDashboard}
+          />
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
+/* ---------------- sub components ---------------- */
+
+const Terminal = ({ sign, tone, onClick, onDrop, redOn, blackOn, clickable, testid }) => (
+  <button
+    data-testid={testid}
+    onClick={onClick}
+    onDragOver={(e) => e.preventDefault()}
+    onDrop={onDrop}
+    className=\"relative grid h-14 w-14 place-items-center rounded-full border-2 font-mono text-lg font-bold transition-transform hover:scale-110\"
+    style={{
+      borderColor: tone,
+      color: tone,
+      background: \"hsl(230 30% 12%)\",
+      cursor: clickable ? \"pointer\" : \"default\",
+    }}
+  >
+    {sign}
+    {redOn && (
+      <span className=\"absolute -right-1 -top-1 h-4 w-4 rounded-full border-2 border-card bg-[hsl(var(--destructive))]\" />
+    )}
+    {blackOn && (
+      <span className=\"absolute -bottom-1 -right-1 h-4 w-4 rounded-full border-2 border-card bg-[hsl(0_0%_10%)]\" />
+    )}
+  </button>
+);
+
+const ProbeBtn = ({ color, active, placed, onClick }) => {
+  const isRed = color === \"red\";
+  return (
+    <button
+      onClick={onClick}
+      data-testid={`probe-${color}`}
+      className=\"flex-1 rounded-md border p-2 text-center font-mono text-[10px] text-white transition-transform hover:scale-[1.03]\"
+      style={{
+        background: isRed
+          ? \"linear-gradient(180deg,#d44a2a,#8a2410)\"
+          : \"linear-gradient(180deg,#444,#1a1a1a)\",
+        borderColor: active ? \"hsl(var(--gold))\" : isRed ? \"#4a1408\" : \"#000\",
+        boxShadow: active ? \"0 0 0 2px hsl(var(--gold))\" : \"none\",
+        opacity: placed ? 0.55 : 1,
+      }}
+    >
+      ● {isRed ? \"CZERWONA\" : \"CZARNA\"}
+      <br />
+      <span className=\"opacity-80\">({placed || (active ? \"trzymasz\" : \"wolna\")})</span>
+    </button>
+  );
+};
+
+const PhaseTimeline = ({ phase }) => {
+  const cur = PHASES.findIndex((p) => p.id === phase);
+  return (
+    <div>
+      <p className=\"mb-2 font-mono text-[11px] tracking-widest text-muted-foreground\">
+        ETAPY MISJI
+      </p>
+      <div className=\"flex flex-col gap-1.5\">
+        {PHASES.map((p, i) => {
+          const done = i < cur;
+          const active = i === cur;
+          return (
+            <div key={p.id} className=\"flex items-center gap-3\">
+              <span
+                className=\"grid h-6 w-6 shrink-0 place-items-center rounded-full font-mono text-[11px] font-bold\"
+                style={{
+                  background: done
+                    ? \"hsl(var(--success))\"
+                    : active
+                      ? \"hsl(var(--primary))\"
+                      : \"hsl(var(--secondary))\",
+                  color: done || active ? \"hsl(var(--primary-foreground))\" : \"hsl(var(--muted-foreground))\",
+                }}
+              >
+                {done ? \"✓\" : i + 1}
+              </span>
+              <span
+                className=\"text-sm\"
+                style={{
+                  color: active
+                    ? \"hsl(var(--foreground))\"
+                    : done
+                      ? \"hsl(var(--success))\"
+                      : \"hsl(var(--muted-foreground))\",
+                  fontWeight: active ? 600 : 400,
+                }}
+              >
+                {p.label}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+const CompletionScreen = ({ completed, mistakes, onExit }) => {
+  const total = Math.floor(completed.duration / 1000);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  const safety = Math.max(0, 100 - mistakes * 20);
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className=\"fixed inset-0 z-[70] grid place-items-center bg-[hsl(230_40%_5%/0.96)] p-5\"
+    >
+      <motion.div
+        initial={{ scale: 0.9, y: 24 }}
+        animate={{ scale: 1, y: 0 }}
+        className=\"w-full max-w-md rounded-2xl border border-gold/40 bg-card p-7 text-center shadow-gold\"
+      >
+        <div className=\"mx-auto mb-4 grid h-16 w-16 place-items-center rounded-2xl gradient-gold text-gold-foreground shadow-gold\">
+          <Trophy className=\"h-8 w-8\" />
+        </div>
+        <h2 className=\"font-display text-2xl font-bold text-foreground\">MISJA WYKONANA</h2>
+        <p className=\"mt-1 text-sm text-muted-foreground\">
+          Farma PV — produkcja przywrócona do 5.42 kW
+        </p>
+
+        <div className=\"my-5 grid grid-cols-3 gap-3\">
+          <Metric value={`${m}:${String(s).padStart(2, \"0\")}`} label=\"CZAS\" tone=\"text-foreground\" />
+          <Metric value={`${safety}%`} label=\"BHP\" tone=\"text-success\" />
+          <Metric value={mistakes} label=\"BŁĘDY\" tone=\"text-destructive\" />
+        </div>
+
+        <div className=\"mb-5 flex items-center justify-center gap-2 rounded-xl border border-xp/30 bg-[hsl(var(--xp)/0.12)] py-3 font-mono text-sm font-bold text-xp\">
+          <Zap className=\"h-4 w-4\" /> +150 XP zapisane na konto
+        </div>
+
+        {completed.perfect && (
+          <p className=\"mb-5 flex items-center justify-center gap-2 font-mono text-xs text-gold\">
+            <CheckCircle2 className=\"h-4 w-4\" /> PRZEBIEG IDEALNY — zero łuku, zero błędów.
+          </p>
+        )}
+
+        <button
+          data-testid=\"return-to-base-btn\"
+          onClick={onExit}
+          className=\"inline-flex w-full items-center justify-center gap-2 rounded-xl gradient-primary px-5 py-3 font-display text-sm font-semibold text-primary-foreground transition-transform hover:scale-[1.02]\"
+        >
+          <ArrowLeft className=\"h-4 w-4\" /> Wróć do bazy
+        </button>
+      </motion.div>
+    </motion.div>
+  );
+};
+
+const Metric = ({ value, label, tone }) => (
+  <div className=\"rounded-xl border border-border bg-secondary/40 p-3\">
+    <p className={`font-mono text-xl font-bold ${tone}`}>{value}</p>
+    <p className=\"font-mono text-[10px] tracking-widest text-muted-foreground\">{label}</p>
+  </div>
+);
+"
+Observation: Create successful: /app/frontend/src/pages/SolarFarmScene.jsx
