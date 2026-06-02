@@ -1,0 +1,573 @@
+Libraries installed (three 0.171 + fiber 9 + drei 10). Now I'll build the 3D construction scene. First a quick reference look to match composition/markers, then I'll write the component.
+Action: file_editor create /app/frontend/src/pages/ConstructionScene.jsx --file-text "import React, { useMemo, useState } from \"react\";
+import { Canvas } from \"@react-three/fiber\";
+import { OrbitControls, Html, ContactShadows } from \"@react-three/drei\";
+import * as THREE from \"three\";
+import { motion, AnimatePresence } from \"framer-motion\";
+import { useNavigate } from \"react-router-dom\";
+import { ArrowLeft, MousePointerClick, X, Play, Hand } from \"lucide-react\";
+
+/* =========================================================================
+   ConstructionScene  ·  Grayscale 3-D construction site (FIGURE 5.11 style)
+   - Real 3D (React Three Fiber). Drag to orbit the camera.
+   - 8 numbered orange hotspots -> WHS / BHP topics.
+   - \"Home page\" overlay panel + topic detail card.
+   ========================================================================= */
+
+/* Grayscale palette */
+const C = {
+  white: \"#edeff1\",
+  light: \"#cfd3d7\",
+  mid: \"#a4aab0\",
+  steel: \"#878d93\",
+  dark: \"#6c727a\",
+  darker: \"#565c64\",
+  tire: \"#3c4046\",
+  hi: \"#f5a623\", // orange accent (helmets / markers)
+};
+
+const UP = new THREE.Vector3(0, 1, 0);
+
+/* A single tubular truss member between two 3-D points (auto-oriented). */
+function Member({ from, to, r = 0.06, color = C.steel }) {
+  const { mid, len, quat } = useMemo(() => {
+    const a = new THREE.Vector3(...from);
+    const b = new THREE.Vector3(...to);
+    const m = a.clone().add(b).multiplyScalar(0.5);
+    const l = a.distanceTo(b);
+    const dir = b.clone().sub(a).normalize();
+    const q = new THREE.Quaternion().setFromUnitVectors(UP, dir);
+    return { mid: [m.x, m.y, m.z], len: l, quat: q };
+  }, [from, to]);
+  return (
+    <mesh position={mid} quaternion={quat} castShadow>
+      <cylinderGeometry args={[r, r, len, 6]} />
+      <meshStandardMaterial color={color} roughness={0.65} metalness={0.15} />
+    </mesh>
+  );
+}
+
+/* Square lattice tower built from truss members. */
+function LatticeTower({ height = 10, width = 1.2, segs = 8, r = 0.06, color = C.steel }) {
+  const members = useMemo(() => {
+    const w = width / 2;
+    const seg = height / segs;
+    const corners = [
+      [w, w],
+      [w, -w],
+      [-w, -w],
+      [-w, w],
+    ];
+    const list = [];
+    // vertical posts
+    corners.forEach(([cx, cz]) => list.push([[cx, 0, cz], [cx, height, cz]]));
+    // rings + face X-braces
+    for (let i = 0; i < segs; i++) {
+      const y0 = i * seg;
+      const y1 = (i + 1) * seg;
+      for (let k = 0; k < 4; k++) {
+        const a = corners[k];
+        const b = corners[(k + 1) % 4];
+        // ring (bottom of segment)
+        list.push([[a[0], y0, a[1]], [b[0], y0, b[1]]]);
+        // X braces on the face
+        list.push([[a[0], y0, a[1]], [b[0], y1, b[1]]]);
+        list.push([[b[0], y0, b[1]], [a[0], y1, a[1]]]);
+      }
+    }
+    // top ring
+    for (let k = 0; k < 4; k++) {
+      const a = corners[k];
+      const b = corners[(k + 1) % 4];
+      list.push([[a[0], height, a[1]], [b[0], height, b[1]]]);
+    }
+    return list;
+  }, [height, width, segs]);
+
+  return (
+    <group>
+      {members.map((m, i) => (
+        <Member key={i} from={m[0]} to={m[1]} r={r} color={color} />
+      ))}
+    </group>
+  );
+}
+
+/* Flat vertical truss (used for crane jibs). */
+function PlaneTruss({ length = 7, rise = 0.7, z = 0, r = 0.05, color = C.steel }) {
+  const members = useMemo(() => {
+    const list = [];
+    const n = Math.round(length);
+    for (let x = 0; x < n; x++) {
+      list.push([[x, 0, z], [x + 1, 0, z]]); // bottom chord
+      list.push([[x, rise, z], [x + 1, rise, z]]); // top chord
+      list.push([[x, 0, z], [x, rise, z]]); // vertical
+      list.push([[x, 0, z], [x + 1, rise, z]]); // diagonal
+    }
+    list.push([[n, 0, z], [n, rise, z]]);
+    return list;
+  }, [length, rise, z]);
+  return (
+    <group>
+      {members.map((m, i) => (
+        <Member key={i} from={m[0]} to={m[1]} r={r} color={color} />
+      ))}
+    </group>
+  );
+}
+
+/* Tower crane: lattice mast + cab + jib + counter-jib + hook & load. */
+function TowerCrane({ position = [0, 0, 0], rotation = [0, 0, 0] }) {
+  const mastH = 9;
+  return (
+    <group position={position} rotation={rotation}>
+      <LatticeTower height={mastH} width={1} segs={8} r={0.07} color={C.dark} />
+      {/* operator cab */}
+      <mesh position={[0, mastH + 0.5, 0]} castShadow>
+        <boxGeometry args={[1.3, 1, 1.3]} />
+        <meshStandardMaterial color={C.mid} roughness={0.6} />
+      </mesh>
+      {/* jib (front) */}
+      <group position={[0.6, mastH + 1.1, 0]}>
+        <PlaneTruss length={8} rise={0.8} z={0.3} color={C.steel} />
+        <PlaneTruss length={8} rise={0.8} z={-0.3} color={C.steel} />
+        {/* trolley + hook cable + load */}
+        <Member from={[6, 0, 0.3]} to={[6, 0, -0.3]} r={0.05} color={C.dark} />
+        <mesh position={[6, -2, 0]} castShadow>
+          <cylinderGeometry args={[0.03, 0.03, 4, 6]} />
+          <meshStandardMaterial color={C.darker} />
+        </mesh>
+        <mesh position={[6, -4.1, 0]} castShadow>
+          <boxGeometry args={[1.2, 0.9, 1.2]} />
+          <meshStandardMaterial color={C.light} roughness={0.7} />
+        </mesh>
+      </group>
+      {/* counter jib + counterweight */}
+      <group position={[-0.6, mastH + 1.1, 0]} rotation={[0, Math.PI, 0]}>
+        <PlaneTruss length={3} rise={0.7} z={0.3} color={C.steel} />
+        <PlaneTruss length={3} rise={0.7} z={-0.3} color={C.steel} />
+        <mesh position={[3, -0.4, 0]} castShadow>
+          <boxGeometry args={[1, 1.2, 1.4]} />
+          <meshStandardMaterial color={C.darker} roughness={0.5} />
+        </mesh>
+      </group>
+    </group>
+  );
+}
+
+/* A-frame derrick crane on the right. */
+function DerrickCrane({ position = [0, 0, 0] }) {
+  return (
+    <group position={position}>
+      {/* two A legs */}
+      <Member from={[-1.5, 0, 0.6]} to={[0, 7, 0]} r={0.12} color={C.dark} />
+      <Member from={[1.5, 0, 0.6]} to={[0, 7, 0]} r={0.12} color={C.dark} />
+      <Member from={[-1.5, 0, -0.6]} to={[0, 7, 0]} r={0.12} color={C.dark} />
+      <Member from={[1.5, 0, -0.6]} to={[0, 7, 0]} r={0.12} color={C.dark} />
+      <Member from={[-1.5, 2.4, 0]} to={[1.5, 2.4, 0]} r={0.08} color={C.steel} />
+      <Member from={[-1.5, 4.6, 0]} to={[1.5, 4.6, 0]} r={0.08} color={C.steel} />
+      {/* horizontal boom */}
+      <Member from={[0, 7, 0]} to={[6.5, 5.4, 0]} r={0.12} color={C.dark} />
+      <Member from={[0, 6.2, 0]} to={[6.2, 4.8, 0]} r={0.07} color={C.steel} />
+      {/* hook */}
+      <mesh position={[6.4, 3.2, 0]} castShadow>
+        <cylinderGeometry args={[0.03, 0.03, 2.4, 6]} />
+        <meshStandardMaterial color={C.darker} />
+      </mesh>
+      <mesh position={[6.4, 1.9, 0]} castShadow>
+        <boxGeometry args={[1, 0.7, 1]} />
+        <meshStandardMaterial color={C.mid} roughness={0.7} />
+      </mesh>
+    </group>
+  );
+}
+
+function Wheel({ position }) {
+  return (
+    <mesh position={position} rotation={[Math.PI / 2, 0, 0]} castShadow>
+      <cylinderGeometry args={[0.45, 0.45, 0.35, 16]} />
+      <meshStandardMaterial color={C.tire} roughness={0.9} />
+    </mesh>
+  );
+}
+
+/* White box delivery truck. */
+function BoxTruck({ position = [0, 0, 0], rotation = [0, 0, 0] }) {
+  return (
+    <group position={position} rotation={rotation}>
+      <mesh position={[1.6, 1.5, 0]} castShadow>
+        <boxGeometry args={[3.6, 2.4, 2.2]} />
+        <meshStandardMaterial color={C.white} roughness={0.8} />
+      </mesh>
+      <mesh position={[-1.1, 1.1, 0]} castShadow>
+        <boxGeometry args={[1.8, 1.6, 2.1]} />
+        <meshStandardMaterial color={C.white} roughness={0.8} />
+      </mesh>
+      <mesh position={[-1.95, 1.2, 0]} castShadow>
+        <boxGeometry args={[0.15, 0.9, 1.9]} />
+        <meshStandardMaterial color={C.light} metalness={0.2} />
+      </mesh>
+      <Wheel position={[-1.1, 0.45, 1.15]} />
+      <Wheel position={[-1.1, 0.45, -1.15]} />
+      <Wheel position={[1.6, 0.45, 1.15]} />
+      <Wheel position={[1.6, 0.45, -1.15]} />
+    </group>
+  );
+}
+
+/* Dump truck with tilted bed. */
+function DumpTruck({ position = [0, 0, 0], rotation = [0, 0, 0] }) {
+  return (
+    <group position={position} rotation={rotation}>
+      <mesh position={[-1.8, 1.2, 0]} castShadow>
+        <boxGeometry args={[1.6, 1.6, 2.2]} />
+        <meshStandardMaterial color={C.mid} roughness={0.7} />
+      </mesh>
+      <mesh position={[0.7, 1.7, 0]} rotation={[0, 0, -0.12]} castShadow>
+        <boxGeometry args={[3.4, 1.4, 2.3]} />
+        <meshStandardMaterial color={C.steel} roughness={0.7} />
+      </mesh>
+      <Wheel position={[-1.8, 0.45, 1.2]} />
+      <Wheel position={[-1.8, 0.45, -1.2]} />
+      <Wheel position={[0.6, 0.45, 1.2]} />
+      <Wheel position={[0.6, 0.45, -1.2]} />
+      <Wheel position={[1.5, 0.45, 1.2]} />
+      <Wheel position={[1.5, 0.45, -1.2]} />
+    </group>
+  );
+}
+
+/* Tracked excavator with articulated boom. */
+function Excavator({ position = [0, 0, 0], rotation = [0, 0, 0] }) {
+  return (
+    <group position={position} rotation={rotation}>
+      <mesh position={[0, 0.45, 0]} castShadow>
+        <boxGeometry args={[3, 0.8, 1.7]} />
+        <meshStandardMaterial color={C.darker} roughness={0.8} />
+      </mesh>
+      <mesh position={[-0.3, 1.5, 0]} castShadow>
+        <boxGeometry args={[2, 1.2, 1.6]} />
+        <meshStandardMaterial color={C.mid} roughness={0.6} />
+      </mesh>
+      {/* boom */}
+      <mesh position={[1.3, 2, 0]} rotation={[0, 0, 0.7]} castShadow>
+        <boxGeometry args={[2.6, 0.4, 0.4]} />
+        <meshStandardMaterial color={C.steel} />
+      </mesh>
+      {/* arm */}
+      <mesh position={[2.6, 1.5, 0]} rotation={[0, 0, -0.9]} castShadow>
+        <boxGeometry args={[2.2, 0.35, 0.35]} />
+        <meshStandardMaterial color={C.steel} />
+      </mesh>
+      {/* bucket */}
+      <mesh position={[3.1, 0.45, 0]} rotation={[0, 0, 0.4]} castShadow>
+        <boxGeometry args={[0.8, 0.8, 0.95]} />
+        <meshStandardMaterial color={C.dark} roughness={0.85} />
+      </mesh>
+    </group>
+  );
+}
+
+/* Shipping container. */
+function Container({ position = [0, 0, 0], rotation = [0, 0, 0], color = C.mid }) {
+  return (
+    <mesh position={position} rotation={rotation} castShadow receiveShadow>
+      <boxGeometry args={[4.2, 2.3, 2.3]} />
+      <meshStandardMaterial color={color} roughness={0.85} />
+    </mesh>
+  );
+}
+
+/* Tiny worker figure (grey body, orange helmet for a touch of life). */
+function Worker({ position = [0, 0, 0], rotation = [0, 0, 0] }) {
+  return (
+    <group position={position} rotation={rotation}>
+      <mesh position={[0, 0.55, 0]} castShadow>
+        <cylinderGeometry args={[0.2, 0.26, 0.95, 10]} />
+        <meshStandardMaterial color={C.steel} roughness={0.85} />
+      </mesh>
+      <mesh position={[0, 1.18, 0]} castShadow>
+        <sphereGeometry args={[0.17, 12, 12]} />
+        <meshStandardMaterial color={C.light} roughness={0.8} />
+      </mesh>
+      <mesh position={[0, 1.27, 0]} castShadow>
+        <sphereGeometry args={[0.19, 12, 12, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <meshStandardMaterial color={C.hi} roughness={0.5} />
+      </mesh>
+      <mesh position={[-0.12, 0.18, 0]} castShadow>
+        <cylinderGeometry args={[0.08, 0.08, 0.5, 6]} />
+        <meshStandardMaterial color={C.darker} />
+      </mesh>
+      <mesh position={[0.12, 0.18, 0]} castShadow>
+        <cylinderGeometry args={[0.08, 0.08, 0.5, 6]} />
+        <meshStandardMaterial color={C.darker} />
+      </mesh>
+    </group>
+  );
+}
+
+/* Pipes lying on the ground. */
+function Pipes({ position = [0, 0, 0], rotation = [0, 0, 0] }) {
+  return (
+    <group position={position} rotation={rotation}>
+      {[-0.5, 0, 0.5].map((z, i) => (
+        <mesh key={i} position={[0, 0.3, z]} rotation={[0, 0, Math.PI / 2]} castShadow>
+          <cylinderGeometry args={[0.28, 0.28, 4, 14]} />
+          <meshStandardMaterial color={i === 1 ? C.light : C.mid} roughness={0.8} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+/* Topic data (WHS / BHP). */
+const HOTSPOTS = [
+  { n: 1, pos: [-7, 3, 5], title: \"Strefa dostaw\", desc: \"Bezpieczny załadunek i rozładunek. Wyznaczone drogi dla pieszych, hamulce postojowe, kliny pod koła.\" },
+  { n: 2, pos: [-3, 1.7, 6], title: \"Wykopy\", desc: \"Zabezpieczenie ścian wykopu (szalunki), bariery i oznakowanie krawędzi, zakaz składowania urobku przy krawędzi.\" },
+  { n: 3, pos: [-2, 3.1, 3], title: \"Maszyny budowlane\", desc: \"Strefa pracy koparki. Zachowaj bezpieczny dystans od zasięgu ramienia i obrotu nadwozia.\" },
+  { n: 4, pos: [0.6, 3.4, 2.4], title: \"Operator i sygnalista\", desc: \"Komunikacja sygnałami ręcznymi, kontakt wzrokowy z operatorem, jedna osoba sygnalizująca.\" },
+  { n: 5, pos: [3, 4.4, 0], title: \"Podnoszenie ładunków\", desc: \"Sprawdź zawiesia i hak. Nigdy nie przebywaj pod wiszącym ładunkiem ani w jego osi.\" },
+  { n: 6, pos: [0, 7, -2], title: \"Praca na wysokości\", desc: \"Szelki bezpieczeństwa, pewne punkty kotwiczenia, balustrady i kosze ochronne.\" },
+  { n: 7, pos: [6, 3.4, -3.5], title: \"Strefa dźwigu\", desc: \"Wygrodzony promień obrotu dźwigu, kontrola podłoża i stabilności, zakaz wstępu osób postronnych.\" },
+  { n: 8, pos: [8, 2.6, 4], title: \"Ruch pojazdów\", desc: \"Drogi technologiczne, kamizelki odblaskowe, ograniczenia prędkości, oddzielenie ruchu pieszych.\" },
+];
+
+/* 3-D-anchored numbered pin. */
+function Hotspot({ data, active, onSelect }) {
+  const [hover, setHover] = useState(false);
+  const on = active || hover;
+  return (
+    <Html position={data.pos} center distanceFactor={14} zIndexRange={[60, 0]} occlude={false}>
+      <button
+        data-testid={`hotspot-${data.n}`}
+        onClick={() => onSelect(data)}
+        onMouseEnter={() => setHover(true)}
+        onMouseLeave={() => setHover(false)}
+        style={{
+          position: \"relative\",
+          background: \"none\",
+          border: \"none\",
+          cursor: \"pointer\",
+          transform: on ? \"scale(1.12)\" : \"scale(1)\",
+          transition: \"transform 0.15s ease\",
+          filter: \"drop-shadow(0 4px 6px rgba(0,0,0,0.35))\",
+        }}
+      >
+        <svg width=\"40\" height=\"52\" viewBox=\"0 0 40 52\" fill=\"none\">
+          <path
+            d=\"M20 1 C9.5 1 1 8.5 1 19 L1 27 C1 39 12 45 20 51 C28 45 39 39 39 27 L39 19 C39 8.5 30.5 1 20 1 Z\"
+            fill={active ? \"#d8860b\" : \"#f5a623\"}
+            stroke=\"#fff\"
+            strokeWidth=\"1.5\"
+          />
+          <text
+            x=\"20\"
+            y=\"26\"
+            textAnchor=\"middle\"
+            fontFamily=\"Space Grotesk, sans-serif\"
+            fontSize=\"20\"
+            fontWeight=\"700\"
+            fill=\"#1f2937\"
+          >
+            {data.n}
+          </text>
+        </svg>
+        {hover && !active && (
+          <span
+            style={{
+              position: \"absolute\",
+              bottom: \"56px\",
+              left: \"50%\",
+              transform: \"translateX(-50%)\",
+              whiteSpace: \"nowrap\",
+              background: \"#1f2329\",
+              color: \"#fff\",
+              padding: \"4px 10px\",
+              borderRadius: \"8px\",
+              fontFamily: \"Inter, sans-serif\",
+              fontSize: \"12px\",
+              fontWeight: 600,
+            }}
+          >
+            {data.title}
+          </span>
+        )}
+      </button>
+    </Html>
+  );
+}
+
+/* The full 3-D world. */
+function SiteWorld({ selected, onSelect }) {
+  return (
+    <>
+      <hemisphereLight args={[\"#ffffff\", \"#aeb4ba\", 0.95]} />
+      <directionalLight
+        position={[14, 18, 8]}
+        intensity={1.25}
+        castShadow
+        shadow-mapSize={[2048, 2048]}
+        shadow-camera-left={-24}
+        shadow-camera-right={24}
+        shadow-camera-top={24}
+        shadow-camera-bottom={-24}
+        shadow-camera-far={60}
+      />
+      <ambientLight intensity={0.25} />
+
+      {/* ground */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
+        <planeGeometry args={[90, 90]} />
+        <meshStandardMaterial color=\"#e7e9eb\" roughness={1} />
+      </mesh>
+      <ContactShadows position={[0, 0.02, 0]} opacity={0.45} scale={50} blur={2.2} far={14} color=\"#2b2f33\" />
+
+      {/* structures */}
+      <LatticeTower height={11} width={1.3} segs={9} r={0.07} color={C.dark} />
+      <group position={[0, 0, -2]} />
+      <TowerCrane position={[-8, 0, -4]} rotation={[0, 0.5, 0]} />
+      <DerrickCrane position={[9, 0, -4]} />
+
+      {/* vehicles */}
+      <BoxTruck position={[-8, 0, 6]} rotation={[0, 0.3, 0]} />
+      <DumpTruck position={[8, 0, 5]} rotation={[0, -0.5, 0]} />
+      <Excavator position={[-1.5, 0, 3.5]} rotation={[0, -0.4, 0]} />
+
+      {/* containers + pipes */}
+      <Container position={[11, 1.2, 1]} rotation={[0, 0.2, 0]} color={C.mid} />
+      <Container position={[11.4, 1.2, -1.6]} rotation={[0, 0.2, 0]} color={C.steel} />
+      <Container position={[-11, 1.15, 0]} rotation={[0, -0.15, 0]} color={C.light} />
+      <Pipes position={[3, 0, 7]} rotation={[0, 0.4, 0]} />
+
+      {/* workers */}
+      <Worker position={[-6, 0, 4]} rotation={[0, 0.6, 0]} />
+      <Worker position={[1.5, 0, 4.6]} rotation={[0, -0.5, 0]} />
+      <Worker position={[5.5, 0, 2.5]} rotation={[0, 0.2, 0]} />
+      <Worker position={[6.2, 0, 3.2]} rotation={[0, 0.8, 0]} />
+      <Worker position={[-2.4, 0, 6]} rotation={[0, -0.3, 0]} />
+
+      {/* hotspots */}
+      {HOTSPOTS.map((h) => (
+        <Hotspot key={h.n} data={h} active={selected?.n === h.n} onSelect={onSelect} />
+      ))}
+
+      <OrbitControls
+        target={[0, 3, 0]}
+        enablePan={false}
+        minDistance={14}
+        maxDistance={42}
+        minPolarAngle={0.25}
+        maxPolarAngle={1.45}
+      />
+    </>
+  );
+}
+
+export default function ConstructionScene() {
+  const navigate = useNavigate();
+  const [selected, setSelected] = useState(null);
+
+  return (
+    <motion.div
+      initial={{ y: \"100%\" }}
+      animate={{ y: 0 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
+      className=\"fixed inset-0 z-50 overflow-hidden\"
+      style={{ background: \"linear-gradient(180deg, #c3cad1 0%, #dfe3e7 55%, #eef1f3 100%)\" }}
+    >
+      {/* 3-D canvas */}
+      <Canvas
+        shadows
+        gl={{ alpha: true, antialias: true }}
+        camera={{ position: [17, 12, 19], fov: 38 }}
+        data-testid=\"construction-canvas\"
+      >
+        <SiteWorld selected={selected} onSelect={setSelected} />
+      </Canvas>
+
+      {/* ===== Overlay: exit button ===== */}
+      <button
+        data-testid=\"exit-construction-btn\"
+        onClick={() => navigate(\"/dashboard\")}
+        className=\"absolute right-4 top-4 z-30 inline-flex items-center gap-2 rounded-xl border border-[hsl(220_10%_70%)] bg-[hsl(0_0%_100%/0.85)] px-4 py-2.5 font-display text-sm font-semibold text-[hsl(220_18%_22%)] backdrop-blur-md transition-transform hover:scale-[1.04]\"
+      >
+        <ArrowLeft className=\"h-4 w-4\" /> Opuść plac
+      </button>
+
+      {/* ===== Overlay: drag hint ===== */}
+      <div className=\"absolute bottom-4 right-4 z-20 inline-flex items-center gap-2 rounded-lg bg-[hsl(220_18%_18%/0.78)] px-3 py-2 font-mono text-[11px] tracking-wide text-white backdrop-blur-md\">
+        <Hand className=\"h-3.5 w-3.5\" /> Przeciągnij, aby obrócić scenę
+      </div>
+
+      {/* ===== Overlay: \"Home page\" panel ===== */}
+      <div className=\"absolute left-4 top-4 z-20 w-[340px] max-w-[80%] overflow-hidden rounded-lg border border-[hsl(220_12%_80%)] bg-white shadow-2xl\">
+        <div className=\"bg-[#f5a623] px-4 py-2.5\">
+          <h2 className=\"font-display text-lg font-bold text-[hsl(30_60%_15%)]\">
+            Strona główna
+          </h2>
+        </div>
+        <div className=\"space-y-2.5 px-4 py-4 text-[13px] leading-relaxed text-[hsl(220_12%_28%)]\">
+          <p>
+            Witaj w module <strong>„Bezpieczeństwo na budowie”</strong>. Poznasz
+            tu zasady BHP (Work Health &amp; Safety) na placu budowy.
+          </p>
+          <p>Przejście modułu zajmie około 30 minut.</p>
+          <p>Oceniany będzie tylko temat „Test końcowy”.</p>
+          <p className=\"flex items-start gap-2 font-semibold text-[hsl(30_70%_38%)]\">
+            <MousePointerClick className=\"mt-0.5 h-4 w-4 shrink-0\" />
+            Najedź na numer, aby zobaczyć opis. Kliknij, aby rozpocząć temat.
+          </p>
+        </div>
+      </div>
+
+      {/* ===== Overlay: figure caption ===== */}
+      <div className=\"absolute bottom-4 left-4 z-20 max-w-[60%] font-display text-xs font-semibold text-[hsl(220_18%_30%)]\">
+        Plac budowy 3-D · szaroskalowy model buduje poczucie miejsca
+      </div>
+
+      {/* ===== Topic detail card ===== */}
+      <AnimatePresence>
+        {selected && (
+          <motion.div
+            initial={{ opacity: 0, y: 24, x: \"-50%\" }}
+            animate={{ opacity: 1, y: 0, x: \"-50%\" }}
+            exit={{ opacity: 0, y: 24, x: \"-50%\" }}
+            className=\"absolute bottom-6 left-1/2 z-30 w-[440px] max-w-[92%] overflow-hidden rounded-2xl border border-[hsl(220_12%_80%)] bg-white shadow-2xl\"
+          >
+            <div className=\"flex items-center justify-between bg-[#f5a623] px-5 py-3\">
+              <div className=\"flex items-center gap-3\">
+                <span className=\"grid h-8 w-8 place-items-center rounded-full bg-[hsl(30_60%_15%)] font-display text-sm font-bold text-[#f5a623]\">
+                  {selected.n}
+                </span>
+                <h3 className=\"font-display text-lg font-bold text-[hsl(30_60%_15%)]\">
+                  {selected.title}
+                </h3>
+              </div>
+              <button
+                onClick={() => setSelected(null)}
+                className=\"grid h-7 w-7 place-items-center rounded-md text-[hsl(30_60%_15%)] hover:bg-[hsl(30_80%_50%)]\"
+                aria-label=\"Zamknij\"
+              >
+                <X className=\"h-4 w-4\" />
+              </button>
+            </div>
+            <div className=\"px-5 py-4\">
+              <p className=\"text-sm leading-relaxed text-[hsl(220_12%_28%)]\">
+                {selected.desc}
+              </p>
+              <button
+                data-testid=\"start-topic-btn\"
+                className=\"mt-4 inline-flex items-center gap-2 rounded-xl bg-[hsl(220_18%_20%)] px-5 py-2.5 font-display text-sm font-semibold text-white transition-transform hover:scale-[1.03]\"
+              >
+                <Play className=\"h-4 w-4 fill-current\" /> Rozpocznij temat
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+"
+Observation: Create successful: /app/frontend/src/pages/ConstructionScene.jsx
