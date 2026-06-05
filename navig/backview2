@@ -1,0 +1,967 @@
+import React, { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+
+/**
+ * BackView — widok zza konstrukcji (2.5D) z naciskiem na fotorealizm.
+ *
+ * ZMIANY v2:
+ * - Junction Box i MC4 w stanie "idle/niepodłączony" są odsunięte od panelu,
+ *   przyciemnione (opacity) i oznaczone pulsującym ostrzeżeniem z tooltipem.
+ * - Nowy komponent <IdleBadge> — pulsujący badge "NIEPODŁĄCZONO / DO PODŁĄCZENIA"
+ *   w kolorze amber, widoczny gdy element istnieje lecz nie jest użytkowany.
+ * - Kable nie stykają się wizualnie z MC4 gdy są odłączone (offset path).
+ * - Lepszy kontrast stanów: connected (100% opacity) vs idle (45% + amber outline).
+ *
+ * props: tiesCut, boxOpen, diodeProofed, mc4Disconnected,
+ *        snipsActive, keyActive, multimeterActive,
+ *        onCutTie, onOpenBox, onProofDiode, onDisconnectMC4
+ */
+
+/* ─────────────────────────────────────────────────────────────────
+   POMOCNICZE KOMPONENTY
+───────────────────────────────────────────────────────────────── */
+
+/**
+ * IdleBadge — pulsujący amber badge "NIEPODŁĄCZONO · DO UŻYCIA"
+ * Wyświetlany nad/pod elementem który jest w scenie ale nieużywany.
+ */
+const IdleBadge = ({ label = "NIEPODŁĄCZONO · DO UŻYCIA", offsetY = -28 }) => (
+  <motion.div
+    style={{
+      position: "absolute",
+      left: "50%",
+      top: offsetY,
+      transform: "translateX(-50%)",
+      whiteSpace: "nowrap",
+      background: "rgba(180,90,0,0.92)",
+      border: "1px solid rgba(255,160,30,0.8)",
+      borderRadius: 5,
+      padding: "2px 7px",
+      fontSize: 8,
+      fontFamily: "monospace",
+      letterSpacing: "0.12em",
+      color: "#ffe8b0",
+      pointerEvents: "none",
+      zIndex: 20,
+    }}
+    animate={{
+      boxShadow: [
+        "0 0 4px rgba(255,140,0,0.3)",
+        "0 0 14px rgba(255,140,0,0.9)",
+        "0 0 4px rgba(255,140,0,0.3)",
+      ],
+      opacity: [0.85, 1, 0.85],
+    }}
+    transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+  >
+    ⚠ {label}
+  </motion.div>
+);
+
+/**
+ * IdleArrow — mała animowana strzałka wskazująca "podłącz mnie tutaj"
+ * kierunek: "up" | "down" | "left" | "right"
+ */
+const IdleArrow = ({ direction = "down", color = "#ff9800" }) => {
+  const rotMap = { up: "rotate(180deg)", down: "rotate(0deg)", left: "rotate(90deg)", right: "rotate(-90deg)" };
+  return (
+    <motion.div
+      style={{
+        position: "absolute",
+        left: "50%",
+        bottom: direction === "down" ? -22 : "auto",
+        top: direction === "up" ? -22 : "auto",
+        transform: `translateX(-50%) ${rotMap[direction]}`,
+        color,
+        fontSize: 14,
+        lineHeight: 1,
+        pointerEvents: "none",
+        zIndex: 20,
+      }}
+      animate={{ y: [0, 5, 0] }}
+      transition={{ duration: 0.9, repeat: Infinity, ease: "easeInOut" }}
+    >
+      ▼
+    </motion.div>
+  );
+};
+
+/* ─────────────────────────────────────────────────────────────────
+   DIODA BYPASS
+───────────────────────────────────────────────────────────────── */
+const Diode = ({ burnt, proofed, multimeterActive, onClick }) => {
+  const [hover, setHover] = useState(false);
+
+  const near = multimeterActive;
+  const contactAnim = near
+    ? {
+        boxShadow: hover
+          ? [
+              "0 0 3px rgba(215,225,235,0.5)",
+              "0 0 16px rgba(225,235,245,1)",
+              "0 0 3px rgba(215,225,235,0.5)",
+            ]
+          : [
+              "0 0 1px rgba(200,210,220,0.25)",
+              "0 0 9px rgba(205,215,225,0.7)",
+              "0 0 1px rgba(200,210,220,0.25)",
+            ],
+        scale: hover ? [1, 1.18, 1] : [1, 1.06, 1],
+      }
+    : { boxShadow: "0 0 0 rgba(0,0,0,0)", scale: 1 };
+  const contactTransition = near
+    ? { duration: hover ? 0.8 : 1.3, repeat: Infinity }
+    : { duration: 0.2 };
+
+  const contactStyle = {
+    width: 11,
+    height: 6,
+    borderRadius: 3,
+    background: "linear-gradient(180deg,#f2f5f8,#9aa2ac 55%,#5c636c)",
+    border: "1px solid #3a3f46",
+  };
+
+  return (
+    <motion.div
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (burnt && multimeterActive) onClick && onClick();
+      }}
+      whileHover={burnt && multimeterActive ? { y: -1 } : {}}
+      className="relative flex flex-col items-center"
+      style={{
+        cursor: burnt && multimeterActive ? "crosshair" : "default",
+        width: 30,
+      }}
+      data-testid={burnt ? "diode-burnt" : undefined}
+    >
+      {/* górny styk */}
+      <motion.div
+        style={contactStyle}
+        animate={contactAnim}
+        transition={contactTransition}
+      />
+      <div
+        style={{
+          width: 2.5,
+          height: 7,
+          background: "linear-gradient(180deg,#e8ecf0,#8a9099)",
+        }}
+      />
+
+      {/* korpus diody */}
+      <div
+        className="relative"
+        style={{
+          width: 24,
+          height: 34,
+          borderRadius: 6,
+          background: burnt
+            ? "radial-gradient(circle at 50% 42%, #4a2e12 0%, #28160a 38%, #0c0603 72%, #000 100%)"
+            : "linear-gradient(180deg,#e6eaee 0%, #b9bfc7 14%, #1d1f23 26%, #0e0f12 50%, #1d1f23 74%, #b9bfc7 86%, #e6eaee 100%)",
+          boxShadow: burnt
+            ? "inset 0 0 8px rgba(0,0,0,0.9), 0 2px 4px rgba(0,0,0,0.6)"
+            : "inset -2px 0 4px rgba(0,0,0,0.55), inset 2px 0 3px rgba(255,255,255,0.18), 0 2px 4px rgba(0,0,0,0.5)",
+          border: `1px solid ${
+            burnt ? (proofed ? "var(--success)" : "#5a1f0c") : "#05060a"
+          }`,
+        }}
+      >
+        {/* pasek katody — tylko sprawna */}
+        {!burnt && (
+          <div
+            className="absolute left-0 right-0"
+            style={{
+              top: 9,
+              height: 3,
+              background: "#d8a23a",
+              opacity: 0.9,
+            }}
+          />
+        )}
+        {/* refleks specularny */}
+        {!burnt && (
+          <div
+            className="absolute"
+            style={{
+              left: 4,
+              top: 3,
+              bottom: 3,
+              width: 3,
+              borderRadius: 3,
+              background:
+                "linear-gradient(180deg,rgba(255,255,255,0.6),rgba(255,255,255,0))",
+            }}
+          />
+        )}
+        {/* spalony środek + pęknięcie */}
+        {burnt && (
+          <>
+            <div
+              className="absolute"
+              style={{
+                left: "50%",
+                top: "50%",
+                width: 18,
+                height: 22,
+                transform: "translate(-50%,-50%) rotate(8deg)",
+                background:
+                  "radial-gradient(circle at 45% 40%, #1a0e05, #000 70%)",
+                clipPath:
+                  "polygon(40% 0%, 62% 18%, 48% 34%, 70% 52%, 52% 70%, 64% 100%, 30% 86%, 44% 60%, 22% 44%, 38% 24%)",
+              }}
+            />
+            <div
+              className="absolute"
+              style={{
+                left: "52%",
+                top: 4,
+                width: 1.5,
+                height: 26,
+                background: "rgba(0,0,0,0.85)",
+                transform: "rotate(10deg)",
+              }}
+            />
+          </>
+        )}
+      </div>
+
+      <div
+        style={{
+          width: 2.5,
+          height: 7,
+          background: "linear-gradient(180deg,#8a9099,#e8ecf0)",
+        }}
+      />
+      {/* dolny styk */}
+      <motion.div
+        style={contactStyle}
+        animate={contactAnim}
+        transition={contactTransition}
+      />
+
+      {burnt && proofed && (
+        <div
+          className="absolute -top-5 left-1/2 -translate-x-1/2 text-[8px] font-mono"
+          style={{ color: "var(--success)", whiteSpace: "nowrap" }}
+        >
+          OL ✓
+        </div>
+      )}
+    </motion.div>
+  );
+};
+
+/* ─────────────────────────────────────────────────────────────────
+   ZŁĄCZKA MC4
+───────────────────────────────────────────────────────────────── */
+const MC4Plug = ({ x, sign, ring, separated }) => {
+  // gdy separated: złączki odsuwają się od siebie wyraźniej (nie tylko dx)
+  const dx = separated ? (sign === "+" ? -18 : 18) : 0;
+  const dy = separated ? 12 : 0; // lekkie opuszczenie w dół gdy odłączone
+  return (
+    <g transform={`translate(${x + dx}, ${dy})`}>
+      {/* korpus tulei */}
+      <rect
+        x="-15"
+        y="18"
+        width="30"
+        height="46"
+        rx="7"
+        fill="url(#mc4Body)"
+        stroke="#0a0a0a"
+        strokeWidth="1.2"
+      />
+      {/* żebra grip */}
+      {[26, 33, 40, 47].map((yy) => (
+        <line
+          key={yy}
+          x1="-12"
+          y1={yy}
+          x2="12"
+          y2={yy}
+          stroke="rgba(0,0,0,0.45)"
+          strokeWidth="1.5"
+        />
+      ))}
+      {/* zatrzask lewy */}
+      <path
+        d="M-15 30 L-22 33 L-22 40 L-15 43 Z"
+        fill="url(#mc4Body)"
+        stroke="#0a0a0a"
+        strokeWidth="1"
+      />
+      {/* zatrzask prawy */}
+      <path
+        d="M15 30 L22 33 L22 40 L15 43 Z"
+        fill="url(#mc4Body)"
+        stroke="#0a0a0a"
+        strokeWidth="1"
+      />
+      {/* pierścień bieguna */}
+      <circle cx="0" cy="14" r="10" fill="#0d0d0d" stroke={ring} strokeWidth="3" />
+      <text
+        x="0"
+        y="18"
+        textAnchor="middle"
+        fontFamily="monospace"
+        fontSize="12"
+        fontWeight="bold"
+        fill={ring}
+      >
+        {sign}
+      </text>
+      {/* terminal metalowy */}
+      <rect x="-3" y="62" width="6" height="9" rx="2" fill="url(#mc4Metal)" />
+    </g>
+  );
+};
+
+/* ─────────────────────────────────────────────────────────────────
+   JUNCTION BOX — wydzielony komponent dla czytelności
+───────────────────────────────────────────────────────────────── */
+const JunctionBox = ({
+  boxOpen,
+  diodeProofed,
+  multimeterActive,
+  onOpenBox,
+  onProofDiode,
+  isIdle,           // true gdy jest w scenie ale nie "podłączona" do kabli
+}) => {
+  return (
+    <div
+      className="absolute"
+      style={{
+        left: "50%",
+        top: isIdle ? "38%" : "40%",            // lekko wyżej gdy idle (odsunięta)
+        transform: isIdle
+          ? "translateX(-50%) translateY(-8px)"  // delikatne odsunięcie
+          : "translateX(-50%)",
+        transition: "all 0.5s ease",
+      }}
+    >
+      {/* Amber outline ring gdy idle */}
+      {isIdle && (
+        <motion.div
+          style={{
+            position: "absolute",
+            inset: -6,
+            borderRadius: 14,
+            border: "2px dashed rgba(255,160,30,0.7)",
+            pointerEvents: "none",
+            zIndex: 10,
+          }}
+          animate={{ opacity: [0.4, 1, 0.4] }}
+          transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+        />
+      )}
+
+      {/* Badge "niepodłączono" */}
+      {isIdle && <IdleBadge label="NIEUŻYWANE · POWINNO BYĆ PODŁĄCZONE" offsetY={-30} />}
+      {isIdle && <IdleArrow direction="down" />}
+
+      <motion.div
+        onClick={() => !boxOpen && !isIdle && onOpenBox && onOpenBox()}
+        whileHover={!boxOpen && !isIdle ? { scale: 1.03 } : {}}
+        className="relative"
+        style={{
+          width: 150,
+          height: 92,
+          borderRadius: 9,
+          background: "linear-gradient(145deg, #2f2f2f, #111)",
+          border: isIdle ? "2px solid rgba(255,140,0,0.5)" : "2px solid #000",
+          cursor: !boxOpen && !isIdle ? "pointer" : "default",
+          opacity: isIdle ? 0.55 : 1,
+          boxShadow: isIdle
+            ? "0 6px 18px rgba(0,0,0,0.4), 0 0 12px rgba(200,100,0,0.2)"
+            : "0 12px 32px rgba(0,0,0,0.6), inset 0 2px 2px rgba(255,255,255,0.12), inset 0 -3px 6px rgba(0,0,0,0.7)",
+          transition: "all 0.4s ease",
+          filter: isIdle ? "saturate(0.5) brightness(0.85)" : "none",
+        }}
+        data-testid="junction-box"
+      >
+        {/* dławiki kablowe */}
+        <div
+          className="absolute -top-2 flex gap-8"
+          style={{ left: "50%", transform: "translateX(-50%)" }}
+        >
+          {[0, 1].map((i) => (
+            <div
+              key={i}
+              style={{
+                width: 14,
+                height: 12,
+                borderRadius: 4,
+                background: "linear-gradient(180deg,#3a3a3a,#0d0d0d)",
+                border: "1px solid #000",
+                boxShadow: "inset 0 1px 1px rgba(255,255,255,0.15)",
+              }}
+            />
+          ))}
+        </div>
+
+        {!boxOpen ? (
+          /* ── POKRYWA ── */
+          <>
+            {[[8, 8], [134, 8], [8, 76], [134, 76]].map(([sx, sy], i) => (
+              <div
+                key={i}
+                className="absolute"
+                style={{
+                  left: sx,
+                  top: sy,
+                  width: 9,
+                  height: 9,
+                  borderRadius: "50%",
+                  background:
+                    "radial-gradient(circle at 35% 30%, #cfd3d8, #6b6f76 60%, #2a2d31)",
+                  boxShadow: "inset 0 0 2px rgba(0,0,0,0.8)",
+                }}
+              >
+                <div
+                  className="absolute"
+                  style={{
+                    left: 1,
+                    top: 4,
+                    width: 7,
+                    height: 1.4,
+                    background: "rgba(0,0,0,0.7)",
+                  }}
+                />
+              </div>
+            ))}
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <div
+                className="text-[10px] font-mono tracking-widest"
+                style={{ color: "#7a8088" }}
+              >
+                J-BOX
+              </div>
+              <div
+                className="text-[7px] font-mono mt-0.5"
+                style={{ color: "#565b63" }}
+              >
+                {isIdle ? "odłączona · IP68" : "IP68 · klik aby otworzyć"}
+              </div>
+            </div>
+          </>
+        ) : (
+          /* ── WNĘTRZE ── */
+          <div
+            className="absolute inset-[6px] rounded-md overflow-hidden"
+            style={{
+              background: "linear-gradient(180deg, #141414, #060606)",
+              boxShadow: "inset 0 4px 10px rgba(0,0,0,0.9)",
+            }}
+          >
+            {/* ślad sadzy pod spaloną diodą */}
+            <div
+              className="absolute"
+              style={{
+                left: "50%",
+                top: "62%",
+                width: 86,
+                height: 60,
+                transform: "translate(-50%,-50%)",
+                background:
+                  "radial-gradient(ellipse at center, rgba(70,40,16,0.95), rgba(45,24,10,0.55) 42%, rgba(20,10,4,0) 75%)",
+                filter: "blur(4px)",
+              }}
+            />
+            {/* zalewa żywicą */}
+            <div
+              className="absolute inset-x-1 bottom-1 h-2 rounded"
+              style={{
+                background:
+                  "linear-gradient(180deg,rgba(20,16,10,0.6),rgba(0,0,0,0.8))",
+              }}
+            />
+            {/* diody bypass */}
+            <div className="absolute inset-0 flex items-center justify-around px-2">
+              <Diode multimeterActive={multimeterActive} />
+              <Diode
+                burnt
+                proofed={diodeProofed}
+                multimeterActive={multimeterActive}
+                onClick={onProofDiode}
+              />
+              <Diode multimeterActive={multimeterActive} />
+            </div>
+          </div>
+        )}
+      </motion.div>
+
+      {/* Ostrzeżenie gdy otwarta i niezmierzona dioda */}
+      {boxOpen && !diodeProofed && !isIdle && (
+        <div
+          className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] font-display tracking-wide"
+          style={{ color: "var(--warning)", whiteSpace: "nowrap" }}
+        >
+          Środkowa dioda zwęglona (ślad sadzy) — zmierz multimetrem (OL)
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ─────────────────────────────────────────────────────────────────
+   ZŁĄCZKI MC4 — wydzielony komponent
+───────────────────────────────────────────────────────────────── */
+const MC4Block = ({
+  mc4Disconnected,
+  keyActive,
+  onDisconnectMC4,
+  isIdle,    // true gdy złączki są w scenie ale nieużywane
+}) => {
+  return (
+    <div
+      className="absolute"
+      style={{
+        left: "50%",
+        top: "90%",
+        transform: isIdle
+          ? "translate(-50%, -50%) translateY(14px)"  // odsunięte w dół gdy idle
+          : "translate(-50%, -50%)",
+        transition: "all 0.5s ease",
+      }}
+    >
+      {/* Amber dashed outline gdy idle */}
+      {isIdle && (
+        <motion.div
+          style={{
+            position: "absolute",
+            inset: -7,
+            borderRadius: 16,
+            border: "2px dashed rgba(255,160,30,0.7)",
+            pointerEvents: "none",
+            zIndex: 10,
+          }}
+          animate={{ opacity: [0.4, 1, 0.4] }}
+          transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+        />
+      )}
+
+      {/* Badge */}
+      {isIdle && (
+        <IdleBadge label="NIEUŻYWANE · DO PODŁĄCZENIA" offsetY={-28} />
+      )}
+      {isIdle && <IdleArrow direction="up" />}
+
+      <motion.div
+        onClick={() =>
+          !isIdle && keyActive && onDisconnectMC4 && onDisconnectMC4()
+        }
+        whileHover={!isIdle && keyActive ? { scale: 1.06 } : {}}
+        className="rounded-xl"
+        style={{
+          background: "rgba(4,8,14,0.78)",
+          border: `1px solid ${
+            isIdle
+              ? "rgba(255,140,0,0.4)"
+              : mc4Disconnected
+              ? "var(--success)"
+              : "var(--border-mid)"
+          }`,
+          padding: "4px 8px",
+          cursor: !isIdle && keyActive ? "crosshair" : "default",
+          opacity: isIdle ? 0.5 : 1,
+          filter: isIdle ? "saturate(0.4) brightness(0.8)" : "none",
+          boxShadow: isIdle
+            ? "0 0 10px rgba(200,100,0,0.15)"
+            : "none",
+          transition: "all 0.4s ease",
+        }}
+        data-testid="mc4-connector-back"
+      >
+        <svg width="170" height="92" viewBox="0 0 200 92">
+          <defs>
+            <linearGradient id="mc4Body" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="#15181c" />
+              <stop offset="40%" stopColor="#3c424a" />
+              <stop offset="60%" stopColor="#2a2f35" />
+              <stop offset="100%" stopColor="#0c0e11" />
+            </linearGradient>
+            <linearGradient id="mc4Metal" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#f0f3f6" />
+              <stop offset="100%" stopColor="#6b727b" />
+            </linearGradient>
+          </defs>
+          <MC4Plug
+            x={72}
+            sign="+"
+            ring="#ff6a3a"
+            separated={mc4Disconnected || isIdle}
+          />
+          <MC4Plug
+            x={128}
+            sign="−"
+            ring="#cfd3d8"
+            separated={mc4Disconnected || isIdle}
+          />
+          {!mc4Disconnected && !isIdle && (
+            <line
+              x1="92"
+              y1="44"
+              x2="108"
+              y2="44"
+              stroke="#2a2f35"
+              strokeWidth="6"
+            />
+          )}
+        </svg>
+        <div
+          className="text-center text-[9px] font-mono -mt-1"
+          style={{
+            color: isIdle
+              ? "rgba(255,160,30,0.7)"
+              : mc4Disconnected
+              ? "var(--success)"
+              : "var(--text-low)",
+          }}
+        >
+          {isIdle
+            ? "⚠ nieużywane złączki MC4"
+            : mc4Disconnected
+            ? "MC4 ROZPIĘTE ✓"
+            : keyActive
+            ? "kliknij kluczem, by rozpiąć"
+            : "złączki MC4"}
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
+/* ─────────────────────────────────────────────────────────────────
+   KABLE SVG
+───────────────────────────────────────────────────────────────── */
+const CablesSVG = ({ tiesCut, mc4Disconnected }) => {
+  const yTop = tiesCut >= 1 ? 470 : 360;
+  const cTop = tiesCut >= 1 ? 520 : 430;
+
+  // gdy mc4 odłączone: kable kończą się w powietrzu (przesunięte w bok)
+  const endXPlus = mc4Disconnected ? 415 : 432;
+  const endXMinus = mc4Disconnected ? 585 : 568;
+  const endY = mc4Disconnected ? 540 : 558;
+
+  const pPlus = `M470 ${yTop} C 440 ${cTop}, 425 ${endY - 20}, ${endXPlus} ${endY}`;
+  const pMinus = `M530 ${yTop} C 560 ${cTop}, 575 ${endY - 20}, ${endXMinus} ${endY}`;
+
+  const op = mc4Disconnected ? 0.4 : 1;
+
+  return (
+    <svg
+      className="absolute inset-0 w-full h-full pointer-events-none"
+      preserveAspectRatio="none"
+      viewBox="0 0 1000 600"
+    >
+      <defs>
+        <linearGradient id="cableRedCore" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="#7a1108" />
+          <stop offset="45%" stopColor="#e8533a" />
+          <stop offset="100%" stopColor="#7a1108" />
+        </linearGradient>
+        <linearGradient id="cableBlkCore" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="#050505" />
+          <stop offset="45%" stopColor="#4a4a4a" />
+          <stop offset="100%" stopColor="#050505" />
+        </linearGradient>
+      </defs>
+
+      <g opacity={op} style={{ transition: "opacity 0.5s ease" }}>
+        {/* cień */}
+        <path
+          d={pPlus}
+          stroke="#000"
+          strokeWidth="13"
+          fill="none"
+          strokeLinecap="round"
+          opacity="0.5"
+        />
+        <path
+          d={pMinus}
+          stroke="#000"
+          strokeWidth="13"
+          fill="none"
+          strokeLinecap="round"
+          opacity="0.5"
+        />
+        {/* rdzeń */}
+        <path
+          d={pPlus}
+          stroke="url(#cableRedCore)"
+          strokeWidth="9"
+          fill="none"
+          strokeLinecap="round"
+        />
+        <path
+          d={pMinus}
+          stroke="url(#cableBlkCore)"
+          strokeWidth="9"
+          fill="none"
+          strokeLinecap="round"
+        />
+        {/* refleks */}
+        <path
+          d={pPlus}
+          stroke="rgba(255,255,255,0.45)"
+          strokeWidth="2.4"
+          fill="none"
+          strokeLinecap="round"
+        />
+        <path
+          d={pMinus}
+          stroke="rgba(255,255,255,0.4)"
+          strokeWidth="2.2"
+          fill="none"
+          strokeLinecap="round"
+        />
+      </g>
+
+      {/* Końcówki kabli gdy odłączone — widoczne "odziane" końce */}
+      {mc4Disconnected && (
+        <>
+          <circle cx={endXPlus} cy={endY} r="7" fill="#e8533a" opacity="0.8" />
+          <circle cx={endXMinus} cy={endY} r="7" fill="#4a4a4a" opacity="0.8" />
+          <circle cx={endXPlus} cy={endY} r="4" fill="#ff9966" opacity="0.9" />
+          <circle cx={endXMinus} cy={endY} r="4" fill="#aaaaaa" opacity="0.9" />
+        </>
+      )}
+    </svg>
+  );
+};
+
+/* ─────────────────────────────────────────────────────────────────
+   TRYTYTKI (ZIP TIES)
+───────────────────────────────────────────────────────────────── */
+const ZipTies = ({ tiesCut, snipsActive, onCutTie }) => (
+  <>
+    {[0, 1, 2].map((i) => {
+      const cut = i < tiesCut;
+      const left = 41 + i * 9;
+      return (
+        <div
+          key={i}
+          className="absolute"
+          style={{ left: `${left}%`, top: "68%" }}
+        >
+          <AnimatePresence>
+            {!cut ? (
+              <motion.div
+                onClick={() => snipsActive && onCutTie && onCutTie(i)}
+                whileHover={snipsActive ? { scale: 1.2 } : {}}
+                exit={{ opacity: 0, y: 34, rotate: 50 }}
+                className="rounded-sm"
+                style={{
+                  width: 16,
+                  height: 28,
+                  background: "linear-gradient(180deg,#3a3f45,#15181c)",
+                  border: "1px solid #000",
+                  boxShadow:
+                    "0 2px 4px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.12)",
+                  cursor: snipsActive ? "crosshair" : "default",
+                }}
+                data-testid={`zip-tie-${i}`}
+                title="trytytka"
+              >
+                <div
+                  className="w-full h-1.5 mt-1.5"
+                  style={{ background: "rgba(0,0,0,0.5)" }}
+                />
+                <div
+                  className="w-full h-1 mt-1"
+                  style={{ background: "rgba(0,0,0,0.4)" }}
+                />
+              </motion.div>
+            ) : (
+              <motion.div
+                initial={{ opacity: 1 }}
+                className="text-[10px] font-mono"
+                style={{ color: "var(--text-faint)" }}
+              >
+                ✂
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      );
+    })}
+  </>
+);
+
+/* ─────────────────────────────────────────────────────────────────
+   GŁÓWNY KOMPONENT BackView
+───────────────────────────────────────────────────────────────── */
+const BackView = ({
+  tiesCut,
+  boxOpen,
+  diodeProofed,
+  mc4Disconnected,
+  snipsActive,
+  keyActive,
+  multimeterActive,
+  onCutTie,
+  onOpenBox,
+  onProofDiode,
+  onDisconnectMC4,
+}) => {
+  /**
+   * "idle" — element istnieje w scenie ale nie jest jeszcze włączony do
+   * normalnego obiegu: nie podłączony kablem / nie interagowany.
+   *
+   * Logika:
+   * - junctionBox isIdle = boks jeszcze nie otwarty I trytytki nie przecięte
+   *   (czyli kable jeszcze do niego nie podprowadzone)
+   * - mc4 isIdle = złączki nie odłączone I trytytki nie przecięte
+   *   (kable jeszcze nie zwolnione, MC4 wisi luźno)
+   *
+   * Możesz dostosować tę logikę do swojego stanu gry.
+   */
+  const jboxIsIdle = !boxOpen && tiesCut === 0;
+  const mc4IsIdle = !mc4Disconnected && tiesCut === 0;
+
+  return (
+    <div
+      className="absolute inset-0 overflow-hidden"
+      style={{
+        background:
+          "linear-gradient(180deg, #0f1319 0%, #1a1f27 52%, #0c1015 100%)",
+      }}
+      data-testid="back-view"
+    >
+      {/* ── Szyny aluminiowe ── */}
+      {[33, 71].map((top, i) => (
+        <div
+          key={i}
+          className="absolute left-0 right-0"
+          style={{
+            top: `${top}%`,
+            height: 18,
+            background:
+              "linear-gradient(180deg, #d2d7dd 0%, #9aa0a8 22%, #6b717a 55%, #474c54 100%)",
+            boxShadow:
+              "0 4px 8px rgba(0,0,0,0.55), inset 0 1px 1px rgba(255,255,255,0.4)",
+          }}
+        >
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                "repeating-linear-gradient(90deg, rgba(0,0,0,0.12) 0 2px, transparent 2px 60px)",
+            }}
+          />
+        </div>
+      ))}
+
+      {/* ── Backsheet panela ── */}
+      <div
+        className="absolute"
+        style={{
+          left: "50%",
+          top: "13%",
+          width: "46%",
+          maxWidth: 430,
+          height: "57%",
+          transform: "translateX(-50%)",
+          background: "linear-gradient(160deg, #f3f5f7, #d8dbdf)",
+          border: "4px solid #9aa1ab",
+          borderRadius: 5,
+          boxShadow:
+            "0 16px 34px rgba(0,0,0,0.55), inset 0 1px 2px rgba(255,255,255,0.8)",
+        }}
+      >
+        {/* linie backsheet */}
+        <div
+          className="absolute inset-2 rounded-sm"
+          style={{
+            background:
+              "repeating-linear-gradient(0deg, rgba(0,0,0,0.035) 0 24px, rgba(0,0,0,0) 24px 26px)",
+          }}
+        />
+        {/* etykieta panelu */}
+        <div
+          className="absolute left-2 top-2 text-[9px] font-mono"
+          style={{ color: "#8b929b" }}
+        >
+          PV-MODULE 410Wp · Voc 49.6V
+        </div>
+
+        {/* ── JUNCTION BOX ── */}
+        <JunctionBox
+          boxOpen={boxOpen}
+          diodeProofed={diodeProofed}
+          multimeterActive={multimeterActive}
+          onOpenBox={onOpenBox}
+          onProofDiode={onProofDiode}
+          isIdle={jboxIsIdle}
+        />
+      </div>
+
+      {/* ── KABLE SVG ── */}
+      <CablesSVG tiesCut={tiesCut} mc4Disconnected={mc4Disconnected} />
+
+      {/* ── TRYTYTKI ── */}
+      <ZipTies
+        tiesCut={tiesCut}
+        snipsActive={snipsActive}
+        onCutTie={onCutTie}
+      />
+
+      {/* ── ZŁĄCZKI MC4 ── */}
+      <MC4Block
+        mc4Disconnected={mc4Disconnected}
+        keyActive={keyActive}
+        onDisconnectMC4={onDisconnectMC4}
+        isIdle={mc4IsIdle}
+      />
+
+      {/* ── Etykieta widoku ── */}
+      <div
+        className="absolute top-3 left-3 px-2 py-1 rounded-md text-[10px] font-display tracking-[0.2em]"
+        style={{
+          background: "rgba(0,0,0,0.4)",
+          color: "var(--text-mid)",
+          border: "1px solid var(--border-soft)",
+        }}
+      >
+        WIDOK OD TYŁU · KONSTRUKCJA
+      </div>
+
+      {/* ── Legenda stanów (opcjonalna, debug / onboarding) ── */}
+      <AnimatePresence>
+        {(jboxIsIdle || mc4IsIdle) && (
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20 }}
+            style={{
+              position: "absolute",
+              bottom: 14,
+              right: 14,
+              background: "rgba(10,14,20,0.88)",
+              border: "1px solid rgba(255,140,0,0.35)",
+              borderRadius: 8,
+              padding: "6px 10px",
+              fontSize: 8,
+              fontFamily: "monospace",
+              color: "rgba(255,180,60,0.85)",
+              lineHeight: 1.7,
+            }}
+          >
+            <div style={{ letterSpacing: "0.1em", marginBottom: 2, color: "rgba(255,180,60,0.5)" }}>
+              ─ STAN ELEMENTÓW ─
+            </div>
+            {jboxIsIdle && <div>⚠ J-BOX: nieużywana, powinna być podłączona</div>}
+            {mc4IsIdle && <div>⚠ MC4: złączki luźne, nie w obiegu</div>}
+            {!jboxIsIdle && <div style={{ color: "rgba(80,200,100,0.7)" }}>✓ J-BOX: aktywna</div>}
+            {!mc4IsIdle && <div style={{ color: "rgba(80,200,100,0.7)" }}>✓ MC4: podłączone</div>}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+export default BackView;
