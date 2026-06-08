@@ -1,0 +1,889 @@
+// src/pages/InteriorScene.jsx
+import React, { useState, useRef, useMemo, useEffect, Suspense } from "react";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { OrbitControls, Html, Environment } from "@react-three/drei";
+import { EffectComposer, Bloom, Vignette, ChromaticAberration } from "@react-three/postprocessing";
+import * as THREE from "three";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  LogOut, Wrench, PaintBucket, Square, CheckCircle2,
+  HardHat, Sparkles, Info, X,
+} from "lucide-react";
+
+/* =========================================================================
+   PALETA — realistyczne kolory budowy w trakcie wykończenia
+   ========================================================================= */
+const C = {
+  // ściany
+  concreteRaw: "#9a8e7e",        // surowy beton, nieotynkowany
+  concreteRawDark: "#7e7466",    // cieniste partie betonu
+  plasterRaw: "#b8a890",         // tynk surowy (do szlifowania)
+  plasterSanded: "#d8ccb8",      // tynk wyszlifowany
+  plasterPainted: "#f4ede0",     // pomalowany
+  // podłoga
+  screedRaw: "#6a6055",          // wylewka jastrychowa
+  screedJoint: "#3e362c",        // spoiny
+  panelWood: "#c8a878",          // panele podłogowe
+  panelWoodDark: "#a48656",
+  // konstrukcja
+  beam: "#4a3f35",               // belki stropowe
+  ceilingRaw: "#9a8e80",         // płyta sufitu
+  // niebo za oknami
+  skyDay: "#c8d8e8",
+  skyWarm: "#e8d4a8",
+  // akcenty
+  steel: "#878d93",
+  rust: "#8a4a2a",
+  hi: "#f5a623",
+  ok: "#4ade80",
+  err: "#ef4444",
+};
+
+/* =========================================================================
+   WYMIARY POKOJU — duża, przestronna hala wykończeniowa
+   ========================================================================= */
+const ROOM = {
+  W: 18,   // szerokość (X)
+  H: 7,    // wysokość (Y)
+  D: 12,   // głębokość (Z)
+};
+
+/* =========================================================================
+   KURZ — 200 cząsteczek opadających powoli
+   ========================================================================= */
+function DustParticles({ count = 200 }) {
+  const pointsRef = useRef(null);
+
+  const { positions, basePositions } = useMemo(() => {
+    const pos = new Float32Array(count * 3);
+    const base = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      const x = (Math.random() - 0.5) * ROOM.W * 0.9;
+      const y = Math.random() * ROOM.H * 0.85 + 0.3;
+      const z = (Math.random() - 0.5) * ROOM.D * 0.9;
+      pos[i * 3] = x; pos[i * 3 + 1] = y; pos[i * 3 + 2] = z;
+      base[i * 3] = x; base[i * 3 + 1] = y; base[i * 3 + 2] = z;
+    }
+    return { positions: pos, basePositions: base };
+  }, [count]);
+
+  useFrame(({ clock }) => {
+    if (!pointsRef.current) return;
+    const t = clock.getElapsedTime();
+    const arr = pointsRef.current.geometry.attributes.position.array;
+    for (let i = 0; i < count; i++) {
+      arr[i * 3] = basePositions[i * 3] + Math.sin(t * 0.3 + i) * 0.15;
+      arr[i * 3 + 1] = basePositions[i * 3 + 1] + Math.sin(t * 0.2 + i * 0.7) * 0.4;
+      arr[i * 3 + 2] = basePositions[i * 3 + 2] + Math.cos(t * 0.25 + i * 0.5) * 0.15;
+    }
+    pointsRef.current.geometry.attributes.position.needsUpdate = true;
+  });
+
+  return (
+    <points ref={pointsRef}>
+      <bufferGeometry>
+        <bufferAttribute
+          attach="attributes-position"
+          count={count}
+          array={positions}
+          itemSize={3}
+        />
+      </bufferGeometry>
+      <pointsMaterial
+        size={0.04}
+        color="#fff8e0"
+        transparent
+        opacity={0.35}
+        sizeAttenuation
+        depthWrite={false}
+      />
+    </points>
+  );
+}
+
+/* =========================================================================
+   ŚCIANA Z OKNAMI — tylna, ze światłem dziennym przez 3 otwory
+   ========================================================================= */
+function BackWallWithWindows() {
+  // ścianę składamy z 7 fragmentów: lewy słupek | okno1 | między1 | okno2 | między2 | okno3 | prawy słupek
+  // wszystko na Y od 0 do H. Okna od Y=2.2 do Y=4.6, szerokość 2.6 każde.
+  const z = -ROOM.D / 2;
+  const winY = 3.4, winH = 2.4, winW = 2.6;
+  const between = 0.8;
+  const winRowW = 3 * winW + 2 * between; // 8.6
+  const sideW = (ROOM.W - winRowW) / 2;
+
+  // nadproże i parapety
+  return (
+    <group position={[0, 0, z]}>
+      {/* parapet (od 0 do 2.2) — pełny */}
+      <mesh position={[0, 1.1, 0]} receiveShadow>
+        <boxGeometry args={[ROOM.W, 2.2, 0.25]} />
+        <meshStandardMaterial color={C.concreteRaw} roughness={0.95} />
+      </mesh>
+      {/* nadproże (od 4.6 do H) — pełne */}
+      <mesh position={[0, (4.6 + ROOM.H) / 2, 0]} receiveShadow>
+        <boxGeometry args={[ROOM.W, ROOM.H - 4.6, 0.25]} />
+        <meshStandardMaterial color={C.concreteRaw} roughness={0.95} />
+      </mesh>
+      {/* lewy słupek */}
+      <mesh position={[-ROOM.W / 2 + sideW / 2, winY, 0]} receiveShadow>
+        <boxGeometry args={[sideW, winH, 0.25]} />
+        <meshStandardMaterial color={C.concreteRaw} roughness={0.95} />
+      </mesh>
+      {/* prawy słupek */}
+      <mesh position={[ROOM.W / 2 - sideW / 2, winY, 0]} receiveShadow>
+        <boxGeometry args={[sideW, winH, 0.25]} />
+        <meshStandardMaterial color={C.concreteRaw} roughness={0.95} />
+      </mesh>
+      {/* słupki między oknami */}
+      {[0, 1].map((i) => {
+        const x = -ROOM.W / 2 + sideW + winW + (winW + between) * i + between / 2;
+        return (
+          <mesh key={i} position={[x, winY, 0]} receiveShadow>
+            <boxGeometry args={[between, winH, 0.25]} />
+            <meshStandardMaterial color={C.concreteRaw} roughness={0.95} />
+          </mesh>
+        );
+      })}
+      {/* "niebo" za oknami — duży plane za ścianą */}
+      <mesh position={[0, winY, -0.5]}>
+        <planeGeometry args={[winRowW + 2, winH + 1]} />
+        <meshBasicMaterial color={C.skyWarm} />
+      </mesh>
+      {/* ramy okien (cienkie listewki w przekroju otworu) */}
+      {[0, 1, 2].map((i) => {
+        const cx = -ROOM.W / 2 + sideW + winW / 2 + (winW + between) * i;
+        return (
+          <group key={i} position={[cx, winY, 0.05]}>
+            {/* pozioma listwa środkowa okna */}
+            <mesh>
+              <boxGeometry args={[winW, 0.06, 0.04]} />
+              <meshStandardMaterial color="#3a3530" />
+            </mesh>
+            {/* pionowa listwa środkowa okna */}
+            <mesh>
+              <boxGeometry args={[0.06, winH, 0.04]} />
+              <meshStandardMaterial color="#3a3530" />
+            </mesh>
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+/* =========================================================================
+   SUFIT z belkami stropowymi
+   ========================================================================= */
+function Ceiling() {
+  const beams = [];
+  for (let x = -ROOM.W / 2 + 1.5; x < ROOM.W / 2; x += 2.5) {
+    beams.push(x);
+  }
+  return (
+    <group>
+      {/* surowa płyta sufitu */}
+      <mesh position={[0, ROOM.H, 0]} rotation={[Math.PI / 2, 0, 0]} receiveShadow>
+        <planeGeometry args={[ROOM.W, ROOM.D]} />
+        <meshStandardMaterial color={C.ceilingRaw} roughness={1} />
+      </mesh>
+      {/* belki stropowe */}
+      {beams.map((x, i) => (
+        <mesh key={i} position={[x, ROOM.H - 0.15, 0]} castShadow>
+          <boxGeometry args={[0.3, 0.3, ROOM.D]} />
+          <meshStandardMaterial color={C.beam} roughness={0.85} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+/* =========================================================================
+   LAMPY ROBOCZE — zwisające z sufitu, świecące
+   ========================================================================= */
+function WorkLamp({ position }) {
+  return (
+    <group position={position}>
+      {/* kabel */}
+      <mesh position={[0, -0.75, 0]}>
+        <cylinderGeometry args={[0.015, 0.015, 1.5, 6]} />
+        <meshStandardMaterial color="#1a1a1a" />
+      </mesh>
+      {/* klosz */}
+      <mesh position={[0, -1.55, 0]} castShadow>
+        <coneGeometry args={[0.35, 0.4, 16, 1, true]} />
+        <meshStandardMaterial color={C.steel} side={THREE.DoubleSide} metalness={0.4} roughness={0.5} />
+      </mesh>
+      {/* żarówka */}
+      <mesh position={[0, -1.65, 0]}>
+        <sphereGeometry args={[0.18, 16, 16]} />
+        <meshStandardMaterial
+          color="#ffe0a0"
+          emissive="#ffe0a0"
+          emissiveIntensity={2.2}
+        />
+      </mesh>
+      <pointLight
+        position={[0, -1.7, 0]}
+        intensity={1.4}
+        distance={9}
+        color="#ffe8c0"
+        castShadow
+        decay={1.8}
+      />
+    </group>
+  );
+}
+
+/* =========================================================================
+   PODŁOGA — wylewka z siatką spoin
+   ========================================================================= */
+function Floor({ tilesPlaced }) {
+  // tilesPlaced to Set z indeksami pól, które user już położył jako panele
+  const GRID = 8; // 8 paneli wzdłuż X
+  const ROWS = 6; // 6 wzdłuż Z
+  const tileW = ROOM.W / GRID;
+  const tileD = ROOM.D / ROWS;
+
+  return (
+    <group>
+      {/* baza — wylewka */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <planeGeometry args={[ROOM.W, ROOM.D]} />
+        <meshStandardMaterial color={C.screedRaw} roughness={1} />
+      </mesh>
+      {/* spoiny */}
+      {Array.from({ length: GRID + 1 }).map((_, i) => (
+        <mesh
+          key={`vx-${i}`}
+          position={[-ROOM.W / 2 + i * tileW, 0.005, 0]}
+          rotation={[-Math.PI / 2, 0, 0]}
+        >
+          <planeGeometry args={[0.02, ROOM.D]} />
+          <meshBasicMaterial color={C.screedJoint} />
+        </mesh>
+      ))}
+      {Array.from({ length: ROWS + 1 }).map((_, i) => (
+        <mesh
+          key={`vz-${i}`}
+          position={[0, 0.005, -ROOM.D / 2 + i * tileD]}
+          rotation={[-Math.PI / 2, 0, 0]}
+        >
+          <planeGeometry args={[ROOM.W, 0.02]} />
+          <meshBasicMaterial color={C.screedJoint} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+/* =========================================================================
+   ŚCIANA BOCZNA do szlifowania (lewa) — siatka pól tynku
+   ========================================================================= */
+function SandingWall({ tiles, onSand, active }) {
+  const GRID_X = 8;
+  const GRID_Y = 5;
+  const wallW = ROOM.D - 0.5;
+  const wallH = ROOM.H - 0.6;
+  const tileW = wallW / GRID_X;
+  const tileH = wallH / GRID_Y;
+
+  return (
+    <group position={[-ROOM.W / 2 + 0.05, ROOM.H / 2 - 0.3, 0]} rotation={[0, Math.PI / 2, 0]}>
+      {/* baza ściany */}
+      <mesh receiveShadow>
+        <boxGeometry args={[wallW, wallH, 0.2]} />
+        <meshStandardMaterial color={C.plasterRaw} roughness={0.95} />
+      </mesh>
+      {/* pola siatki */}
+      {tiles.map((t, i) => {
+        const x = i % GRID_X;
+        const y = Math.floor(i / GRID_X);
+        const px = -wallW / 2 + tileW / 2 + x * tileW;
+        const py = -wallH / 2 + tileH / 2 + y * tileH;
+        const color = new THREE.Color(C.plasterRaw).lerp(new THREE.Color(C.plasterSanded), t);
+        return (
+          <mesh
+            key={i}
+            position={[px, py, 0.11]}
+            onClick={(e) => { e.stopPropagation(); onSand(i); }}
+            onPointerOver={(e) => {
+              if (active && e.buttons === 1) onSand(i);
+            }}
+          >
+            <boxGeometry args={[tileW * 0.96, tileH * 0.94, 0.02]} />
+            <meshStandardMaterial color={color} roughness={0.7 - t * 0.4} />
+          </mesh>
+        );
+      })}
+    </group>
+  );
+}
+
+/* =========================================================================
+   ŚCIANA PRZECIWLEGŁA do malowania (prawa)
+   ========================================================================= */
+function PaintingWall({ painted, onPaint, active }) {
+  const GRID_X = 12;
+  const GRID_Y = 7;
+  const wallW = ROOM.D - 0.5;
+  const wallH = ROOM.H - 0.6;
+  const tileW = wallW / GRID_X;
+  const tileH = wallH / GRID_Y;
+
+  return (
+    <group position={[ROOM.W / 2 - 0.05, ROOM.H / 2 - 0.3, 0]} rotation={[0, -Math.PI / 2, 0]}>
+      <mesh receiveShadow>
+        <boxGeometry args={[wallW, wallH, 0.2]} />
+        <meshStandardMaterial color={C.plasterSanded} roughness={0.85} />
+      </mesh>
+      {Array.from({ length: GRID_X * GRID_Y }).map((_, i) => {
+        const x = i % GRID_X;
+        const y = Math.floor(i / GRID_X);
+        const px = -wallW / 2 + tileW / 2 + x * tileW;
+        const py = -wallH / 2 + tileH / 2 + y * tileH;
+        const isPainted = painted.has(i);
+        return (
+          <mesh
+            key={i}
+            position={[px, py, 0.11]}
+            onClick={(e) => { e.stopPropagation(); onPaint(i); }}
+            onPointerOver={(e) => { if (active && e.buttons === 1) onPaint(i); }}
+          >
+            <boxGeometry args={[tileW * 0.98, tileH * 0.98, 0.015]} />
+            <meshStandardMaterial
+              color={isPainted ? C.plasterPainted : C.plasterSanded}
+              roughness={0.55}
+              transparent
+              opacity={isPainted ? 1 : 0}
+            />
+          </mesh>
+        );
+      })}
+    </group>
+  );
+}
+
+/* =========================================================================
+   PANELE PODŁOGOWE — układanie
+   ========================================================================= */
+function FlooringPanels({ placed, onPlace, active }) {
+  const GRID = 8;
+  const ROWS = 6;
+  const tileW = ROOM.W / GRID;
+  const tileD = ROOM.D / ROWS;
+
+  return (
+    <group>
+      {Array.from({ length: GRID * ROWS }).map((_, i) => {
+        const x = i % GRID;
+        const z = Math.floor(i / GRID);
+        const px = -ROOM.W / 2 + tileW / 2 + x * tileW;
+        const pz = -ROOM.D / 2 + tileD / 2 + z * tileD;
+        const isPlaced = placed.has(i);
+        return (
+          <mesh
+            key={i}
+            position={[px, isPlaced ? 0.04 : 0.6, pz]}
+            rotation={[-Math.PI / 2, 0, 0]}
+            onClick={(e) => { e.stopPropagation(); onPlace(i); }}
+            onPointerOver={() => {
+              document.body.style.cursor = active && !isPlaced ? "pointer" : "default";
+            }}
+            visible={isPlaced || active}
+          >
+            <planeGeometry args={[tileW * 0.96, tileD * 0.96]} />
+            <meshStandardMaterial
+              color={i % 2 === 0 ? C.panelWood : C.panelWoodDark}
+              roughness={0.5}
+              transparent
+              opacity={isPlaced ? 1 : 0.25}
+            />
+          </mesh>
+        );
+      })}
+    </group>
+  );
+}
+
+/* =========================================================================
+   NARZĘDZIA i REKWIZYTY rozrzucone po podłodze
+   ========================================================================= */
+function Props() {
+  return (
+    <group>
+      {/* wiaderko z farbą */}
+      <group position={[-5, 0.25, 3]}>
+        <mesh castShadow>
+          <cylinderGeometry args={[0.3, 0.28, 0.5, 16]} />
+          <meshStandardMaterial color="#e8e8e8" roughness={0.6} metalness={0.2} />
+        </mesh>
+        <mesh position={[0, 0.26, 0]}>
+          <cylinderGeometry args={[0.28, 0.28, 0.03, 16]} />
+          <meshStandardMaterial color={C.plasterPainted} roughness={0.4} />
+        </mesh>
+        {/* uchwyt */}
+        <mesh position={[0, 0.4, 0]} rotation={[0, 0, 0]}>
+          <torusGeometry args={[0.3, 0.015, 6, 16, Math.PI]} />
+          <meshStandardMaterial color="#3a3530" metalness={0.6} />
+        </mesh>
+      </group>
+
+      {/* drabina aluminiowa, oparta o ścianę */}
+      <group position={[-7, 0, -2]} rotation={[0, 0.4, -0.15]}>
+        {/* pręty pionowe */}
+        <mesh position={[-0.3, 2, 0]} castShadow>
+          <boxGeometry args={[0.08, 4, 0.08]} />
+          <meshStandardMaterial color={C.steel} metalness={0.7} roughness={0.4} />
+        </mesh>
+        <mesh position={[0.3, 2, 0]} castShadow>
+          <boxGeometry args={[0.08, 4, 0.08]} />
+          <meshStandardMaterial color={C.steel} metalness={0.7} roughness={0.4} />
+        </mesh>
+        {/* szczeble */}
+        {[0.4, 1.0, 1.6, 2.2, 2.8, 3.4].map((y, i) => (
+          <mesh key={i} position={[0, y, 0]} castShadow>
+            <boxGeometry args={[0.7, 0.06, 0.08]} />
+            <meshStandardMaterial color={C.steel} metalness={0.7} roughness={0.4} />
+          </mesh>
+        ))}
+      </group>
+
+      {/* worki cementu (stos 3 szt.) */}
+      <group position={[6, 0, 4]}>
+        {[0, 1, 2].map((i) => (
+          <mesh key={i} position={[(i % 2) * 0.1, 0.2 + i * 0.32, (i % 2) * 0.05]} rotation={[0, i * 0.3, 0]} castShadow>
+            <boxGeometry args={[0.9, 0.3, 0.55]} />
+            <meshStandardMaterial color="#8a7a60" roughness={0.95} />
+          </mesh>
+        ))}
+      </group>
+
+      {/* taczka */}
+      <group position={[3, 0, 3.5]} rotation={[0, -0.4, 0]}>
+        <mesh position={[0, 0.4, 0]} castShadow>
+          <boxGeometry args={[1.2, 0.35, 0.7]} />
+          <meshStandardMaterial color={C.rust} roughness={0.85} />
+        </mesh>
+        {/* koło */}
+        <mesh position={[0.6, 0.2, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+          <cylinderGeometry args={[0.25, 0.25, 0.15, 16]} />
+          <meshStandardMaterial color="#2a2520" roughness={0.9} />
+        </mesh>
+        {/* uchwyty */}
+        <mesh position={[-0.9, 0.5, 0.3]} rotation={[0, 0, -0.1]} castShadow>
+          <cylinderGeometry args={[0.04, 0.04, 1, 8]} />
+          <meshStandardMaterial color="#5a4a35" />
+        </mesh>
+        <mesh position={[-0.9, 0.5, -0.3]} rotation={[0, 0, -0.1]} castShadow>
+          <cylinderGeometry args={[0.04, 0.04, 1, 8]} />
+          <meshStandardMaterial color="#5a4a35" />
+        </mesh>
+      </group>
+
+      {/* paleta z cegłami */}
+      <group position={[5, 0, -3]}>
+        {/* paleta */}
+        <mesh position={[0, 0.08, 0]} castShadow>
+          <boxGeometry args={[1.2, 0.15, 1]} />
+          <meshStandardMaterial color="#7a6238" roughness={0.95} />
+        </mesh>
+        {/* stos cegieł */}
+        {Array.from({ length: 12 }).map((_, i) => {
+          const row = Math.floor(i / 4);
+          const col = i % 4;
+          return (
+            <mesh
+              key={i}
+              position={[-0.45 + col * 0.3, 0.25 + row * 0.12, 0]}
+              castShadow
+            >
+              <boxGeometry args={[0.28, 0.1, 0.6]} />
+              <meshStandardMaterial color="#a8543a" roughness={0.9} />
+            </mesh>
+          );
+        })}
+      </group>
+
+      {/* rozlana zaprawa na podłodze (plama) */}
+      <mesh position={[-3, 0.01, 1]} rotation={[-Math.PI / 2, 0, 0.4]}>
+        <circleGeometry args={[0.6, 16]} />
+        <meshStandardMaterial color="#a89880" roughness={1} transparent opacity={0.7} />
+      </mesh>
+    </group>
+  );
+}
+
+/* =========================================================================
+   ŚWIAT WEWNĘTRZNY
+   ========================================================================= */
+function InteriorWorld({ activeTask, state, setState }) {
+  const sandTile = (idx) => {
+    if (activeTask !== "sanding") return;
+    setState((s) => {
+      const next = [...s.sandingTiles];
+      next[idx] = Math.min(1, next[idx] + 0.34);
+      return { ...s, sandingTiles: next };
+    });
+  };
+  const placePanel = (idx) => {
+    if (activeTask !== "flooring") return;
+    setState((s) => {
+      if (s.flooringPlaced.has(idx)) return s;
+      const next = new Set(s.flooringPlaced);
+      next.add(idx);
+      return { ...s, flooringPlaced: next };
+    });
+  };
+  const paintCell = (idx) => {
+    if (activeTask !== "painting") return;
+    setState((s) => {
+      if (s.paintingPainted.has(idx)) return s;
+      const next = new Set(s.paintingPainted);
+      next.add(idx);
+      return { ...s, paintingPainted: next };
+    });
+  };
+
+  return (
+    <>
+      {/* === oświetlenie === */}
+      <ambientLight intensity={0.55} color="#ffe8c0" />
+      <directionalLight
+        position={[0, 8, -4]}
+        intensity={1.4}
+        color="#fff5e0"
+        castShadow
+        shadow-mapSize={[2048, 2048]}
+        shadow-camera-left={-12}
+        shadow-camera-right={12}
+        shadow-camera-top={10}
+        shadow-camera-bottom={-10}
+      />
+      {/* światło wpadające przez okna (3x pointLight za oknami) */}
+      {[-3.4, 0, 3.4].map((x, i) => (
+        <pointLight
+          key={i}
+          position={[x, 3.4, -ROOM.D / 2 - 1]}
+          intensity={1.8}
+          distance={14}
+          color="#fff5e0"
+        />
+      ))}
+      {/* mgła wnętrza */}
+      <fog attach="fog" args={["#c8b89a", 12, 28]} />
+
+      {/* === podłoga, sufit, ściany === */}
+      <Floor />
+      <Ceiling />
+      <BackWallWithWindows />
+
+      {/* przednia ściana — niewidoczna od strony kamery (otwarta) — tylko cienka linia */}
+      <mesh position={[0, ROOM.H / 2, ROOM.D / 2]} visible={false}>
+        <boxGeometry args={[ROOM.W, ROOM.H, 0.2]} />
+        <meshStandardMaterial color={C.concreteRaw} />
+      </mesh>
+
+      {/* === lampy robocze === */}
+      <WorkLamp position={[-4, ROOM.H, 0]} />
+      <WorkLamp position={[4, ROOM.H, 0]} />
+
+      {/* === ściany do zadań === */}
+      <SandingWall
+        tiles={state.sandingTiles}
+        onSand={sandTile}
+        active={activeTask === "sanding"}
+      />
+      <PaintingWall
+        painted={state.paintingPainted}
+        onPaint={paintCell}
+        active={activeTask === "painting"}
+      />
+      <FlooringPanels
+        placed={state.flooringPlaced}
+        onPlace={placePanel}
+        active={activeTask === "flooring"}
+      />
+
+      {/* === rekwizyty === */}
+      <Props />
+
+      {/* === kurz w powietrzu === */}
+      <DustParticles count={200} />
+
+      <OrbitControls
+        target={[0, 2.5, 0]}
+        enablePan={false}
+        minDistance={5}
+        maxDistance={16}
+        minPolarAngle={0.35}
+        maxPolarAngle={1.45}
+      />
+    </>
+  );
+}
+
+/* =========================================================================
+   GŁÓWNY KOMPONENT
+   ========================================================================= */
+export default function InteriorScene({ progress, onProgress, onExit }) {
+  const [activeTask, setActiveTask] = useState("sanding");
+  const [hint, setHint] = useState(null); // {title, body}
+  const [introVisible, setIntroVisible] = useState(true);
+
+  // wewnętrzny stan zadań (siatki)
+  const [state, setState] = useState({
+    sandingTiles: Array(8 * 5).fill(0),
+    flooringPlaced: new Set(),
+    paintingPainted: new Set(),
+  });
+
+  // wylicz postępy i zsynchronizuj z parentem
+  useEffect(() => {
+    const sanding = state.sandingTiles.reduce((s, v) => s + v, 0) / state.sandingTiles.length;
+    const flooring = state.flooringPlaced.size / (8 * 6);
+    const painting = state.paintingPainted.size / (12 * 7);
+    onProgress({ sanding, flooring, painting });
+  }, [state, onProgress]);
+
+  // intro znika po 3s lub po pierwszym kliknięciu w zadanie
+  useEffect(() => {
+    const t = setTimeout(() => setIntroVisible(false), 3500);
+    return () => clearTimeout(t);
+  }, []);
+
+  const tasks = [
+    {
+      id: "sanding",
+      label: "Szlifowanie tynku",
+      icon: Wrench,
+      progress: progress.sanding,
+      color: "#f5a623",
+      hint: "Lewa ściana. Kliknij lub przeciągnij wciśniętym LPM po polach — każde wymaga 3 przejść.",
+    },
+    {
+      id: "flooring",
+      label: "Układanie paneli",
+      icon: Square,
+      progress: progress.flooring,
+      color: "#4ade80",
+      hint: "Podłoga. Klikaj w pola — panele opadną na miejsce. Zacznij od narożnika.",
+    },
+    {
+      id: "painting",
+      label: "Malowanie ściany",
+      icon: PaintBucket,
+      progress: progress.painting,
+      color: "#60a5fa",
+      hint: "Prawa ściana. Przytrzymaj LPM i przesuwaj — farba pokrywa siatkę.",
+    },
+  ];
+
+  const total = (progress.sanding + progress.flooring + progress.painting) / 3;
+  const allDone = progress.sanding >= 0.95 && progress.flooring >= 0.95 && progress.painting >= 0.95;
+  const activeTaskData = tasks.find((t) => t.id === activeTask);
+
+  const switchTask = (id) => {
+    setActiveTask(id);
+    setIntroVisible(false);
+  };
+
+  return (
+    <div className="fixed inset-0 overflow-hidden" style={{ background: "#1a1d22" }}>
+      {/* === SCENA 3D — pełny ekran === */}
+      <Canvas
+        shadows
+        camera={{ position: [0, 3.5, 10], fov: 58 }}
+        gl={{ antialias: true, alpha: false }}
+        style={{ position: "absolute", inset: 0 }}
+      >
+        <color attach="background" args={["#2a2520"]} />
+        <Suspense fallback={null}>
+          <InteriorWorld activeTask={activeTask} state={state} setState={setState} />
+          <EffectComposer>
+            <Bloom
+              intensity={0.45}
+              luminanceThreshold={0.78}
+              luminanceSmoothing={0.2}
+              mipmapBlur
+            />
+            <Vignette offset={0.35} darkness={0.55} />
+            <ChromaticAberration offset={[0.0004, 0.0004]} />
+          </EffectComposer>
+        </Suspense>
+      </Canvas>
+
+      {/* ===================== HUD ===================== */}
+
+      {/* === górny pasek === */}
+      <div
+        className="absolute left-0 right-0 top-0 z-20 flex items-center justify-between px-5"
+        style={{
+          height: 60,
+          background: "linear-gradient(180deg, rgba(15,18,24,0.92) 0%, rgba(15,18,24,0) 100%)",
+        }}
+      >
+        <div className="flex items-center gap-3">
+          <div className="grid h-9 w-9 place-items-center rounded-lg bg-[#f5a623]/15 border border-[#f5a623]/30">
+            <HardHat className="h-5 w-5 text-[#f5a623]" />
+          </div>
+          <div>
+            <div className="font-display text-sm font-bold text-white">Wnętrze obiektu · prace wykończeniowe</div>
+            <div className="font-mono text-[10px] tracking-[0.18em] text-white/55 uppercase">
+              {activeTaskData?.label} · {Math.round(activeTaskData?.progress * 100)}%
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* pasek całości */}
+          <div className="hidden md:flex items-center gap-2 rounded-lg bg-white/5 border border-white/10 px-3 py-1.5">
+            <Sparkles className="h-3.5 w-3.5 text-[#f5a623]" />
+            <span className="font-mono text-[10px] tracking-wider text-white/70 uppercase">Całość</span>
+            <div className="h-1.5 w-32 overflow-hidden rounded-full bg-white/10">
+              <div
+                className="h-full bg-gradient-to-r from-[#f5a623] to-[#4ade80] transition-all duration-500"
+                style={{ width: `${total * 100}%` }}
+              />
+            </div>
+            <span className="font-mono text-[11px] font-bold text-white">{Math.round(total * 100)}%</span>
+          </div>
+
+          <button
+            onClick={onExit}
+            className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 font-display text-xs font-semibold text-white backdrop-blur-md transition-all hover:bg-white/10 hover:scale-[1.03]"
+            data-testid="exit-interior-btn"
+          >
+            <LogOut className="h-3.5 w-3.5" /> Wyjdź
+          </button>
+        </div>
+      </div>
+
+      {/* === dolny pasek z zadaniami === */}
+      <div
+        className="absolute bottom-0 left-0 right-0 z-20 flex items-end justify-center px-5 pb-4"
+        style={{
+          background: "linear-gradient(0deg, rgba(15,18,24,0.92) 0%, rgba(15,18,24,0) 100%)",
+          paddingTop: 40,
+        }}
+      >
+        <div className="flex items-stretch gap-1.5 rounded-xl bg-black/45 p-1.5 backdrop-blur-md border border-white/10">
+          {tasks.map((t) => {
+            const Icon = t.icon;
+            const isActive = activeTask === t.id;
+            const isDone = t.progress >= 0.95;
+            return (
+              <button
+                key={t.id}
+                onClick={() => switchTask(t.id)}
+                className="group relative flex min-w-[160px] items-center gap-2.5 rounded-lg px-3 py-2 transition-all"
+                style={{
+                  background: isActive ? `${t.color}22` : "transparent",
+                  border: `1px solid ${isActive ? `${t.color}66` : "transparent"}`,
+                }}
+                data-testid={`task-btn-${t.id}`}
+              >
+                <div
+                  className="grid h-8 w-8 place-items-center rounded-md transition-all"
+                  style={{
+                    background: isActive ? t.color : "rgba(255,255,255,0.06)",
+                    color: isActive ? "#1a1d22" : t.color,
+                  }}
+                >
+                  {isDone ? <CheckCircle2 className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
+                </div>
+                <div className="flex-1 text-left">
+                  <div className="font-display text-[11px] font-bold uppercase tracking-wider text-white">
+                    {t.label}
+                  </div>
+                  <div className="mt-0.5 h-1 w-full overflow-hidden rounded-full bg-white/8">
+                    <div
+                      className="h-full transition-all duration-300"
+                      style={{ width: `${t.progress * 100}%`, background: t.color }}
+                    />
+                  </div>
+                </div>
+                <span className="font-mono text-[10px] font-bold text-white/80">
+                  {Math.round(t.progress * 100)}%
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* === dyskretny hint aktywnego zadania (lewy dolny róg, nad paskiem) === */}
+      <div className="absolute bottom-24 left-5 z-20 max-w-[320px]">
+        <div className="rounded-lg border border-white/10 bg-black/50 px-3 py-2 backdrop-blur-md">
+          <div className="flex items-start gap-2">
+            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: activeTaskData?.color }} />
+            <span className="font-mono text-[10.5px] leading-snug text-white/75">
+              {activeTaskData?.hint}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* === intro (auto-znika po 3.5s lub po wybraniu zadania) === */}
+      <AnimatePresence>
+        {introVisible && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.35 }}
+            className="absolute left-1/2 top-20 z-30 -translate-x-1/2"
+          >
+            <div className="rounded-lg border border-[#f5a623]/30 bg-black/70 px-4 py-2 backdrop-blur-md">
+              <div className="flex items-center gap-2 font-mono text-[11px] tracking-wider text-white/85 uppercase">
+                <Sparkles className="h-3.5 w-3.5 text-[#f5a623]" />
+                Wybierz zadanie z paska na dole, żeby zacząć pracę
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* === ekran sukcesu === */}
+      <AnimatePresence>
+        {allDone && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-40 grid place-items-center bg-black/65 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.92, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              transition={{ delay: 0.1, type: "spring", stiffness: 200, damping: 20 }}
+              className="w-[480px] max-w-[92%] overflow-hidden rounded-2xl border-2 border-[#4ade80]/50 bg-[#15181d] shadow-2xl"
+            >
+              <div className="bg-gradient-to-r from-[#4ade80]/20 to-[#f5a623]/20 px-6 py-5 text-center">
+                <CheckCircle2 className="mx-auto mb-3 h-14 w-14 text-[#4ade80]" />
+                <h3 className="font-display text-2xl font-bold text-white">Prace ukończone</h3>
+                <p className="mt-1 font-mono text-[11px] tracking-wider text-white/60 uppercase">
+                  Szlif · Podłoga · Malowanie · 100%
+                </p>
+              </div>
+              <div className="px-6 py-5">
+                <p className="text-center text-sm leading-relaxed text-white/75">
+                  Wyszlifowałeś tynk, ułożyłeś panele i pomalowałeś ścianę. W realu — kask, maska, okulary, ale technikę ćwiczyłeś tutaj.
+                </p>
+                <div className="mt-5 flex justify-center">
+                  <button
+                    onClick={onExit}
+                    className="rounded-xl bg-[#f5a623] px-6 py-3 font-display text-sm font-bold text-[#1a1d22] transition-transform hover:scale-105"
+                  >
+                    Wróć na plac budowy
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
