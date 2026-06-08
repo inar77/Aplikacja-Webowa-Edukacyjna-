@@ -1,0 +1,207 @@
+Teraz **StartScene** — wprowadzenie / "Witaj w Navig" + **MultimeterTrainingScene** — interaktywny trener (pokrętło):
+Action: file_editor create /app/frontend/src/navig/scenes/StartScene.jsx --file-text "import React, { useState, useEffect } from \"react\";
+import { motion, AnimatePresence } from \"framer-motion\";
+import { ArrowLeft, Play, Wrench, Shield, Zap, Map as MapIcon } from \"lucide-react\";
+import { useNavigate } from \"react-router-dom\";
+import LiveCrewFeed from \"../social/LiveCrewFeed\";
+
+/**
+ * StartScene
+ * ------------------------------------------------------------
+ * Pierwszy ekran po wejściu w Navig — \"Witaj, mistrzu\".
+ * Zadanie: zapoznać użytkownika z metaforą \"nawigacji\",
+ * 3 zasadami BHP wprowadzającymi w klimat, podpis kontraktu nauki.
+ */
+
+const SLIDES = [
+  {
+    key: \"welcome\",
+    icon: MapIcon,
+    title: \"Witaj na trasie.\",
+    body:
+      \"W Navig nie klikasz lekcji — nawigujesz przez zawód. Każdy node na mapie to konkretne miejsce pracy, w którym czeka problem do rozwiązania.\",
+    cue: \"Mistrz: usiądź, przeczytaj. Nie spieszysz się.\",
+  },
+  {
+    key: \"rules\",
+    icon: Shield,
+    title: \"Trzy zasady mistrza.\",
+    list: [
+      \"1.  Najpierw odłącz napięcie — zawsze.\",
+      \"2.  Sprawdzaj multimetrem. Nie ufaj wyłącznikom.\",
+      \"3.  Jeśli nie wiesz — pytaj, zanim ruszysz zacisk.\",
+    ],
+    cue: \"Każda misja powtórzy te zasady aż wejdą Ci w krew.\",
+  },
+  {
+    key: \"loop\",
+    icon: Wrench,
+    title: \"Pętla uczenia.\",
+    body:
+      \"Briefing → robota w FPP → korektywny feedback → mini-quiz → fakty „wiedziałeś, że…\\". Powtarzane długo, prawie nieczujne, ale w głowie zostaje.\",
+    cue: \"Brygada online: 81 fachowców uczy się teraz razem z tobą.\",
+  },
+];
+
+export default function StartScene() {
+  const navigate = useNavigate();
+  const [idx, setIdx] = useState(0);
+  const slide = SLIDES[idx];
+  const Icon = slide.icon;
+
+  // automatyczne przesunięcie po 12s żeby nie zostawić ludzi w intro
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (idx < SLIDES.length - 1) setIdx(idx + 1);
+    }, 12000);
+    return () => clearTimeout(t);
+  }, [idx]);
+
+  return (
+    <div
+      data-testid=\"start-scene\"
+      className=\"relative min-h-screen w-full overflow-hidden text-[#e8eef9]\"
+      style={{ background: \"radial-gradient(ellipse 80% 60% at 50% 30%, #142036 0%, #0c1322 55%, #050811 100%)\" }}
+    >
+      {/* GRID */}
+      <div
+        aria-hidden
+        className=\"pointer-events-none absolute inset-0 opacity-[0.10]\"
+        style={{
+          backgroundImage:
+            \"repeating-linear-gradient(0deg, rgba(120,170,230,0.45) 0 1px, transparent 1px 28px), repeating-linear-gradient(90deg, rgba(120,170,230,0.45) 0 1px, transparent 1px 28px)\",
+        }}
+      />
+
+      <header className=\"relative z-30 flex items-center justify-between px-6 py-4\">
+        <button
+          data-testid=\"start-back\"
+          onClick={() => navigate(\"/\")}
+          className=\"flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[0.78rem] uppercase tracking-[0.22em] text-[#c8d2e6] transition hover:bg-white/10\"
+          style={{ fontFamily: \"'JetBrains Mono', monospace\" }}
+        >
+          <ArrowLeft size={14} /> Mapa
+        </button>
+        <div className=\"text-[0.7rem] uppercase tracking-[0.32em] text-[#5fb3ff]\" style={{ fontFamily: \"'JetBrains Mono', monospace\" }}>
+          ◆ INTRO · MISJA 01 · START
+        </div>
+        <span style={{ width: 88 }} />
+      </header>
+
+      <div className=\"absolute right-6 top-[100px] z-20\">
+        <LiveCrewFeed running={true} />
+      </div>
+
+      <div className=\"relative z-10 mx-auto max-w-[820px] px-6 pt-6 pb-12\">
+        <AnimatePresence mode=\"wait\">
+          <motion.div
+            key={slide.key}
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -14 }}
+            transition={{ duration: 0.4 }}
+            className=\"rounded-[14px] border border-white/10 p-8\"
+            style={{ background: \"rgba(20,28,48,0.55)\", backdropFilter: \"blur(10px)\" }}
+          >
+            <div className=\"flex items-center gap-3\">
+              <Icon size={22} style={{ color: \"#f4a13d\" }} />
+              <div
+                className=\"text-[0.68rem] uppercase tracking-[0.28em] text-[#f4a13d]\"
+                style={{ fontFamily: \"'JetBrains Mono', monospace\" }}
+              >
+                część {idx + 1} / {SLIDES.length}
+              </div>
+            </div>
+            <h1 className=\"mt-2 text-[3.4rem] leading-[1] text-[#f4ecd8]\" style={{ fontFamily: \"'Caveat', cursive\" }}>
+              {slide.title}
+            </h1>
+            {slide.body && (
+              <p className=\"mt-3 text-[1.05rem] leading-relaxed text-[#c8d2e6]/85\" style={{ fontFamily: \"'JetBrains Mono', monospace\" }}>
+                {slide.body}
+              </p>
+            )}
+            {slide.list && (
+              <ul className=\"mt-4 space-y-1.5\">
+                {slide.list.map((line, i) => (
+                  <li
+                    key={i}
+                    className=\"text-[1.15rem] leading-snug text-[#f4ecd8]/95\"
+                    style={{ fontFamily: \"'Caveat', cursive\" }}
+                  >
+                    {line}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {slide.cue && (
+              <div
+                className=\"mt-5 border-l-2 border-[#f4a13d]/50 pl-3 text-[1.1rem] italic text-[#f4ecd8]/80\"
+                style={{ fontFamily: \"'Caveat', cursive\" }}
+              >
+                {slide.cue}
+              </div>
+            )}
+          </motion.div>
+        </AnimatePresence>
+
+        {/* progress dots */}
+        <div className=\"mt-6 flex items-center justify-center gap-3\">
+          {SLIDES.map((s, i) => (
+            <button
+              key={s.key}
+              data-testid={`start-dot-${i}`}
+              onClick={() => setIdx(i)}
+              aria-label={`Slajd ${i + 1}`}
+              className=\"h-2 w-10 rounded-full transition\"
+              style={{
+                background: i === idx ? \"#f4a13d\" : \"rgba(255,255,255,0.12)\",
+                boxShadow: i === idx ? \"0 0 12px rgba(244,161,61,0.55)\" : \"none\",
+              }}
+            />
+          ))}
+        </div>
+
+        <div className=\"mt-6 flex justify-between\">
+          <button
+            data-testid=\"start-prev\"
+            onClick={() => setIdx(Math.max(0, idx - 1))}
+            disabled={idx === 0}
+            className=\"rounded-[8px] border border-white/10 px-4 py-2 text-[0.78rem] uppercase tracking-[0.22em] text-[#c8d2e6] disabled:opacity-30\"
+            style={{ fontFamily: \"'JetBrains Mono', monospace\" }}
+          >
+            ‹ wstecz
+          </button>
+          {idx < SLIDES.length - 1 ? (
+            <button
+              data-testid=\"start-next\"
+              onClick={() => setIdx(idx + 1)}
+              className=\"rounded-[8px] px-6 py-3 text-[0.85rem] uppercase tracking-[0.22em] text-[#0a0e1a]\"
+              style={{
+                background: \"linear-gradient(180deg, #f4a13d 0%, #d8862a 100%)\",
+                fontFamily: \"'JetBrains Mono', monospace\",
+                boxShadow: \"0 6px 22px rgba(244,161,61,0.35)\",
+              }}
+            >
+              dalej ›
+            </button>
+          ) : (
+            <button
+              data-testid=\"start-finish\"
+              onClick={() => navigate(\"/\")}
+              className=\"flex items-center gap-2 rounded-[8px] px-6 py-3 text-[0.85rem] uppercase tracking-[0.22em] text-[#0a0e1a]\"
+              style={{
+                background: \"linear-gradient(180deg, #58d896, #2db166)\",
+                fontFamily: \"'JetBrains Mono', monospace\",
+                boxShadow: \"0 6px 22px rgba(88,216,150,0.35)\",
+              }}
+            >
+              <Play size={14} /> Ruszam w trasę
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+"
+Observation: Create successful: /app/frontend/src/navig/scenes/StartScene.jsx
