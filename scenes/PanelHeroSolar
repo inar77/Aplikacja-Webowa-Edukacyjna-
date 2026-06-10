@@ -1,0 +1,457 @@
+'use client'
+import { useState } from "react";
+
+/* ============================================================
+   SOLAR PANEL HERO — realistyczny moduł PV + tło dachu (dzień)
+   Patch wizualny: zastępuje stare "koślawe prostokąty" w tle.
+   Interaktywne strefy edukacyjne:
+   - rama aluminiowa  → ZIELONY (poprawny punkt chwytu)
+   - szkło / ogniwa   → CZERWONY (zły chwyt — mikropęknięcia)
+   - przewody + MC4   → POMARAŃCZOWY (nie ciągnij, nie rozpinaj pod obciążeniem)
+   - tabliczka        → NIEBIESKI (parametry znamionowe)
+   ============================================================ */
+
+export const ZONE_INFO = {
+  frame: {
+    name: "Rama aluminiowa (35 mm)",
+    tone: "good",
+    text: "Poprawny punkt chwytu. Rama przenosi obciążenia — chwytaj i opieraj moduł zawsze za ramę, nigdy za szkło ani przewody.",
+  },
+  glass: {
+    name: "Szkło hartowane / ogniwa",
+    tone: "bad",
+    text: "BŁĄD: nacisk punktowy powoduje mikropęknięcia ogniw (przyszłe hotspoty). Nie naciskaj, nie kładź narzędzi na powierzchni.",
+  },
+  mc4: {
+    name: "Przewody solarne + złącza MC4",
+    tone: "warn",
+    text: "Nie ciągnij za przewody. NIGDY nie rozłączaj MC4 pod obciążeniem — łuk DC. Nie kładź modułu na złączach.",
+  },
+  label: {
+    name: "Tabliczka znamionowa",
+    tone: "info",
+    text: "Pmax 410 Wp · Voc 37,2 V · Isc 13,9 A · klasa A. Zawsze weryfikuj parametry stringu przed pomiarem.",
+  },
+};
+
+export const TONE_COLOR = {
+  good: "#58d896",
+  bad:  "#ff3838",
+  warn: "#f4a13d",
+  info: "#5fb3ff",
+};
+
+const TONE_FILL = {
+  good: "rgba(88,216,150,0.22)",
+  bad:  "rgba(255,56,56,0.18)",
+  warn: "rgba(244,161,61,0.20)",
+  info: "rgba(95,179,255,0.20)",
+};
+
+/* ── Moduł tłowy na dachu ── */
+function BackdropModule({ x, y, w = 200, h = 130, dim }) {
+  const cols = 6;
+  const rows = 4;
+  return (
+    <g opacity={dim ? 0.45 : 1}>
+      {/* szyny montażowe poziome */}
+      <rect x={x - 10} y={y + h * 0.25} width={w + 20} height="6" rx="2"
+            fill="#7a8290" stroke="#555c66" strokeWidth="0.8" />
+      <rect x={x - 10} y={y + h * 0.75} width={w + 20} height="6" rx="2"
+            fill="#7a8290" stroke="#555c66" strokeWidth="0.8" />
+      {/* nóżki/wsporniki */}
+      {[0.15, 0.5, 0.85].map((f, i) => (
+        <rect key={i}
+              x={x + w * f - 4} y={y + h + 6}
+              width="8" height="18" rx="2"
+              fill="#666d7a" stroke="#444950" strokeWidth="0.8" />
+      ))}
+      {/* cień pod modułem */}
+      <ellipse cx={x + w / 2} cy={y + h + 24} rx={w * 0.45} ry="5"
+               fill="rgba(0,0,0,0.25)" />
+      {/* rama */}
+      <rect x={x} y={y} width={w} height={h} rx="3"
+            fill="#b0b8c2" stroke="#6a7280" strokeWidth="1.2" />
+      {/* ogniwa */}
+      <rect x={x + 5} y={y + 5} width={w - 10} height={h - 10}
+            fill="#0e1d42" stroke="#1e3060" strokeWidth="0.8" />
+      {Array.from({ length: cols - 1 }).map((_, j) => (
+        <line key={`v${j}`}
+              x1={x + 5 + ((w - 10) / cols) * (j + 1)} y1={y + 5}
+              x2={x + 5 + ((w - 10) / cols) * (j + 1)} y2={y + h - 5}
+              stroke="#2a4080" strokeWidth="0.7" opacity="0.8" />
+      ))}
+      {Array.from({ length: rows - 1 }).map((_, j) => (
+        <line key={`h${j}`}
+              x1={x + 5} y1={y + 5 + ((h - 10) / rows) * (j + 1)}
+              x2={x + w - 5} y2={y + 5 + ((h - 10) / rows) * (j + 1)}
+              stroke="#2a4080" strokeWidth="0.7" opacity="0.8" />
+      ))}
+      {/* refleks */}
+      <polygon
+        points={`${x + w * 0.1},${y + 5} ${x + w * 0.22},${y + 5} ${x + w * 0.08},${y + h - 5} ${x + w * 0.02},${y + h - 5}`}
+        fill="rgba(255,255,255,0.14)" />
+    </g>
+  );
+}
+
+/* ── Tło dzienne — niebo + dach z perspektywą + panele na konstrukcji ── */
+function DaytimeBackdrop({ running }) {
+  return (
+    <svg
+      className="pointer-events-none absolute inset-0 h-full w-full"
+      viewBox="0 0 800 720"
+      preserveAspectRatio="xMidYMid slice"
+      aria-hidden="true"
+    >
+      <defs>
+        <linearGradient id="sph2-sky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stopColor="#5ba4d8" />
+          <stop offset="55%"  stopColor="#9ecbee" />
+          <stop offset="100%" stopColor="#cde5f5" />
+        </linearGradient>
+        <linearGradient id="sph2-roof" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stopColor="#8a9198" />
+          <stop offset="100%" stopColor="#5e666e" />
+        </linearGradient>
+        <linearGradient id="sph2-wall" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stopColor="#2a3040" />
+          <stop offset="100%" stopColor="#1a1f2a" />
+        </linearGradient>
+        <radialGradient id="sph2-sun" cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0%"   stopColor="rgba(255,246,210,1)" />
+          <stop offset="35%"  stopColor="rgba(255,230,150,0.5)" />
+          <stop offset="100%" stopColor="rgba(255,230,150,0)" />
+        </radialGradient>
+      </defs>
+
+      {/* NIEBO */}
+      <rect x="0" y="0" width="800" height="290" fill="url(#sph2-sky)" />
+
+      {/* SŁOŃCE */}
+      <circle cx="680" cy="72" r="72" fill="url(#sph2-sun)" />
+      <circle cx="680" cy="72" r="24" fill="#fff6d0" />
+      {Array.from({ length: 10 }).map((_, i) => {
+        const a = (i / 10) * Math.PI * 2;
+        return (
+          <line key={i}
+            x1={680 + Math.cos(a) * 32} y1={72 + Math.sin(a) * 32}
+            x2={680 + Math.cos(a) * 50} y2={72 + Math.sin(a) * 50}
+            stroke="rgba(255,242,190,0.9)" strokeWidth="2.5" strokeLinecap="round" />
+        );
+      })}
+
+      {/* CHMURY */}
+      <g fill="rgba(255,255,255,0.80)">
+        <ellipse cx="130" cy="58" rx="60" ry="15" />
+        <ellipse cx="170" cy="46" rx="42" ry="12" />
+        <ellipse cx="440" cy="105" rx="50" ry="13" />
+        <ellipse cx="490" cy="96"  rx="35" ry="10" />
+      </g>
+
+      {/* KOMIN sąsiada */}
+      <rect x="38" y="185" width="28" height="65" fill="#586070" />
+      <rect x="33" y="178" width="38" height="10" rx="1" fill="#475060" />
+
+      {/* DACH — perspektywa z lewej (niżej) do prawej (wyżej) */}
+      <polygon points="0,310 800,250 800,500 0,500"
+               fill="url(#sph2-roof)" />
+      {/* przetłoczenia blachy trapezowej */}
+      {Array.from({ length: 30 }).map((_, i) => {
+        const xi = i * 27 + 5;
+        const yTop = 310 - (xi / 800) * 60;
+        return (
+          <g key={i}>
+            <polygon
+              points={`${xi},${yTop} ${xi + 8},${yTop - 4} ${xi + 8},500 ${xi},500`}
+              fill="rgba(255,255,255,0.12)" />
+            <line x1={xi + 8} y1={yTop - 4} x2={xi + 8} y2="500"
+                  stroke="rgba(0,0,0,0.18)" strokeWidth="1" />
+          </g>
+        );
+      })}
+      {/* cień u dołu dachu */}
+      <polygon points="0,500 800,470 800,500 0,500"
+               fill="rgba(0,0,0,0.22)" />
+
+      {/* RZĄD MODUŁÓW na dachu (leżące, z konstrukcją) */}
+      <BackdropModule x={385} y={158} dim={!running} />
+      <BackdropModule x={600} y={143} dim={!running} />
+      {/* trzeci moduł — ucięty prawą krawędzią */}
+      <g clipPath="url(#clip-right)">
+        <BackdropModule x={780} y={128} dim={!running} />
+      </g>
+      <defs>
+        <clipPath id="clip-right">
+          <rect x="0" y="0" width="800" height="720" />
+        </clipPath>
+      </defs>
+
+      {/* KABLE — z dachu przez przepust do wnętrza */}
+      <path d="M 445 295 C 440 340, 420 370, 410 420"
+            fill="none" stroke="#0f1115" strokeWidth="4" strokeLinecap="round" opacity="0.8" />
+      <path d="M 460 295 C 456 340, 436 370, 426 420"
+            fill="none" stroke="#6b1414" strokeWidth="4" strokeLinecap="round" opacity="0.8" />
+      {/* kablokanał na ścianie */}
+      <rect x="408" y="420" width="22" height="80" rx="2"
+            fill="#2a3040" stroke="#3a4255" strokeWidth="1" />
+
+      {/* ŚCIANA TECHNICZNA (pod inwerterem) */}
+      <rect x="0" y="500" width="800" height="220" fill="url(#sph2-wall)" />
+      <line x1="0" y1="500" x2="800" y2="500"
+            stroke="#4a5568" strokeWidth="1.5" />
+
+      {/* PODŁOGA */}
+      <rect x="0" y="640" width="800" height="80" fill="#0f1318" />
+      <line x1="0" y1="640" x2="800" y2="640"
+            stroke="rgba(255,255,255,0.07)" strokeWidth="1" />
+
+      {/* pozioma belka montażowa na ścianie */}
+      <rect x="0" y="518" width="800" height="8" rx="2"
+            fill="#3a4252" stroke="#2a3040" strokeWidth="0.8" opacity="0.7" />
+    </svg>
+  );
+}
+
+/* ── Hero moduł — LEŻĄCY, wyśrodkowany, interaktywny ── */
+function HeroModule({ activeZone, onZone, onZoneClick }) {
+  const zoneProps = (id) => ({
+    onMouseEnter: () => onZone?.(id),
+    onMouseLeave: () => onZone?.(null),
+    onClick: () => onZoneClick?.(id),
+    style: { cursor: "pointer", pointerEvents: "all" },
+  });
+  const active = (id) => activeZone === id;
+
+  // Proporcje rzeczywistego modułu: ~1722×1134 mm ≈ 1.52:1
+  // SVG: 460×310 (landscape)
+  const W = 460;
+  const H = 310;
+  const cols = 6;
+  const rows = 4;
+  const cellW = (W - 20) / cols;
+  const cellH = (H - 20) / rows;
+
+  return (
+    /* pozycja: dolna-lewa ⅔ sceny, ~20px od lewej, wyśrodkowany pionowo w workspace */
+    <div
+      className="absolute bottom-[120px] left-[5%] z-[5] select-none"
+      style={{ width: "min(460px, 55%)" }}
+      data-testid="solar-panel-hero"
+    >
+      {/* chip tytułowy */}
+      <div
+        className="mb-2 inline-block rounded-full border px-3 py-1 text-[0.56rem] uppercase tracking-[0.24em]"
+        style={{
+          borderColor: "rgba(255,255,255,0.3)",
+          background: "rgba(8,12,22,0.6)",
+          color: "#dde6f0",
+          fontFamily: "var(--font-mono)",
+          backdropFilter: "blur(6px)",
+        }}
+      >
+        Moduł PV · 410 Wp · string 1 · leży poziomo na dachu
+      </div>
+
+      <svg viewBox={`0 0 ${W} ${H + 60}`} className="w-full drop-shadow-2xl">
+        <defs>
+          <linearGradient id="sph2-frame-g" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%"   stopColor="#e8ecf0" />
+            <stop offset="40%"  stopColor="#aab2bc" />
+            <stop offset="60%"  stopColor="#d4d9df" />
+            <stop offset="100%" stopColor="#8d959f" />
+          </linearGradient>
+          <linearGradient id="sph2-cells-g" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"   stopColor="#12254e" />
+            <stop offset="100%" stopColor="#091538" />
+          </linearGradient>
+          <linearGradient id="sph2-sheen-g" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%"   stopColor="rgba(255,255,255,0.32)" />
+            <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+          </linearGradient>
+        </defs>
+
+        {/* CIEŃ rzucany na dach */}
+        <ellipse cx={W / 2} cy={H + 50} rx={W * 0.46} ry="10"
+                 fill="rgba(0,0,0,0.40)" />
+
+        {/* głębokość ramy (bok dolny i prawy) */}
+        <polygon points={`0,${H} ${W},${H} ${W + 10},${H + 10} 10,${H + 10}`}
+                 fill="#6a7280" stroke="#4a5060" strokeWidth="0.8" />
+        <polygon points={`${W},0 ${W + 10},10 ${W + 10},${H + 10} ${W},${H}`}
+                 fill="#7a8290" stroke="#4a5060" strokeWidth="0.8" />
+
+        {/* RAMA */}
+        <rect x="0" y="0" width={W} height={H} rx="4"
+              fill="url(#sph2-frame-g)" stroke="#5a6270" strokeWidth="1.5" />
+        {/* śruby narożne */}
+        {[[10, 10], [W - 10, 10], [10, H - 10], [W - 10, H - 10]].map(([cx, cy], i) => (
+          <circle key={i} cx={cx} cy={cy} r="4"
+                  fill="#6a7280" stroke="#3a4048" strokeWidth="1" />
+        ))}
+        {/* klemy środkowe (na dłuższych bokach) */}
+        {[W * 0.33, W * 0.67].map((cx, i) => (
+          <g key={i}>
+            <rect x={cx - 5} y="-4" width="10" height="8" rx="2"
+                  fill="#8a919c" stroke="#555c66" strokeWidth="0.8" />
+            <rect x={cx - 5} y={H - 4} width="10" height="8" rx="2"
+                  fill="#8a919c" stroke="#555c66" strokeWidth="0.8" />
+          </g>
+        ))}
+
+        {/* BACKSHEET — jasna szczelina między ogniwami */}
+        <rect x="8" y="8" width={W - 16} height={H - 16}
+              fill="#c8d0da" rx="2" />
+
+        {/* OGNIWA */}
+        {Array.from({ length: rows }).map((_, r) =>
+          Array.from({ length: cols }).map((_, c) => (
+            <rect
+              key={`${r}-${c}`}
+              x={10 + c * cellW + 1}
+              y={10 + r * cellH + 1}
+              width={cellW - 2}
+              height={cellH - 2}
+              rx="2"
+              fill="url(#sph2-cells-g)"
+            />
+          ))
+        )}
+
+        {/* BUSBARY */}
+        {Array.from({ length: cols }).map((_, c) =>
+          [0.25, 0.5, 0.75].map((f, j) => (
+            <line
+              key={`bb-${c}-${j}`}
+              x1={10 + c * cellW + cellW * f}
+              y1="10"
+              x2={10 + c * cellW + cellW * f}
+              y2={H - 10}
+              stroke="#9fb8d8"
+              strokeWidth="0.6"
+              opacity="0.5"
+            />
+          ))
+        )}
+
+        {/* REFLEKS szkła */}
+        <polygon
+          points={`${W * 0.08},8 ${W * 0.22},8 ${W * 0.14},${H - 8} ${W * 0.04},${H - 8}`}
+          fill="url(#sph2-sheen-g)"
+          opacity="0.55"
+        />
+        <polygon
+          points={`${W * 0.30},8 ${W * 0.34},8 ${W * 0.26},${H - 8} ${W * 0.23},${H - 8}`}
+          fill="rgba(255,255,255,0.15)"
+        />
+
+        {/* JUNCTION BOX + przewody MC4 (wyśrodkowane na krótszym boku) */}
+        <rect x={W / 2 - 24} y={H - 8} width="48" height="16" rx="3"
+              fill="#1a1e28" stroke="#2a3040" strokeWidth="1" />
+        <rect x={W / 2 - 18} y={H - 4} width="12" height="8" rx="1"
+              fill="#252a38" />
+        <rect x={W / 2 + 6}  y={H - 4} width="12" height="8" rx="1"
+              fill="#252a38" />
+        {/* przewód − */}
+        <path d={`M ${W / 2 - 12} ${H + 8} C ${W / 2 - 12} ${H + 30}, ${W / 2 - 28} ${H + 40}, ${W / 2 - 28} ${H + 55}`}
+              fill="none" stroke="#0f1115" strokeWidth="5" strokeLinecap="round" />
+        {/* przewód + */}
+        <path d={`M ${W / 2 + 12} ${H + 8} C ${W / 2 + 12} ${H + 30}, ${W / 2 + 28} ${H + 40}, ${W / 2 + 28} ${H + 55}`}
+              fill="none" stroke="#6b0f0f" strokeWidth="5" strokeLinecap="round" />
+        {/* złącza MC4 */}
+        <rect x={W / 2 - 40} y={H + 52} width="26" height="10" rx="4"
+              fill="#0c0e12" stroke="#2c3038" strokeWidth="1" />
+        <text x={W / 2 - 38} y={H + 72} fontSize="8" fill="rgba(255,255,255,0.85)"
+              fontFamily="var(--font-mono)">MC4 −</text>
+        <rect x={W / 2 + 14} y={H + 52} width="26" height="10" rx="4"
+              fill="#0c0e12" stroke="#2c3038" strokeWidth="1" />
+        <text x={W / 2 + 12} y={H + 72} fontSize="8" fill="rgba(255,255,255,0.85)"
+              fontFamily="var(--font-mono)">MC4 +</text>
+
+        {/* TABLICZKA ZNAMIONOWA — prawy dolny róg */}
+        <g>
+          <rect x={W - 115} y={H - 50} width="106" height="40" rx="2"
+                fill="#f2f4f7" stroke="#aab2bc" strokeWidth="1" />
+          <text x={W - 110} y={H - 38} fontSize="7" fontWeight="700"
+                fill="#1a2230" fontFamily="var(--font-mono)">NAVIG SOLAR 410Wp</text>
+          <text x={W - 110} y={H - 27} fontSize="6"
+                fill="#3a4250" fontFamily="var(--font-mono)">Voc 37.2V · Isc 13.9A</text>
+          <text x={W - 110} y={H - 16} fontSize="6"
+                fill="#3a4250" fontFamily="var(--font-mono)">IEC 61215 · Class A</text>
+        </g>
+
+        {/* ====== STREFY INTERAKTYWNE ====== */}
+        {/* szkło */}
+        <rect data-testid="hero-zone-glass"
+              x="10" y="10" width={W - 20} height={H - 20}
+              fill={active("glass") ? TONE_FILL.bad : "rgba(0,0,0,0)"}
+              stroke={active("glass") ? TONE_COLOR.bad : "none"}
+              strokeWidth="2.5"
+              {...zoneProps("glass")} />
+        {/* tabliczka */}
+        <rect data-testid="hero-zone-label"
+              x={W - 115} y={H - 50} width="106" height="40" rx="2"
+              fill={active("label") ? TONE_FILL.info : "rgba(0,0,0,0)"}
+              stroke={active("label") ? TONE_COLOR.info : "none"}
+              strokeWidth="2"
+              {...zoneProps("label")} />
+        {/* rama (evenodd ring) */}
+        <path data-testid="hero-zone-frame"
+              d={`M0,0 h${W} v${H} h-${W} Z M10,10 v${H - 20} h${W - 20} V10 Z`}
+              fillRule="evenodd"
+              fill={active("frame") ? TONE_FILL.good : "rgba(0,0,0,0)"}
+              stroke={active("frame") ? TONE_COLOR.good : "none"}
+              strokeWidth="2.5"
+              {...zoneProps("frame")} />
+        {/* złącza MC4 */}
+        <rect data-testid="hero-zone-mc4"
+              x={W / 2 - 50} y={H - 10} width="100" height={70}
+              fill={active("mc4") ? TONE_FILL.warn : "rgba(0,0,0,0)"}
+              stroke={active("mc4") ? TONE_COLOR.warn : "none"}
+              strokeWidth="2" strokeDasharray="5 3"
+              {...zoneProps("mc4")} />
+      </svg>
+
+      {/* chip aktywnej strefy */}
+      <div className="mt-1 min-h-[22px]">
+        {activeZone && ZONE_INFO[activeZone] && (
+          <span
+            data-testid="hero-zone-chip"
+            className="inline-block rounded-full border px-3 py-0.5 text-[0.56rem] font-bold uppercase tracking-[0.2em]"
+            style={{
+              color: TONE_COLOR[ZONE_INFO[activeZone].tone],
+              borderColor: TONE_COLOR[ZONE_INFO[activeZone].tone],
+              background: "rgba(8,12,22,0.75)",
+              fontFamily: "var(--font-mono)",
+            }}
+          >
+            {ZONE_INFO[activeZone].tone === "good" ? "✓ " : ZONE_INFO[activeZone].tone === "bad" ? "✕ " : "• "}
+            {ZONE_INFO[activeZone].name}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ── Eksport główny ── */
+export default function SolarPanelHero({
+  running = true,
+  activeZone: activeZoneProp,
+  onZone,
+  onZoneClick,
+}) {
+  const [localZone, setLocalZone] = useState(null);
+  const activeZone = activeZoneProp !== undefined ? activeZoneProp : localZone;
+  const handleZone = (z) => {
+    setLocalZone(z);
+    onZone?.(z);
+  };
+
+  return (
+    <div className="absolute inset-0">
+      <DaytimeBackdrop running={running} />
+      <HeroModule activeZone={activeZone} onZone={handleZone} onZoneClick={onZoneClick} />
+    </div>
+  );
+}
