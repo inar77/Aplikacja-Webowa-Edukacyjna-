@@ -1,0 +1,178 @@
+'use client'
+import { useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+
+/**
+ * ArcFlashConsequence — nakładka efektów łuku DC (NA WIERZCH istniejącego errorScreen).
+ * - pełnoekranowy czerwony flash #1a0505 z blur
+ * - 8 iskier (pomarańczowo-białe cząstki) eksplodujących z pozycji hebla DC
+ * - opis dźwięku: "⚡ ŁUSK ELEKTRYCZNY" (bez audio)
+ *
+ * props:
+ *   active  — bool, czy nakładka jest widoczna (rodzic wyłącza po ~2.6 s)
+ *   origin  — { x, y } w % viewportu, skąd lecą iskry (pozycja hebla DC)
+ */
+export default function ArcFlashConsequence({ active, origin = { x: 42, y: 72 } }) {
+  // deterministyczne "losowe" trajektorie iskier — stabilne między renderami
+  const sparks = useMemo(() => {
+    const rnd = (seed) => {
+      const x = Math.sin(seed * 127.1 + 311.7) * 43758.5453;
+      return x - Math.floor(x);
+    };
+    return Array.from({ length: 8 }).map((_, i) => {
+      const angle = (i / 8) * Math.PI * 2 + rnd(i) * 0.9;
+      const dist = 140 + rnd(i + 10) * 260;
+      return {
+        id: i,
+        dx: Math.cos(angle) * dist,
+        dy: Math.sin(angle) * dist - 60, // lekko w górę — iskry "strzelają"
+        size: 5 + rnd(i + 20) * 9,
+        delay: rnd(i + 30) * 0.12,
+        white: i % 3 === 0, // co trzecia iskra biało-gorąca
+        rot: rnd(i + 40) * 360,
+      };
+    });
+  }, []);
+
+  return (
+    <AnimatePresence>
+      {active && (
+        <motion.div
+          data-testid="arc-consequence-overlay"
+          className="pointer-events-none fixed inset-0 z-[110]"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0, transition: { duration: 0.5 } }}
+        >
+          {/* Czerwony flash z blur — #1a0505 */}
+          <motion.div
+            className="absolute inset-0"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: [0, 1, 0.92, 0.85] }}
+            transition={{ duration: 1.4, times: [0, 0.06, 0.4, 1] }}
+            style={{
+              background:
+                "radial-gradient(circle at " + origin.x + "% " + origin.y + "%, rgba(255,90,30,0.55) 0%, rgba(120,15,8,0.85) 35%, #1a0505 75%)",
+              backdropFilter: "blur(6px)",
+              WebkitBackdropFilter: "blur(6px)",
+            }}
+          />
+
+          {/* Błysk biały w punkcie hebla — pierwsze 200 ms */}
+          <motion.div
+            className="absolute rounded-full"
+            initial={{ opacity: 1, scale: 0.2 }}
+            animate={{ opacity: [1, 0.8, 0], scale: [0.2, 2.6, 4] }}
+            transition={{ duration: 0.55, times: [0, 0.3, 1] }}
+            style={{
+              left: `${origin.x}%`,
+              top: `${origin.y}%`,
+              width: 160,
+              height: 160,
+              marginLeft: -80,
+              marginTop: -80,
+              background:
+                "radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(255,210,140,0.9) 35%, rgba(255,120,40,0.4) 65%, transparent 100%)",
+              filter: "blur(2px)",
+            }}
+          />
+
+          {/* Iskry — 8 cząstek z pozycji hebla DC */}
+          {sparks.map((s) => (
+            <motion.div
+              key={s.id}
+              className="absolute"
+              initial={{ x: 0, y: 0, opacity: 1, scale: 1, rotate: 0 }}
+              animate={{
+                x: s.dx,
+                y: [0, s.dy * 0.7, s.dy + 120], // parabola — grawitacja ściąga iskrę
+                opacity: [1, 1, 0],
+                scale: [1, 0.8, 0.2],
+                rotate: s.rot,
+              }}
+              transition={{ duration: 1.1 + s.delay * 2, delay: s.delay, ease: "easeOut" }}
+              style={{
+                left: `${origin.x}%`,
+                top: `${origin.y}%`,
+                width: s.size,
+                height: s.size * 0.45,
+                borderRadius: s.size,
+                background: s.white
+                  ? "linear-gradient(90deg, #ffffff, #ffe9b8)"
+                  : "linear-gradient(90deg, #ffb347, #ff6a1a)",
+                boxShadow: s.white
+                  ? "0 0 14px rgba(255,255,255,0.95), 0 0 28px rgba(255,200,120,0.7)"
+                  : "0 0 12px rgba(255,140,40,0.95)",
+              }}
+            />
+          ))}
+
+          {/* Opis dźwięku — zgodnie ze specyfikacją (bez audio) */}
+          <motion.div
+            className="absolute left-1/2 -translate-x-1/2 text-center"
+            style={{ top: "22%" }}
+            initial={{ opacity: 0, scale: 0.7 }}
+            animate={{ opacity: [0, 1, 1, 0.85], scale: [0.7, 1.12, 1, 1] }}
+            transition={{ duration: 1.2, times: [0, 0.15, 0.5, 1] }}
+          >
+            <div
+              className="text-[3.2rem] font-black tracking-[0.14em]"
+              style={{
+                color: "#fff1e6",
+                fontFamily: "var(--font-mono)",
+                textShadow: "0 0 24px rgba(255,120,40,0.95), 0 0 60px rgba(255,60,20,0.7)",
+              }}
+            >
+              ⚡ ŁUSK ELEKTRYCZNY
+            </div>
+            <motion.div
+              className="mt-1 text-[0.85rem] uppercase tracking-[0.4em]"
+              style={{ color: "rgba(255,200,170,0.85)", fontFamily: "var(--font-mono)" }}
+              animate={{ opacity: [0.4, 1, 0.4] }}
+              transition={{ duration: 0.4, repeat: 3 }}
+            >
+              plazma · 19 000 °C · łuk nie gaśnie
+            </motion.div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+/**
+ * ArcEducationCard — karta "Co poszło nie tak:" do wpięcia WEWNĄTRZ istniejącego
+ * errorScreen (dodatek, nie zamiennik). Fizyka łuku DC + podstawa prawna.
+ */
+export function ArcEducationCard() {
+  return (
+    <div
+      className="mt-4 rounded-[var(--radius-sm)] border-l-2 p-3"
+      data-testid="arc-education-card"
+      style={{ background: "rgba(255,150,56,0.10)", borderLeftColor: "#ff9838" }}
+    >
+      <div
+        className="text-[0.62rem] uppercase tracking-[0.28em]"
+        style={{ color: "#ffc18a", fontFamily: "var(--font-mono)", fontWeight: 600 }}
+      >
+        Co poszło nie tak:
+      </div>
+      <p
+        className="mt-1.5 text-[0.92rem] leading-snug"
+        style={{ color: "#ffe8d6", fontFamily: "var(--font-body)" }}
+      >
+        Rozłączyłeś 600 V DC przy ~8 A pod obciążeniem — łuk o mocy <strong>4,8 kW</strong> oddał
+        w pół sekundy <strong>≈ 2,4 kJ</strong> energii wprost w styki i Twoją dłoń (temperatura plazmy do 19 000 °C).
+        <br />
+        Prąd stały <strong>nie przechodzi przez zero</strong> jak AC, więc łuk nie gaśnie sam —
+        dlatego najpierw LCD → Safe Shutdown (inwerter zbija prąd stringu do 0 A), dopiero potem hebel DC.
+      </p>
+      <div
+        className="mt-2 text-[0.68rem] tracking-[0.04em]"
+        style={{ color: "rgba(255,200,170,0.75)", fontFamily: "var(--font-mono)" }}
+      >
+        Podstawa prawna: Rozporządzenie MG z dnia 28.03.2013 §54 — kolejność wyłączeń DC/AC
+      </div>
+    </div>
+  );
+}
