@@ -1,0 +1,57 @@
+{/* tablica BHP — procedura wyłączeniowa */}
+<group position={[-ROOM.W / 2 + 0.085, 1.5, 1.2]} rotation={[0, Math.PI / 2, 0]}>
+  <mesh>
+    <boxGeometry args={[0.55, 0.7, 0.008]} />
+    <meshStandardMaterial color="#f4f6fa" roughness={0.6} />
+  </mesh>
+  <Html
+    position={[0, 0, 0.006]}
+    center
+    distanceFactor={1.8}
+    zIndexRange={[10, 0]}
+  >
+    <div
+      style={{
+        width: 130,
+        fontFamily: "monospace",
+        color: "#1a1d22",
+        padding: 6,
+        pointerEvents: "none",
+        userSelect: "none",
+      }}
+    >
+      <div
+        style={{
+          fontSize: 7,
+          fontWeight: 800,
+          background: "#cc2820",
+          color: "#fff",
+          padding: "2px 4px",
+          letterSpacing: "0.08em",
+          textAlign: "center",
+        }}
+      >
+        PROCEDURA WYŁĄCZENIOWA PV
+      </div>
+      <div style={{ fontSize: 5.5, marginTop: 4, lineHeight: 1.4 }}>
+        <div><strong>1.</strong> LCD → MENU → Safe Shutdown</div>
+        <div><strong>2.</strong> Czekaj 3 min na rozładowanie DC</div>
+        <div><strong>3.</strong> Sprawdź U_DC &lt; 30V</div>
+        <div><strong>4.</strong> Hebel DC → OFF</div>
+        <div><strong>5.</strong> Hebel AC → OFF</div>
+        <div><strong>6.</strong> Multimetr — weryfikacja</div>
+      </div>
+      <div
+        style={{
+          fontSize: 4.5,
+          marginTop: 4,
+          paddingTop: 3,
+          borderTop: "1px solid #c8ccd2",
+          opacity: 0.65,
+        }}
+      >
+        N SEP-E-002 · IEC 62446
+      </div>
+    </div>
+  </Html>
+</group>
