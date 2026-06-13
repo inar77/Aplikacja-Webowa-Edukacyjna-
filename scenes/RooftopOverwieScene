@@ -1,0 +1,253 @@
+import React, { useMemo, useState } from "react";
+
+/* ============================================================================
+ *  NAVIG · RooftopOverviewScene.jsx
+ *  --------------------------------------------------------------------------
+ *  Izometryczny widok dachu z instalacją PV (2 stringi × 4 moduły = 8).
+ *  Kliknięcie w dowolny panel  -> onPanelClick()   (przejście do FPV)
+ *  Kliknięcie w puszkę (JB)     -> onJunctionBoxClick()
+ *  activeId === "junction-box"  -> pulsujący highlight puszki
+ *
+ *  Propsy: { onPanelClick, onJunctionBoxClick, activeId, completedSteps }
+ *  Styl: ciepłe brązy dachu · granatowe panele z niebieskim blaskiem · czarne kable
+ *  viewBox = "0 0 1000 620" · zero zależności poza React
+ * ========================================================================== */
+
+const C = {
+  sky1: "#f6d9a8",
+  sky2: "#e9b873",
+  roof: "#7a4a2b",
+  roofDark: "#5f3820",
+  roofLight: "#9a6038",
+  ridge: "#4a2c18",
+  panel: "#10204a",
+  panelEdge: "#26407e",
+  panelGlow: "#4f8bff",
+  cell: "#16294f",
+  cable: "#0a0a0a",
+  jb: "#1a1a1a",
+  jbEdge: "#3a3a3a",
+  hi: "#ffd23a",
+};
+
+/* --- izometryczna baza dachu --- */
+const O = { x: 388, y: 120 };
+const UX = { x: 104, y: 52 }; // krok w prawo po połaci
+const UY = { x: -104, y: 52 }; // krok "w głąb" połaci
+const pt = (c, r) => ({ x: O.x + c * UX.x + r * UY.x, y: O.y + c * UX.y + r * UY.y });
+const poly = (pts) => pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+
+/* siatka 4 kolumny × 2 rzędy paneli */
+const PW = 0.92; // szerokość panelu (w jednostkach UX)
+const PL = 0.78; // długość panelu (w jednostkach UY)
+const GX = 1.02; // odstęp kolumn
+const GY = 0.92; // odstęp rzędów
+
+function panelCorners(col, row) {
+  const c0 = col * GX,
+    r0 = row * GY;
+  const a = pt(c0, r0);
+  const b = pt(c0 + PW, r0);
+  const d = pt(c0 + PW, r0 + PL);
+  const e = pt(c0, r0 + PL);
+  return { a, b, d, e };
+}
+
+export default function RooftopOverviewScene({
+  onPanelClick,
+  onJunctionBoxClick,
+  activeId,
+  completedSteps = [],
+  energyActive = true,
+}) {
+  const [hover, setHover] = useState(null);
+  const jbActive = activeId === "junction-box";
+
+  const panels = useMemo(() => {
+    const arr = [];
+    for (let row = 0; row < 2; row++)
+      for (let col = 0; col < 4; col++) arr.push({ col, row, id: `pv-${row}-${col}` });
+    return arr;
+  }, []);
+
+  // puszka przyłączeniowa w prawym-dolnym rogu połaci
+  const jb = pt(4 * GX + 0.15, 1 * GY + PL + 0.35);
+
+  // ścieżki kabli: od dolnej krawędzi każdego panelu do puszki
+  const cables = useMemo(
+    () =>
+      panels.map((p) => {
+        const { e, d } = panelCorners(p.col, p.row);
+        const start = { x: (e.x + d.x) / 2, y: (e.y + d.y) / 2 };
+        const mid = { x: (start.x + jb.x) / 2, y: Math.max(start.y, jb.y) + 18 };
+        const path = `M ${start.x.toFixed(1)} ${start.y.toFixed(1)} Q ${mid.x.toFixed(1)} ${mid.y.toFixed(1)} ${jb.x.toFixed(1)} ${jb.y.toFixed(1)}`;
+        return { id: `cable-${p.id}`, path };
+      }),
+    // eslint-disable-next-line
+    [panels]
+  );
+
+  return (
+    <svg viewBox="0 0 1000 620" width="100%" style={{ display: "block", fontFamily: "ui-sans-serif, system-ui" }} data-testid="rooftop-overview-scene">
+      <defs>
+        <linearGradient id="ro-sky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor={C.sky1} />
+          <stop offset="1" stopColor={C.sky2} />
+        </linearGradient>
+        <linearGradient id="ro-panel" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#1b2f63" />
+          <stop offset="0.5" stopColor={C.panel} />
+          <stop offset="1" stopColor="#0a1733" />
+        </linearGradient>
+        <filter id="ro-glow" x="-40%" y="-40%" width="180%" height="180%">
+          <feGaussianBlur stdDeviation="6" result="b" />
+          <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+        </filter>
+        <filter id="ro-soft" x="-30%" y="-30%" width="160%" height="160%">
+          <feGaussianBlur stdDeviation="3" />
+        </filter>
+        <radialGradient id="ro-sun" cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0" stopColor="#fff7e0" />
+          <stop offset="1" stopColor="#ffce6b" stopOpacity="0" />
+        </radialGradient>
+        <style>{`
+          @keyframes roJbPulse { 0%,100%{ opacity:.25; transform:scale(1);} 50%{ opacity:.85; transform:scale(1.12);} }
+          .ro-jb-ring { transform-box: fill-box; transform-origin: center; animation: roJbPulse 1.4s ease-in-out infinite; }
+          .ro-panel { cursor: pointer; transition: filter .2s ease; }
+          .ro-panel:hover { filter: url(#ro-glow); }
+          .ro-jb { cursor: pointer; }
+        `}</style>
+      </defs>
+
+      {/* niebo + słońce */}
+      <rect x="0" y="0" width="1000" height="620" fill="url(#ro-sky)" />
+      <circle cx="120" cy="90" r="150" fill="url(#ro-sun)" />
+
+      {/* połać dachu (parallelogram z marginesem) */}
+      {(() => {
+        const m = 0.7;
+        const A = pt(-m, -m), B = pt(4 * GX + m, -m), D = pt(4 * GX + m, 1 * GY + PL + m + 0.6), E = pt(-m, 1 * GY + PL + m + 0.6);
+        return (
+          <g>
+            {/* grubość połaci */}
+            <polygon points={poly([E, D, { x: D.x, y: D.y + 34 }, { x: E.x, y: E.y + 34 }])} fill={C.roofDark} />
+            <polygon points={poly([B, D, { x: D.x, y: D.y + 34 }, { x: B.x, y: B.y + 34 }])} fill={C.ridge} />
+            {/* powierzchnia */}
+            <polygon points={poly([A, B, D, E])} fill={C.roof} stroke={C.ridge} strokeWidth="2" />
+            {/* faktura blachodachówki */}
+            {Array.from({ length: 14 }).map((_, i) => {
+              const f = i / 13;
+              const s = pt(-m + f * (4 * GX + 2 * m), -m);
+              const t = pt(-m + f * (4 * GX + 2 * m), 1 * GY + PL + m + 0.6);
+              return <line key={i} x1={s.x} y1={s.y} x2={t.x} y2={t.y} stroke={C.roofLight} strokeWidth="1" opacity="0.25" />;
+            })}
+          </g>
+        );
+      })()}
+
+      {/* KABLE (czarne) + animowany przepływ energii */}
+      <g>
+        {cables.map((cb) => (
+          <path key={cb.id} id={cb.id} d={cb.path} fill="none" stroke={C.cable} strokeWidth="3" strokeLinecap="round" opacity="0.85" />
+        ))}
+        <EnergyFlow cables={cables} isActive={energyActive} />
+      </g>
+
+      {/* PANELE */}
+      {panels.map((p, i) => {
+        const { a, b, d, e } = panelCorners(p.col, p.row);
+        const done = completedSteps.includes(p.id);
+        const tilt = 10; // udawane uniesienie górnej krawędzi
+        const at = { x: a.x, y: a.y - tilt }, bt = { x: b.x, y: b.y - tilt };
+        return (
+          <g
+            key={p.id}
+            className="ro-panel"
+            data-testid={`rooftop-panel-${p.id}`}
+            onClick={() => onPanelClick?.(p.id)}
+            onMouseEnter={() => setHover(p.id)}
+            onMouseLeave={() => setHover(null)}
+          >
+            {/* cień na dachu */}
+            <polygon points={poly([{ x: a.x + 6, y: a.y + 10 }, { x: b.x + 6, y: b.y + 10 }, { x: d.x + 6, y: d.y + 10 }, { x: e.x + 6, y: e.y + 10 }])} fill="#000" opacity="0.18" filter="url(#ro-soft)" />
+            {/* boczna grubość ramy */}
+            <polygon points={poly([at, a, e, { x: e.x, y: e.y }])} fill="#0a1430" />
+            <polygon points={poly([at, bt, b, a])} fill="#16294f" />
+            {/* tafla panelu */}
+            <polygon points={poly([at, bt, d, e])} fill="url(#ro-panel)" stroke={C.panelEdge} strokeWidth="2"
+              style={{ filter: hover === p.id ? "url(#ro-glow)" : "none" }} />
+            {/* siatka ogniw */}
+            {Array.from({ length: 5 }).map((_, k) => {
+              const f = (k + 1) / 6;
+              const s = { x: at.x + (bt.x - at.x) * f, y: at.y + (bt.y - at.y) * f };
+              const t = { x: e.x + (d.x - e.x) * f, y: e.y + (d.y - e.y) * f };
+              return <line key={k} x1={s.x} y1={s.y} x2={t.x} y2={t.y} stroke="#0a1838" strokeWidth="1.2" />;
+            })}
+            {Array.from({ length: 3 }).map((_, k) => {
+              const f = (k + 1) / 4;
+              const s = { x: at.x + (e.x - at.x) * f, y: at.y + (e.y - at.y) * f };
+              const t = { x: bt.x + (d.x - bt.x) * f, y: bt.y + (d.y - bt.y) * f };
+              return <line key={k} x1={s.x} y1={s.y} x2={t.x} y2={t.y} stroke="#0a1838" strokeWidth="1.2" />;
+            })}
+            {/* refleks */}
+            <polygon points={poly([at, { x: at.x + (bt.x - at.x) * 0.4, y: at.y + (bt.y - at.y) * 0.4 }, { x: e.x + (d.x - e.x) * 0.2, y: e.y + (d.y - e.y) * 0.2 }, e])} fill="#6ea0ff" opacity="0.12" />
+            {/* znacznik ukończenia / podpowiedź klik */}
+            {done && <circle cx={(at.x + d.x) / 2} cy={(at.y + d.y) / 2} r="11" fill="#22c55e" stroke="#fff" strokeWidth="2" />}
+            {i === 0 && (
+              <g>
+                <circle cx={(at.x + d.x) / 2} cy={(at.y + d.y) / 2} r="16" fill={C.panelGlow} opacity="0.18">
+                  <animate attributeName="r" values="14;22;14" dur="1.6s" repeatCount="indefinite" />
+                </circle>
+                <text x={(at.x + d.x) / 2} y={(at.y + d.y) / 2 + 4} textAnchor="middle" fontSize="11" fontWeight="700" fill="#dbeafe">FPV ▸</text>
+              </g>
+            )}
+          </g>
+        );
+      })}
+
+      {/* PUSZKA PRZYŁĄCZENIOWA (junction box) */}
+      <g className="ro-jb" data-testid="rooftop-junction-box" onClick={() => onJunctionBoxClick?.()}>
+        {jbActive && (
+          <circle className="ro-jb-ring" cx={jb.x} cy={jb.y - 6} r="34" fill="none" stroke={C.hi} strokeWidth="4" />
+        )}
+        <ellipse cx={jb.x} cy={jb.y + 16} rx="34" ry="13" fill="#000" opacity="0.22" filter="url(#ro-soft)" />
+        {/* korpus */}
+        <polygon points={poly([{ x: jb.x - 28, y: jb.y - 14 }, { x: jb.x + 28, y: jb.y - 14 }, { x: jb.x + 28, y: jb.y + 10 }, { x: jb.x - 28, y: jb.y + 10 }])} fill={C.jb} stroke={C.jbEdge} strokeWidth="2" rx="4" />
+        <rect x={jb.x - 28} y={jb.y - 22} width="56" height="14" rx="3" fill="#2a2a2a" stroke={C.jbEdge} strokeWidth="1.5" />
+        <circle cx={jb.x - 18} cy={jb.y - 2} r="3" fill="#444" />
+        <circle cx={jb.x + 18} cy={jb.y - 2} r="3" fill="#444" />
+        <text x={jb.x} y={jb.y + 4} textAnchor="middle" fontSize="9" fill={jbActive ? C.hi : "#9aa0a6"} fontWeight="700">JB · DC</text>
+      </g>
+
+      {/* HUD */}
+      <g>
+        <rect x="24" y="24" width="300" height="64" rx="12" fill="#0b1220" opacity="0.82" />
+        <text x="40" y="50" fill="#dbeafe" fontSize="15" fontWeight="700">Dach · instalacja PV (2 × 4)</text>
+        <text x="40" y="72" fill="#93c5fd" fontSize="12">Kliknij panel ▸ przejdź do widoku przy module (FPV)</text>
+      </g>
+    </svg>
+  );
+}
+
+/* ============================================================================
+ *  EnergyFlow — animowany przepływ energii wzdłuż kabli (Prompt 4)
+ *  <g id="energy-flow"> z <circle> + <animateMotion><mpath/></animateMotion>
+ *  Aktywny tylko gdy isActive === true (inaczej opacity 0).
+ * ========================================================================== */
+function EnergyFlow({ cables, isActive }) {
+  const dots = 4; // 4 kropki na kabel, przesunięte w czasie
+  return (
+    <g id="energy-flow" opacity={isActive ? 1 : 0} style={{ transition: "opacity .4s" }}>
+      {cables.map((cb) =>
+        Array.from({ length: dots }).map((_, i) => (
+          <circle key={`${cb.id}-${i}`} r="3.2" fill="rgba(255,220,50,0.9)">
+            <animate attributeName="opacity" values="0;1;1;0" dur="2s" begin={`${i * 0.45}s`} repeatCount="indefinite" />
+            <animateMotion dur="2s" begin={`${i * 0.45}s`} repeatCount="indefinite" rotate="auto">
+              <mpath href={`#${cb.id}`} />
+            </animateMotion>
+          </circle>
+        ))
+      )}
+    </g>
+  );
+}
