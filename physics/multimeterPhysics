@@ -1,0 +1,409 @@
+const Q = 1.602176634e-19; // ładunek elementarny [C]
+const KB = 1.380649e-23; // stała Boltzmanna [J/K]
+const EG = 1.12; // przerwa energetyczna krzemu [eV]
+const G_STC = 1000; // nasłonecznienie STC [W/m2]
+const T_STC_K = 298.15; // 25 °C w Kelwinach
+
+/* ---- domyślny moduł PV (zgodny z PanelHeroSolar: 410 Wp) ---- */
+export const DEFAULT_MODULE = {
+  label: "NAVIG SOLAR 410 Wp",
+  Voc: 37.2, // napięcie obwodu otwartego STC [V]
+  Isc: 13.9, // prąd zwarcia STC [A]
+  Vmp: 31.0, // napięcie MPP STC [V]
+  Imp: 13.23, // prąd MPP STC [A]
+  Pmax: 410, // moc szczytowa [Wp]
+  Ns: 60, // ogniw w szeregu (dla napięcia termicznego)
+  n: 1.1, // współczynnik idealności diody
+  Rs: 0.28, // rezystancja szeregowa [Ω]
+  Rsh: 320, // rezystancja równoległa (upływu) [Ω]
+  NOCT: 45, // nominalna temp. pracy ogniwa [°C]
+  alphaIsc: 0.0005, // temp. współczynnik Isc [1/°C]  (+0.05 %/°C)
+  betaVoc: -0.0027, // temp. współczynnik Voc [1/°C]  (-0.27 %/°C)
+};
+
+/* =====================  MODEL ELEKTRYCZNY  ============================== */
+
+/** Temperatura ogniwa z modelu NOCT. */
+export function cellTemp(Tamb, G, NOCT = 45) {
+  return Tamb + ((NOCT - 20) / 800) * G;
+}
+
+/** Napięcie termiczne modułu Vt = n * k*T/q * Ns. */
+function thermalVoltage(spec, Tc) {
+  return spec.n * (KB * (Tc + 273.15)) / Q * spec.Ns;
+}
+
+/** Prąd nasycenia diody I0(STC) z warunku V=Voc, I=0. */
+function i0AtStc(spec) {
+  const VtStc = spec.n * (KB * T_STC_K) / Q * spec.Ns;
+  return spec.Isc / (Math.exp(spec.Voc / VtStc) - 1);
+}
+
+/** I0 przeskalowane temperaturą (zależność ~T^3 * exp(-Eg/kT)). */
+function i0AtTemp(spec, Tc) {
+  const Tk = Tc + 273.15;
+  const I0stc = i0AtStc(spec);
+  return (
+    I0stc *
+    Math.pow(Tk / T_STC_K, 3) *
+    Math.exp((Q * EG) / (spec.n * KB) * (1 / T_STC_K - 1 / Tk))
+  );
+}
+
+/** Fotoprąd Iph w danych warunkach. */
+function photoCurrent(spec, G, Tc) {
+  return (G / G_STC) * spec.Isc * (1 + spec.alphaIsc * (Tc - 25));
+}
+
+/**
+ * Prąd MODUŁU dla zadanego napięcia V (Newton-Raphson na równaniu
+ * jednodiodowym). Sercem "skomplikowanego algorytmu".
+ */
+export function moduleCurrentAtV(spec, V, env) {
+  const Tc = cellTemp(env.Tamb, env.G, spec.NOCT);
+  const Vt = thermalVoltage(spec, Tc);
+  const Iph = photoCurrent(spec, G_STC === 0 ? 0 : env.G, Tc);
+  const I0 = i0AtTemp(spec, Tc);
+
+  let I = Iph; // punkt startowy
+  for (let k = 0; k < 200; k++) {
+    const Vd = V + I * spec.Rs;
+    // ochrona przed overflow exp() powyżej Voc
+    const expo = Math.exp(Math.min(Vd / Vt, 60));
+    const f = Iph - I0 * (expo - 1) - Vd / spec.Rsh - I;
+    const df = -I0 * expo * (spec.Rs / Vt) - spec.Rs / spec.Rsh - 1;
+    const step = f / df;
+    I -= step;
+    if (Math.abs(step) < 1e-9) break;
+  }
+  return I;
+}
+
+/** Voc modułu (analitycznie, Iph/I0). */
+export function moduleVoc(spec, env) {
+  const Tc = cellTemp(env.Tamb, env.G, spec.NOCT);
+  const Vt = thermalVoltage(spec, Tc);
+  const Iph = photoCurrent(spec, env.G, Tc);
+  const I0 = i0AtTemp(spec, Tc);
+  if (Iph <= 0) return 0;
+  return Vt * Math.log(Iph / I0 + 1);
+}
+
+/**
+ * Pełna charakterystyka stringa (n modułów w szeregu).
+ * Zwraca punkty robocze: Voc, Isc, Vmp, Imp, Pmax oraz temp. ogniwa.
+ */
+export function computeString(spec, nModules, env) {
+  const Tc = cellTemp(env.Tamb, env.G, spec.NOCT);
+  const VocMod = moduleVoc(spec, env);
+  const VocString = VocMod * nModules;
+  const Isc = photoCurrent(spec, env.G, Tc); // prąd wspólny dla szeregu
+
+  // skan po napięciu modułu -> Pmax (MPP)
+  let Pmax = 0,
+    Vmp = 0,
+    Imp = 0;
+  const N = 240;
+  for (let i = 0; i <= N; i++) {
+    const Vmod = (VocMod * i) / N;
+    const I = Math.max(0, moduleCurrentAtV(spec, Vmod, env));
+    const P = Vmod * I * nModules; // moc całego stringa
+    if (P > Pmax) {
+      Pmax = P;
+      Vmp = Vmod * nModules;
+      Imp = I;
+    }
+  }
+  return {
+    Voc: VocString,
+    Isc,
+    Vmp,
+    Imp,
+    Pmax,
+    Tcell: Tc,
+    VocModule: VocMod,
+    nModules,
+  };
+}
+
+/* =====================  DEFINICJE MIERNIKA  ============================= */
+
+export const DMM_FUNCTIONS = {
+  VDC: { id: "VDC", label: "V⎓ (DC)", unit: "V", ranges: [6, 60, 600, 1000] },
+  VAC: { id: "VAC", label: "V~ (AC)", unit: "V", ranges: [60, 600, 750] },
+  ADC: { id: "ADC", label: "A⎓ (DC)", unit: "A", ranges: [6, 20] },
+  OHM: { id: "OHM", label: "Ω", unit: "Ω", ranges: [600, 6000, 60000] },
+  CONT: { id: "CONT", label: "•))) ciągłość", unit: "Ω", ranges: [600] },
+  INSULATION: {
+    id: "INSULATION",
+    label: "MΩ izolacja",
+    unit: "MΩ",
+    ranges: [250, 500, 1000], // napięcie testowe [V]
+  },
+};
+
+/* zaciski / punkty styku sond */
+export const TERMINALS = {
+  DC_PLUS: "DC+",
+  DC_MINUS: "DC-",
+  PE: "PE", // uziemienie / rama
+  FRAME: "frame",
+  AIR: "open", // sonda w powietrzu
+};
+
+/* katalog usterek scenariusza */
+export const FAULTS = {
+  NONE: "none",
+  REVERSE_WIRING: "reverse_wiring", // odwrócona polaryzacja w puszce
+  OPEN_STRING: "open_string", // przerwa (np. niewpięte MC4)
+  SHORT_CIRCUIT: "short_circuit", // zwarcie modułu/stringa
+  GROUND_FAULT: "ground_fault", // doziemienie (niska izolacja)
+};
+
+/* ---- formatowanie odczytu na wyświetlaczu ---- */
+function formatNumber(v, unit) {
+  const a = Math.abs(v);
+  if (unit === "MΩ") return v >= 999 ? ">999" : v.toFixed(v < 10 ? 2 : 1);
+  if (unit === "Ω") {
+    if (a >= 1000) return (v / 1000).toFixed(2) + "k";
+    return v.toFixed(a < 10 ? 2 : 1);
+  }
+  if (unit === "A") return v.toFixed(2);
+  return v.toFixed(1); // V
+}
+
+const fb = (severity, code, title, body) => ({ severity, code, title, body });
+
+/* =====================  GŁÓWNA FUNKCJA POMIARU  ======================== */
+/**
+ * measure(opts) -> wynik pomiaru + feedback edukacyjny
+ *
+ * opts = {
+ *   func:    'VDC' | 'VAC' | 'ADC' | 'OHM' | 'CONT' | 'INSULATION',
+ *   range:   number,                 // wybrany zakres (max) lub napięcie testowe
+ *   red:     TERMINALS.*,            // gdzie stoi sonda CZERWONA
+ *   black:   TERMINALS.*,            // gdzie stoi sonda CZARNA
+ *   env:     { G, Tamb },           // warunki: nasłonecznienie, temp.
+ *   spec:    DEFAULT_MODULE,
+ *   nModules:8,
+ *   fault:   FAULTS.*,
+ *   live:    boolean,                // czy obwód jest pod napięciem / DC zamknięty
+ * }
+ */
+export function measure(opts) {
+  const {
+    func,
+    range,
+    red = TERMINALS.AIR,
+    black = TERMINALS.AIR,
+    env = { G: 1000, Tamb: 25 },
+    spec = DEFAULT_MODULE,
+    nModules = 8,
+    fault = FAULTS.NONE,
+    live = true,
+  } = opts;
+
+  const fn = DMM_FUNCTIONS[func];
+  const unit = fn.unit;
+  const string = computeString(spec, nModules, env);
+
+  // --- punkt odniesienia: idealne (bezusterkowe) napięcie DC stringa ---
+  const VocFull = string.Voc; // np. ~297 V STC, ~330 V przy -10°C
+
+  // pomocnicze: czy sondy są na biegunach DC (dowolna kolejność)
+  const onDC =
+    (red === TERMINALS.DC_PLUS && black === TERMINALS.DC_MINUS) ||
+    (red === TERMINALS.DC_MINUS && black === TERMINALS.DC_PLUS);
+  const reversed = red === TERMINALS.DC_MINUS && black === TERMINALS.DC_PLUS;
+  const onPE =
+    red === TERMINALS.PE ||
+    black === TERMINALS.PE ||
+    red === TERMINALS.FRAME ||
+    black === TERMINALS.FRAME;
+  const floating = red === TERMINALS.AIR || black === TERMINALS.AIR;
+
+  /* ---------- BLOKADA BEZPIECZEŃSTWA: Ω / ciągłość / izolacja na żywym obwodzie ---------- */
+  if (
+    (func === "OHM" || func === "CONT" || func === "INSULATION") &&
+    live &&
+    onDC &&
+    VocFull > 5 &&
+    fault !== FAULTS.OPEN_STRING &&
+    fault !== FAULTS.SHORT_CIRCUIT
+  ) {
+    return {
+      display: "⚡ HV",
+      unit,
+      numeric: NaN,
+      status: "danger",
+      feedback: fb(
+        "danger",
+        "MEAS_ON_LIVE",
+        "STOP — pomiar R/ciągłości na obwodzie pod napięciem!",
+        `Na zaciskach jest ~${VocFull.toFixed(
+          0
+        )} V DC. Pomiar rezystancji/ciągłości wymusza prąd z miernika i zwiera obwód — grozi uszkodzeniem miernika, oparzeniem i ŁUKIEM DC (DC nie gaśnie sam). Najpierw bezpiecznie rozłącz string, a potem napięciem DMM potwierdź brak napięcia (zasada „measure dead").`
+      ),
+    };
+  }
+
+  /* ===========================  V DC  ================================= */
+  if (func === "VDC") {
+    if (floating)
+      return reading("0.0", 0, "info", fb(
+        "info",
+        "PROBE_AIR",
+        "Brak obwodu",
+        "Co najmniej jedna sonda nie dotyka zacisku. Przyłóż czerwoną do DC+, czarną do DC-."
+      ));
+
+    if (onPE && !onDC) {
+      // pomiar względem PE — diagnostyka doziemienia
+      const v = fault === FAULTS.GROUND_FAULT ? VocFull * 0.45 : 0.2;
+      return rangeAware(v, range, unit,
+        v > 5
+          ? fb("warning", "GND_FAULT_V", "Napięcie względem PE!",
+              `Między biegunem DC a PE mierzysz ${v.toFixed(0)} V — to objaw DOZIEMIENIA (uszkodzona izolacja). Zdrowy string „pływa" względem ziemi (≈0 V).`)
+          : fb("ok", "GND_OK", "Izolacja względem PE OK", "Brak istotnego napięcia bieguna względem PE — instalacja nie jest doziemiona.")
+      );
+    }
+
+    if (onDC) {
+      let v;
+      switch (fault) {
+        case FAULTS.OPEN_STRING:
+          v = 0.0; break; // przerwa -> brak napięcia
+        case FAULTS.SHORT_CIRCUIT:
+          v = 0.0; break; // zwarcie -> 0 V
+        default:
+          v = VocFull;
+      }
+      const signed = reversed ? -v : v;
+      const res = rangeAware(signed, range, unit, null);
+      if (res.status === "error") return res; // OL itp.
+
+      // feedback merytoryczny
+      if (fault === FAULTS.OPEN_STRING)
+        res.feedback = fb("warning", "OPEN_STRING", "0 V mimo słońca = przerwa",
+          "Voc powinno wynosić ~" + VocFull.toFixed(0) + " V. Odczyt 0 V przy nasłonecznieniu oznacza PRZERWĘ w stringu (np. niewpięte złącze MC4, przerwana żyła). Sprawdź ciągłość — ale dopiero po potwierdzeniu braku napięcia.");
+      else if (fault === FAULTS.SHORT_CIRCUIT)
+        res.feedback = fb("warning", "SHORT", "0 V = zwarcie",
+          "Brak napięcia przy świetle może też oznaczać zwarcie. Zmierz prąd zwarcia (A⎓) lub odłącz moduły i mierz pojedynczo.");
+      else if (reversed)
+        res.feedback = fb("warning", "REVERSE_PROBE", "Odczyt ujemny — odwrócone sondy/polaryzacja",
+          `Miernik pokazuje ${signed.toFixed(1)} V. Wartość bezwzględna jest poprawna, ale znak „−" znaczy: czerwona sonda jest na minusie. Zamień sondy. Jeśli to wynik podłączenia w falowniku — masz ODWRÓCONĄ POLARYZACJĘ stringa (groźne dla MPPT).`);
+      else
+        res.feedback = fb("ok", "VDC_OK", `Voc ≈ ${v.toFixed(1)} V DC`,
+          `Poprawny pomiar napięcia obwodu otwartego. Przy ${env.Tamb}°C / ${env.G} W/m² i ${nModules} modułach Voc≈${v.toFixed(1)} V. Pamiętaj: w zimie Voc ROŚNIE — projektuj string < napięcia maks. falownika.`);
+      return res;
+    }
+  }
+
+  /* ===========================  V AC  ================================= */
+  if (func === "VAC") {
+    if (floating) return reading("0.0", 0, "info", fb("info", "PROBE_AIR", "Brak obwodu", "Przyłóż obie sondy."));
+    if (onDC) {
+      // true-RMS na źródle DC: pokaże ~0 (lub szum) -> typowy błąd początkującego
+      const v = 0.0;
+      return reading(formatNumber(v, unit), v, "warning", fb(
+        "warning",
+        "AC_ON_DC",
+        "Zły rodzaj napięcia — to jest DC, nie AC",
+        `String PV to źródło STAŁONAPIĘCIOWE (DC). Na funkcji V~ (AC) miernik pokazuje ~0 V, co BŁĘDNIE sugeruje brak napięcia — a faktycznie na zaciskach jest ~${VocFull.toFixed(
+          0
+        )} V DC! Przełącz pokrętło na V⎓ (DC). To klasyczny i niebezpieczny błąd.`
+      ));
+    }
+    return reading("0.0", 0, "info", fb("info", "AC_NONE", "Brak AC", "Po stronie DC nie ma napięcia przemiennego."));
+  }
+
+  /* ===========================  A DC  ================================= */
+  if (func === "ADC") {
+    // pomiar prądu wymaga przepięcia sond do gniazda A i wpięcia szeregowego
+    if (!onDC)
+      return reading("0.00", 0, "info", fb("info", "ADC_SETUP",
+        "Amperomierz wpina się SZEREGOWO", "Pomiar prądu wymaga przerwania obwodu i wpięcia miernika w szereg (gniazdo A). Dla stringów PV bezpieczniej użyć cęgów DC."));
+    if (fault === FAULTS.OPEN_STRING)
+      return reading("0.00", 0, "warning", fb("warning", "ADC_OPEN", "Brak prądu — przerwa", "0 A mimo słońca potwierdza przerwę w obwodzie."));
+    const i = string.Isc;
+    return rangeAware(i, range, unit, fb("ok", "ADC_OK", `Isc ≈ ${i.toFixed(2)} A`,
+      `Prąd zwarcia rośnie liniowo z nasłonecznieniem. UWAGA: zwarcie stringa do pomiaru Isc rób tylko dedykowanym przyrządem — nie rozpinaj MC4 pod obciążeniem (łuk DC).`));
+  }
+
+  /* ===================  Ω / CIĄGŁOŚĆ  (obwód martwy)  ================= */
+  if (func === "OHM" || func === "CONT") {
+    if (floating)
+      return reading(func === "CONT" ? "OL" : "OL", Infinity, "info",
+        fb("info", "R_OPEN", "Rozwarcie", "Sondy nie tworzą obwodu (∞). Przyłóż do mierzonych punktów."));
+    if (fault === FAULTS.OPEN_STRING)
+      return reading("OL", Infinity, "warning", fb("warning", "R_BREAK",
+        "Przerwa — brak ciągłości", "Miernik pokazuje OL/∞ → żyła jest przerwana lub MC4 nie wpięte. Zlokalizuj i wepnij złącze."));
+    if (fault === FAULTS.SHORT_CIRCUIT) {
+      const r = 0.3;
+      return reading(func === "CONT" ? "0.3 •)))" : formatNumber(r, unit), r, "warning",
+        fb("warning", "R_SHORT", "Zwarcie", "Bliska 0 Ω tam, gdzie spodziewasz się rezystancji = ZWARCIE. W ciągłości słyszysz buzzer."));
+    }
+    // zdrowy przewód: mała rezystancja
+    const r = 0.5 + Math.random() * 0.4;
+    return reading(func === "CONT" ? r.toFixed(2) + " •)))" : formatNumber(r, unit), r, "ok",
+      fb("ok", "R_OK", "Ciągłość OK", `Niska rezystancja (~${r.toFixed(2)} Ω) i buzzer = żyła ciągła. Pomiar wykonany na obwodzie BEZ napięcia — prawidłowo.`));
+  }
+
+  /* =======================  IZOLACJA (MΩ)  =========================== */
+  if (func === "INSULATION") {
+    if (!onPE)
+      return reading("---", NaN, "info", fb("info", "ISO_SETUP",
+        "Pomiar izolacji: aktywny ↔ PE", `Test izolacji wykonuje się napięciem ${range} V DC między żyłą czynną (DC+/DC-) a PE/ramą.`));
+    const riso = fault === FAULTS.GROUND_FAULT ? 0.12 : 540 + Math.random() * 200;
+    const ok = riso >= 1; // próg 1 MΩ (PN-HD 60364)
+    return reading(formatNumber(riso, unit), riso, ok ? "ok" : "danger",
+      ok
+        ? fb("ok", "ISO_OK", `Izolacja ${riso.toFixed(0)} MΩ — OK`, `> 1 MΩ przy ${range} V to wynik prawidłowy (norma instalacyjna). Izolacja zdrowa.`)
+        : fb("danger", "ISO_FAIL", `Izolacja ${riso.toFixed(2)} MΩ — AWARIA!`, `< 1 MΩ oznacza USZKODZONĄ IZOLACJĘ / doziemienie. Ryzyko porażenia i zadziałania zabezpieczeń różnicowych. Nie oddawaj instalacji do użytku — znajdź i usuń uszkodzenie.`));
+  }
+
+  return reading("---", NaN, "info", fb("info", "NA", "Brak pomiaru", "Wybierz funkcję i przyłóż sondy."));
+}
+
+/* ---- helpery wyniku ---- */
+function reading(display, numeric, status, feedback) {
+  return { display, numeric, status, feedback, unit: feedback?.unit };
+}
+
+/** Uwzględnia wybrany zakres: over-range -> "OL", zbyt duży zakres -> info. */
+function rangeAware(value, range, unit, feedback) {
+  const a = Math.abs(value);
+  if (range && a > range) {
+    return {
+      display: "OL",
+      numeric: value,
+      status: "error",
+      feedback: fb(
+        "error",
+        "OVER_RANGE",
+        `Przekroczony zakres (${range} ${unit})`,
+        `Mierzysz ~${a.toFixed(0)} ${unit}, a wybrany zakres to ${range} ${unit} → wyświetlacz pokazuje "OL" (over-load). Przełącz na wyższy zakres lub użyj AUTO. Uwaga: "OL" to NIE to samo co 0 — napięcie nadal jest obecne!`
+      ),
+    };
+  }
+  return {
+    display: formatNumber(value, unit),
+    numeric: value,
+    status: "ok",
+    feedback,
+  };
+}
+
+/* ---- generator I-V do wykresów (opcjonalnie) ---- */
+export function ivCurve(spec, nModules, env, points = 60) {
+  const VocMod = moduleVoc(spec, env);
+  const out = [];
+  for (let i = 0; i <= points; i++) {
+    const Vmod = (VocMod * i) / points;
+    const I = Math.max(0, moduleCurrentAtV(spec, Vmod, env));
+    out.push({ V: +(Vmod * nModules).toFixed(2), I: +I.toFixed(3), P: +(Vmod * I * nModules).toFixed(1) });
+  }
+  return out;
+}
+
+export default { measure, computeString, moduleVoc, ivCurve, DMM_FUNCTIONS, TERMINALS, FAULTS, DEFAULT_MODULE };
