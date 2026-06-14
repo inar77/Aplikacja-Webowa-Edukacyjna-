@@ -1,0 +1,225 @@
+import React, { useMemo, useState } from "react";
+import { measure, DMM_FUNCTIONS, TERMINALS, FAULTS } from "../physics/multimeterPhysics";
+
+/* ============================================================================
+ *  NAVIG · MultimeterTool.jsx
+ *  --------------------------------------------------------------------------
+ *  Interaktywny multimetr cyfrowy (DMM) sterowany SILNIKIEM FIZYKI.
+ *  - pokrętło wyboru funkcji (V⎓ / V~ / A⎓ / Ω / ciągłość / izolacja)
+ *  - wybór zakresu (over-range => "OL")
+ *  - dwie sondy: czerwoną i czarną dokładasz do zacisków sceny
+ *  - duży LCD + komunikat edukacyjny "co źle i dlaczego niebezpiecznie"
+ *
+ *  Propsy:
+ *    env       : { G, Tamb }          warunki (nasłonecznienie / temperatura)
+ *    fault     : FAULTS.*             usterka scenariusza (do nauki diagnozy)
+ *    live      : boolean              czy string jest pod napięciem
+ *    nModules  : number               ilość modułów w stringu
+ *    onReading : (result) => void     callback z wynikiem (np. do onHit / logów)
+ *    onClose   : () => void           zamknięcie nakładki
+ *  --------------------------------------------------------------------------
+ *  Zależności: tylko React + ./physics/multimeterPhysics  (zero innych)
+ * ========================================================================== */
+
+const PROBE_POINTS = [
+  { id: TERMINALS.DC_PLUS, label: "DC +", hint: "biegun dodatni stringa" },
+  { id: TERMINALS.DC_MINUS, label: "DC −", hint: "biegun ujemny stringa" },
+  { id: TERMINALS.PE, label: "PE", hint: "uziemienie / rama" },
+  { id: TERMINALS.AIR, label: "powietrze", hint: "sonda odłożona" },
+];
+
+const STATUS_COLOR = {
+  ok: "#22c55e",
+  info: "#38bdf8",
+  warning: "#f59e0b",
+  danger: "#ef4444",
+  error: "#ef4444",
+};
+
+export default function MultimeterTool({
+  env = { G: 1000, Tamb: 25 },
+  fault = FAULTS.NONE,
+  live = true,
+  nModules = 8,
+  onReading,
+  onClose,
+}) {
+  const [func, setFunc] = useState("VDC");
+  const [range, setRange] = useState(DMM_FUNCTIONS.VDC.ranges[2]); // 600 V
+  const [red, setRed] = useState(TERMINALS.AIR);
+  const [black, setBlack] = useState(TERMINALS.AIR);
+
+  const fn = DMM_FUNCTIONS[func];
+
+  const result = useMemo(() => {
+    const r = measure({ func, range, red, black, env, nModules, fault, live });
+    return r;
+  }, [func, range, red, black, env, nModules, fault, live]);
+
+  // emit reading w efekcie kontrolowanym przyciskiem (żeby nie spamować)
+  const commit = () => onReading?.(result);
+
+  const color = STATUS_COLOR[result.status] || "#38bdf8";
+
+  return (
+    <div data-testid="multimeter-tool" style={S.wrap}>
+      <style>{CSS}</style>
+
+      {/* nagłówek */}
+      <div style={S.head}>
+        <span style={S.headTitle}>NAVIG DMM · pomiar fizyczny</span>
+        <button data-testid="dmm-close" onClick={onClose} style={S.closeBtn}>✕</button>
+      </div>
+
+      <div style={S.body}>
+        {/* ---- LEWA: korpus miernika ---- */}
+        <div style={S.meter}>
+          {/* LCD */}
+          <div style={{ ...S.lcd, boxShadow: `inset 0 0 30px ${color}22, 0 0 0 2px ${color}55` }}>
+            <div style={S.lcdTopRow}>
+              <span style={{ color }}>{fn.label}</span>
+              <span style={{ color: "#7dd3fc" }}>{range}{fn.id === "INSULATION" ? "V test" : ""}</span>
+            </div>
+            <div data-testid="dmm-display" style={{ ...S.lcdValue, color, textShadow: `0 0 14px ${color}cc` }}>
+              {result.display}
+              <span style={S.lcdUnit}>{result.unit || fn.unit}</span>
+            </div>
+            <div style={S.lcdEnv}>☀ {env.G} W/m² · {env.Tamb}°C · {nModules} mod.</div>
+          </div>
+
+          {/* pokrętło funkcji */}
+          <div style={S.dialLabel}>FUNKCJA</div>
+          <div style={S.dial}>
+            {Object.values(DMM_FUNCTIONS).map((f) => (
+              <button
+                key={f.id}
+                data-testid={`dmm-func-${f.id}`}
+                onClick={() => { setFunc(f.id); setRange(f.ranges[Math.min(2, f.ranges.length - 1)]); }}
+                style={{ ...S.dialBtn, ...(func === f.id ? S.dialBtnOn : {}) }}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {/* zakres */}
+          <div style={S.dialLabel}>{fn.id === "INSULATION" ? "NAPIĘCIE TESTOWE" : "ZAKRES"}</div>
+          <div style={S.rangeRow}>
+            {fn.ranges.map((r) => (
+              <button
+                key={r}
+                data-testid={`dmm-range-${r}`}
+                onClick={() => setRange(r)}
+                style={{ ...S.rangeBtn, ...(range === r ? S.rangeBtnOn : {}) }}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* ---- PRAWA: sondy + feedback ---- */}
+        <div style={S.right}>
+          <div style={S.probesBox}>
+            <ProbeSelector
+              label="Sonda CZERWONA (+)"
+              color="#ef4444"
+              testid="probe-red"
+              value={red}
+              onChange={setRed}
+            />
+            <ProbeSelector
+              label="Sonda CZARNA (−)"
+              color="#e5e7eb"
+              testid="probe-black"
+              value={black}
+              onChange={setBlack}
+            />
+          </div>
+
+          {/* komunikat edukacyjny */}
+          <div
+            data-testid="dmm-feedback"
+            style={{ ...S.feedback, borderColor: color, background: `${color}12` }}
+          >
+            <div style={{ ...S.fbTitle, color }}>
+              {result.status === "danger" ? "⚠ " : result.status === "ok" ? "✓ " : "• "}
+              {result.feedback?.title}
+            </div>
+            <div style={S.fbBody}>{result.feedback?.body}</div>
+            {result.feedback?.code && (
+              <div style={S.fbCode}>kod: {result.feedback.code}</div>
+            )}
+          </div>
+
+          <button data-testid="dmm-commit" onClick={commit} style={{ ...S.commit, background: color }}>
+            Zarejestruj pomiar →
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProbeSelector({ label, color, value, onChange, testid }) {
+  return (
+    <div style={S.probeCol}>
+      <div style={{ ...S.probeLabel, color }}>
+        <span style={{ ...S.probeDot, background: color }} /> {label}
+      </div>
+      <div style={S.probeBtns}>
+        {PROBE_POINTS.map((p) => (
+          <button
+            key={p.id}
+            data-testid={`${testid}-${p.id}`}
+            title={p.hint}
+            onClick={() => onChange(p.id)}
+            style={{ ...S.probeBtn, ...(value === p.id ? { ...S.probeBtnOn, borderColor: color, color } : {}) }}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ---- style ---- */
+const S = {
+  wrap: { width: "min(720px, 94vw)", background: "#0b1220", borderRadius: 16, border: "1px solid #1e293b", color: "#e2e8f0", fontFamily: "'IBM Plex Mono', ui-monospace, monospace", overflow: "hidden", boxShadow: "0 30px 80px rgba(0,0,0,.6)" },
+  head: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: "#0f172a", borderBottom: "1px solid #1e293b" },
+  headTitle: { fontSize: 13, letterSpacing: 1, color: "#93c5fd", textTransform: "uppercase" },
+  closeBtn: { background: "transparent", border: "1px solid #334155", color: "#94a3b8", borderRadius: 8, width: 28, height: 28, cursor: "pointer" },
+  body: { display: "flex", gap: 16, padding: 16, flexWrap: "wrap" },
+  meter: { flex: "1 1 280px", background: "#111827", borderRadius: 12, padding: 14, border: "1px solid #1f2937" },
+  lcd: { background: "#0a0f0a", borderRadius: 10, padding: "12px 14px", marginBottom: 14 },
+  lcdTopRow: { display: "flex", justifyContent: "space-between", fontSize: 12, opacity: 0.9 },
+  lcdValue: { fontSize: 46, fontWeight: 700, lineHeight: 1.1, letterSpacing: 1, display: "flex", alignItems: "baseline", gap: 8 },
+  lcdUnit: { fontSize: 18, opacity: 0.8 },
+  lcdEnv: { fontSize: 11, color: "#64748b", marginTop: 4 },
+  dialLabel: { fontSize: 10, letterSpacing: 1.5, color: "#64748b", margin: "8px 0 6px" },
+  dial: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 },
+  dialBtn: { padding: "8px 6px", fontSize: 11, background: "#0f172a", border: "1px solid #1f2937", borderRadius: 8, color: "#94a3b8", cursor: "pointer", transition: "background-color .15s, color .15s, border-color .15s" },
+  dialBtnOn: { background: "#1d4ed8", borderColor: "#3b82f6", color: "#fff" },
+  rangeRow: { display: "flex", gap: 6, flexWrap: "wrap" },
+  rangeBtn: { padding: "6px 12px", fontSize: 12, background: "#0f172a", border: "1px solid #1f2937", borderRadius: 8, color: "#94a3b8", cursor: "pointer" },
+  rangeBtnOn: { background: "#0e7490", borderColor: "#22d3ee", color: "#fff" },
+  right: { flex: "1 1 300px", display: "flex", flexDirection: "column", gap: 12 },
+  probesBox: { display: "flex", flexDirection: "column", gap: 10, background: "#111827", borderRadius: 12, padding: 12, border: "1px solid #1f2937" },
+  probeCol: {},
+  probeLabel: { fontSize: 12, display: "flex", alignItems: "center", gap: 6, marginBottom: 6 },
+  probeDot: { width: 10, height: 10, borderRadius: 99, display: "inline-block" },
+  probeBtns: { display: "flex", gap: 6, flexWrap: "wrap" },
+  probeBtn: { padding: "6px 10px", fontSize: 11, background: "#0f172a", border: "1px solid #1f2937", borderRadius: 8, color: "#94a3b8", cursor: "pointer" },
+  probeBtnOn: { background: "#0b1220", fontWeight: 700 },
+  feedback: { borderRadius: 12, border: "1px solid", padding: 12, minHeight: 90 },
+  fbTitle: { fontSize: 13, fontWeight: 700, marginBottom: 6 },
+  fbBody: { fontSize: 12, lineHeight: 1.5, color: "#cbd5e1" },
+  fbCode: { fontSize: 10, color: "#475569", marginTop: 6 },
+  commit: { padding: "11px 14px", border: "none", borderRadius: 10, color: "#06121f", fontWeight: 700, fontSize: 13, cursor: "pointer" },
+};
+
+const CSS = `
+@keyframes dmmPulse { 0%,100%{opacity:.6} 50%{opacity:1} }
+[data-testid="multimeter-tool"] button:hover { filter: brightness(1.12); }
+`;
